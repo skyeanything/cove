@@ -50,6 +50,20 @@ export function App() {
     };
   }, [isSettingsWindow]);
 
+  // 主窗口监听 provider 被关闭事件：若当前选中的是该 provider，则清除 ChatInput 的模型选中
+  useEffect(() => {
+    if (isSettingsWindow) return;
+    const unlistenPromise = listen<{ providerId: string }>("provider-disabled", (e) => {
+      const providerId = e.payload?.providerId;
+      if (providerId && useChatStore.getState().providerId === providerId) {
+        void useChatStore.getState().clearModelSelection();
+      }
+    });
+    return () => {
+      unlistenPromise.then((unlisten) => unlisten());
+    };
+  }, [isSettingsWindow]);
+
   useEffect(() => {
     const root = document.documentElement;
     if (theme === "dark") {

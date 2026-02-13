@@ -4,18 +4,23 @@ import { ChatHeader } from "./ChatHeader";
 
 interface ChatAreaProps {
   leftSidebarOpen: boolean;
-  onOpenModelSelector: () => void;
+  modelSelectorOpen?: boolean;
+  onModelSelectorOpenChange?: (open: boolean) => void;
 }
 
 export function ChatArea({
   leftSidebarOpen,
-  onOpenModelSelector,
+  modelSelectorOpen,
+  onModelSelectorOpenChange,
 }: ChatAreaProps) {
   return (
     <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden bg-background">
       <ChatHeader leftSidebarOpen={leftSidebarOpen} />
       <MessageList />
-      <ChatInput onOpenModelSelector={onOpenModelSelector} />
+      <ChatInput
+        modelSelectorOpen={modelSelectorOpen}
+        onModelSelectorOpenChange={onModelSelectorOpenChange}
+      />
     </div>
   );
 }

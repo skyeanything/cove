@@ -14,7 +14,7 @@ export async function openSettingsWindow() {
   new WebviewWindow(SETTINGS_LABEL, {
     url: window.location.origin + "?window=settings",
     title: i18n.t("common.settings"),
-    width: 1000,
+    width: 760,
     height: 660,
     center: true,
     resizable: true,

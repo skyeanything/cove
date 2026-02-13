@@ -21,10 +21,11 @@ import {
   CircleGauge,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useChatStore } from "@/stores/chatStore";
 import type { ToolCallInfo, MessagePart } from "@/stores/chatStore";
+import { useTypewriter } from "@/hooks/useTypewriter";
 import type { Message } from "@/db/types";
 import { usePermissionStore } from "@/stores/permissionStore";
 import type { PendingPermission } from "@/stores/permissionStore";
@@ -55,6 +56,23 @@ class MarkdownErrorBoundary extends Component<
   }
 }
 
+/** Truncate the last text part by `charDelta` characters to keep parts in sync with the typewriter. */
+function truncateLastTextPart(parts: MessagePart[], charDelta: number): MessagePart[] {
+  if (charDelta <= 0 || parts.length === 0) return parts;
+  const result = [...parts];
+  for (let i = result.length - 1; i >= 0; i--) {
+    const part = result[i]!;
+    if (part.type === "text" && part.text) {
+      const newLen = Math.max(0, part.text.length - charDelta);
+      if (newLen !== part.text.length) {
+        result[i] = { ...part, text: part.text.slice(0, newLen) };
+      }
+      break;
+    }
+  }
+  return result;
+}
+
 export function MessageList() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const messages = useChatStore((s) => s.messages);
@@ -63,6 +81,14 @@ export function MessageList() {
   const streamingReasoning = useChatStore((s) => s.streamingReasoning);
   const streamingToolCalls = useChatStore((s) => s.streamingToolCalls);
   const streamingParts = useChatStore((s) => s.streamingParts);
+
+  // Smooth typewriter: reveals streaming text at a uniform rate
+  const smoothedContent = useTypewriter(streamingContent, isStreaming);
+  const charDelta = streamingContent.length - smoothedContent.length;
+  const smoothedParts = useMemo(
+    () => truncateLastTextPart(streamingParts, charDelta),
+    [streamingParts, charDelta],
+  );
 
   // 仅当用户已在底部附近时才自动滚到底部，避免上滑阅读时被拉回导致抖动
   const AUTO_SCROLL_THRESHOLD_PX = 120;
@@ -74,7 +100,7 @@ export function MessageList() {
     if (distanceFromBottom <= AUTO_SCROLL_THRESHOLD_PX) {
       viewport.scrollTop = viewport.scrollHeight;
     }
-  }, [messages, streamingContent, streamingReasoning, streamingToolCalls, streamingParts]);
+  }, [messages, smoothedContent, streamingReasoning, streamingToolCalls, smoothedParts]);
 
   if (messages.length === 0 && !isStreaming) {
     return <EmptyState />;
@@ -89,10 +115,10 @@ export function MessageList() {
           ))}
           {isStreaming && (
             <AssistantMessage
-              content={streamingContent}
+              content={smoothedContent}
               reasoning={streamingReasoning}
               toolCalls={streamingToolCalls}
-              parts={streamingParts}
+              parts={smoothedParts}
               isStreaming
             />
           )}
@@ -279,7 +305,6 @@ function AssistantMessage({
   const [copiedWhich, setCopiedWhich] = useState<"plain" | "markdown" | null>(null);
   const regenerateMessage = useChatStore((s) => s.regenerateMessage);
   const isStreaming = useChatStore((s) => s.isStreaming);
-  const providerType = useChatStore((s) => s.providerType);
   const showTokens = (tokensInput != null && tokensInput > 0) || (tokensOutput != null && tokensOutput > 0);
 
   const handleRegenerate = useCallback(() => {
@@ -288,6 +313,24 @@ function AssistantMessage({
   }, [messageId, isStreaming, regenerateMessage]);
 
   const pendingAsk = usePermissionStore((s) => s.pendingAsk);
+
+  // 每个 event 追加时给流式块加短暂动效类
+  const [justAppended, setJustAppended] = useState(false);
+  const prevContentLenRef = useRef(0);
+  useEffect(() => {
+    if (!streaming) {
+      prevContentLenRef.current = 0;
+      return;
+    }
+    const len = content.length;
+    if (len > prevContentLenRef.current) {
+      setJustAppended(true);
+      prevContentLenRef.current = len;
+      const t = setTimeout(() => setJustAppended(false), 120);
+      return () => clearTimeout(t);
+    }
+    prevContentLenRef.current = len;
+  }, [streaming, content]);
 
   const handleCopy = useCallback((text: string, as: "plain" | "markdown") => {
     navigator.clipboard.writeText(text).then(() => {
@@ -308,7 +351,7 @@ function AssistantMessage({
       onMouseEnter={() => setMessageHovered(true)}
       onMouseLeave={() => setMessageHovered(false)}
     >
-      <div className="mt-3 flex size-8 shrink-0 overflow-hidden rounded-full bg-white">
+      <div className="-mt-1 flex size-8 shrink-0 overflow-hidden rounded-full bg-white">
           <img src="/logo.png" alt="" className="size-full object-cover" />
         </div>
 
@@ -355,6 +398,12 @@ function AssistantMessage({
                 <div className="text-[14px] leading-relaxed whitespace-pre-wrap">{content}</div>
               }
             >
+              <div
+                className={cn(
+                  streaming && "streaming-content",
+                  justAppended && "streaming-just-appended",
+                )}
+              >
               {hasOrderedParts ? (
               <div className="space-y-2">
                 {orderedParts!.map((part, index) =>
@@ -384,9 +433,6 @@ function AssistantMessage({
                     {renderMessageContent(content, !!streaming, true)}
                   </div>
                 )}
-              {streaming && (
-                  <span className="inline-block size-2 animate-pulse rounded-full bg-muted-foreground" />
-                )}
               </div>
             ) : (
               <>
@@ -400,16 +446,27 @@ function AssistantMessage({
                 <div className="text-[14px] leading-relaxed">
                   {renderMessageContent(content ?? "", !!streaming, true)}
                   {streaming && !content && (toolCalls?.length ?? 0) === 0 && (
-                    <span className="inline-block size-2 animate-pulse rounded-full bg-muted-foreground" />
+                    <span className="cursor-blink ml-0.5 inline-block h-4 w-0.5 bg-brand align-middle" aria-hidden />
                   )}
                 </div>
               </>
             )}
+              </div>
             </Suspense>
           </MarkdownErrorBoundary>
 
           {!streaming && (copyContent || showTokens) && (
-            <div className="-mt-4 mb-2 -ml-1 min-h-8">
+            <div className={cn(
+              "mb-2 -ml-1 min-h-8",
+              // markdown-body has mb-4; compensate with -mt-4 to stay tight.
+              // But when the last visible element is a tool call block, there's
+              // no mb-4, so use mt-1 to avoid overlapping the card border.
+              hasOrderedParts
+                ? (orderedParts![orderedParts!.length - 1]?.type === "tool" && !(content?.trim() && copyContent !== content))
+                  ? "mt-1" : "-mt-4"
+                : (toolCalls?.length && !content?.trim())
+                  ? "mt-1" : "-mt-4",
+            )}>
               {messageHovered && (
                 <div className="flex items-center gap-1">
                   {copyContent && (
@@ -886,7 +943,7 @@ function ToolCallBlock({ toolCall, pendingAsk }: { toolCall: ToolCallInfo; pendi
   );
 }
 
-/** 按 <think> 与 Markdown 片段渲染；思考块用 ReasoningSegment，其余用 MarkdownContent */
+/** 按 <think> 与 Markdown 片段渲染；思考块用 ReasoningSegment，其余用 MarkdownContent；流式时最后一格可带文末光标 */
 function renderMessageContent(
   text: string | undefined,
   isStreaming: boolean,
@@ -907,8 +964,13 @@ function renderMessageContent(
             />
           );
         }
+        const isLast = isLastSegment && i === blocks.length - 1;
         return (
-          <MarkdownContent key={`md-${i}`} source={block.content} />
+          <MarkdownContent
+            key={`md-${i}`}
+            source={block.content}
+            trailingCursor={isStreaming && isLast}
+          />
         );
       })}
     </>

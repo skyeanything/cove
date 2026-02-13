@@ -16,6 +16,7 @@
     "@ai-sdk/anthropic": "^3.0.38",
     "@ai-sdk/deepseek": "^2.0.12",
     "@ai-sdk/google": "^3.0.22",
+    "@ai-sdk/moonshotai": "^2.0.5",
     "@ai-sdk/openai": "^3.0.26",
     "@lobehub/icons": "^4.2.0",
     "@tailwindcss/vite": "^4.1.18",

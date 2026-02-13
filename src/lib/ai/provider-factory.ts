@@ -3,6 +3,7 @@ import { createDeepSeek } from "@ai-sdk/deepseek";
 import { createAnthropic } from "@ai-sdk/anthropic";
 import { createGoogleGenerativeAI } from "@ai-sdk/google";
 import { createAmazonBedrock } from "@ai-sdk/amazon-bedrock";
+import { createMoonshotAI } from "@ai-sdk/moonshotai";
 import type { LanguageModel } from "ai";
 import type { Provider, ProviderConfig } from "@/db/types";
 
@@ -90,6 +91,15 @@ export function getModel(provider: Provider, modelId: string): LanguageModel {
         baseURL: provider.base_url || "https://api.mistral.ai/v1",
       });
       return mistral(modelId);
+    }
+
+    case "moonshot": {
+      const base = provider.base_url || "https://api.moonshot.cn";
+      const moonshot = createMoonshotAI({
+        apiKey: provider.api_key,
+        baseURL: base.endsWith("/v1") ? base : `${base}/v1`,
+      });
+      return moonshot.chatModel(modelId);
     }
 
     case "openrouter": {

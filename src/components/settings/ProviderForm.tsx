@@ -2,28 +2,42 @@ import { useState, useEffect, useRef } from "react";
 import { useDataStore } from "@/stores/dataStore";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { PROVIDER_METAS } from "@/lib/ai/provider-meta";
-import { verifyAndFetchModels } from "@/lib/ai/model-service";
-import type { ProviderType, ProviderConfig, Provider } from "@/db/types";
-import { Eye, EyeOff, Loader2, RefreshCw } from "lucide-react";
+import { verifyAndFetchModels, testConnection, type VerifyAndFetchResult } from "@/lib/ai/model-service";
+import type { ProviderType, ProviderConfig, Provider, ModelOption } from "@/db/types";
+import { useTranslation } from "react-i18next";
+import { Eye, EyeOff, Loader2, Download, Settings2, Zap, Check, X, Wrench, Brain, Image, ImagePlus, Database } from "lucide-react";
 import { ProviderIcon } from "@/components/common/ProviderIcon";
+import { ModelOptionsForm } from "./ModelOptionsForm";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { emit } from "@tauri-apps/api/event";
 
 interface ProviderFormProps {
   providerType: ProviderType;
 }
 
 export function ProviderForm({ providerType }: ProviderFormProps) {
+  const { t } = useTranslation();
   const providers = useDataStore((s) => s.providers);
   const createProvider = useDataStore((s) => s.createProvider);
   const updateProvider = useDataStore((s) => s.updateProvider);
   const toggleProvider = useDataStore((s) => s.toggleProvider);
 
   const meta = PROVIDER_METAS[providerType];
+  const descriptionText = meta.descriptionKey
+    ? t(meta.descriptionKey)
+    : meta.description ?? "";
   const existing = providers.find((p) => p.type === providerType);
 
   const [apiKey, setApiKey] = useState("");
@@ -40,11 +54,12 @@ export function ProviderForm({ providerType }: ProviderFormProps) {
   const [modelsLoading, setModelsLoading] = useState(false);
   const [fetchError, setFetchError] = useState("");
   const [disabledModels, setDisabledModels] = useState<Set<string>>(new Set());
+  const [modelSearch, setModelSearch] = useState("");
+  const [modelOptionsOpen, setModelOptionsOpen] = useState(false);
+  const [modelOptionsModelId, setModelOptionsModelId] = useState<string | null>(null);
+  const [testingModelId, setTestingModelId] = useState<string | null>(null);
+  const [testResult, setTestResult] = useState<{ modelId: string; ok: boolean; error?: string } | null>(null);
 
-  const fetchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  // Tracks whether the reset effect has run for the current providerType.
-  // Prevents auto-fetch from firing with stale apiKey during the transient
-  // render where providerType changed but form state hasn't reset yet.
   const resetDone = useRef(false);
 
 
@@ -90,7 +105,29 @@ export function ProviderForm({ providerType }: ProviderFormProps) {
       setModels([]);
     }
     resetDone.current = true;
+    setModelSearch("");
+    setTestingModelId(null);
+    setTestResult(null);
   }, [providerType]);
+
+  /* ---- 单模型行：点击闪电测试该 provider 连通性 ---- */
+  async function handleTestModel(modelId: string) {
+    if (!existing) return;
+    setTestingModelId(modelId);
+    setTestResult(null);
+    try {
+      const result = await testConnection(existing);
+      setTestResult({ modelId, ok: result.ok, error: result.error });
+    } catch (e) {
+      setTestResult({
+        modelId,
+        ok: false,
+        error: e instanceof Error ? e.message : "Connection failed",
+      });
+    } finally {
+      setTestingModelId(null);
+    }
+  }
 
   /* ---- save: optimistic store update + async DB write ---- */
 
@@ -180,82 +217,16 @@ export function ProviderForm({ providerType }: ProviderFormProps) {
     }
   }
 
-  /* ---- auto-save + auto-fetch models ---- */
-
+  /* ---- 防抖保存：API Key / Base URL 变更后写库，不自动拉取模型 ---- */
   useEffect(() => {
-    let cancelled = false;
-    const canFetch = meta.requiresApiKey ? !!apiKey : true;
-
-    // Skip the transient render where providerType changed but
-    // apiKey/baseUrl haven't been reset yet — avoids sending the
-    // old provider's key to the new provider's endpoint.
     if (!resetDone.current) return;
-
-    if (!canFetch) {
-      setModels([]);
-      setFetchError("");
-      return;
-    }
-
-    if (fetchTimer.current) clearTimeout(fetchTimer.current);
-    fetchTimer.current = setTimeout(async () => {
-      // 1) Auto-save: persist provider to DB FIRST, so data survives
-      //    even if the window is closed before blur fires.
-      await save();
-      if (cancelled) return;
-
-      // 2) Then fetch/verify models
-      setModelsLoading(true);
-      setFetchError("");
-      try {
-        const tmp: Provider = {
-          id: "",
-          name: meta.displayName,
-          type: providerType,
-          api_key: apiKey || undefined,
-          base_url: baseUrl || meta.defaultBaseUrl || undefined,
-          enabled: 1,
-          config: undefined,
-          created_at: "",
-          updated_at: "",
-        };
-        const fetched = await verifyAndFetchModels(tmp);
-        if (cancelled) return;
-        setModels(fetched);
-        setFetchError("");
-
-        // Persist cached models — row is guaranteed to exist after save()
-        const row = useDataStore
-          .getState()
-          .providers.find((p) => p.type === providerType);
-        if (row) {
-          const c: ProviderConfig = row.config
-            ? (JSON.parse(row.config) as ProviderConfig)
-            : {};
-          c.cached_models = fetched;
-          c.cached_models_at = new Date().toISOString();
-          await updateProvider(row.id, { config: JSON.stringify(c) });
-        }
-      } catch (e) {
-        if (cancelled) return;
-        setFetchError(
-          e instanceof Error ? e.message : "Failed to fetch models",
-        );
-      } finally {
-        if (!cancelled) setModelsLoading(false);
-      }
-    }, 1000);
-
-    return () => {
-      cancelled = true;
-      if (fetchTimer.current) clearTimeout(fetchTimer.current);
-    };
+    const t = setTimeout(() => save(), 800);
+    return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [apiKey, baseUrl, providerType]);
 
-  /* ---- manual refresh ---- */
-
-  async function handleRefresh() {
+  /* ---- 显式 Fetch 获取模型 ---- */
+  async function handleFetchModels() {
     setModelsLoading(true);
     setFetchError("");
     try {
@@ -270,7 +241,9 @@ export function ProviderForm({ providerType }: ProviderFormProps) {
         created_at: "",
         updated_at: "",
       };
-      const fetched = await verifyAndFetchModels(tmp);
+      const raw: VerifyAndFetchResult = await verifyAndFetchModels(tmp);
+      const fetched = Array.isArray(raw) ? raw : raw.modelIds;
+      const modelOptions = Array.isArray(raw) ? undefined : raw.modelOptions;
       setModels(fetched);
       setFetchError("");
 
@@ -283,6 +256,9 @@ export function ProviderForm({ providerType }: ProviderFormProps) {
           : {};
         c.cached_models = fetched;
         c.cached_models_at = new Date().toISOString();
+        if (modelOptions && Object.keys(modelOptions).length > 0) {
+          c.model_options = { ...c.model_options, ...modelOptions };
+        }
         await updateProvider(row.id, { config: JSON.stringify(c) });
       }
     } catch (e) {
@@ -308,31 +284,47 @@ export function ProviderForm({ providerType }: ProviderFormProps) {
 
   const noKeyNeeded = !meta.requiresApiKey;
   const isConfigured = noKeyNeeded ? !!existing : !!apiKey;
-  const statusLabel = isConfigured ? "Configured" : "Not configured";
-  const statusVariant = isConfigured ? "secondary" : "outline";
-  const enabledModelCount = models.filter((m) => !disabledModels.has(m)).length;
 
   /* ---- render ---- */
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b px-5 py-3">
-        <div className="flex items-center gap-2">
-          <ProviderIcon type={providerType} className="size-5" />
-          <h3 className="text-[15px] font-semibold">{meta.displayName}</h3>
-        </div>
-        <div className="flex items-center gap-2">
-          <Badge variant={statusVariant} className="text-[12px] font-normal">
-            {statusLabel}
-          </Badge>
-          {existing && (
-            <Switch
-              size="sm"
-              checked={!!existing.enabled}
-              onCheckedChange={() => toggleProvider(existing.id)}
-            />
-          )}
+      {/* Header：名称 + Active 徽章 + 描述，右侧为 Switch */}
+      <div className="flex flex-col gap-2 border-b px-5 py-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex min-w-0 flex-1 items-start gap-2">
+            <ProviderIcon type={providerType} className="size-5 shrink-0 mt-0.5" />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-[15px] font-semibold">{meta.displayName}</h3>
+                {existing?.enabled ? (
+                  <Badge className="rounded-[4px] border-0 bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 dark:bg-emerald-500/20 text-[10px] font-normal px-1 py-0.5 leading-tight">
+                    {t("provider.form.active")}
+                  </Badge>
+                ) : null}
+              </div>
+              {descriptionText && (
+                <p className="mt-0.5 truncate text-[12px] text-muted-foreground">
+                  {descriptionText}
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            {existing && (
+              <Switch
+                size="sm"
+                checked={!!existing.enabled}
+                onCheckedChange={async () => {
+                  const wasEnabled = !!existing.enabled;
+                  await toggleProvider(existing.id);
+                  if (wasEnabled) {
+                    await emit("provider-disabled", { providerId: existing.id });
+                  }
+                }}
+              />
+            )}
+          </div>
         </div>
       </div>
 
@@ -342,15 +334,15 @@ export function ProviderForm({ providerType }: ProviderFormProps) {
           {/* API Key */}
           {meta.type !== "bedrock" && meta.type !== "ollama" && (
             <div className="flex flex-col gap-1.5">
-              <Label className="text-[13px]">API Key</Label>
+              <Label className="text-[13px]">{t("provider.form.apiKey")}</Label>
               <div className="relative">
                 <Input
                   type={showKey ? "text" : "password"}
                   value={apiKey}
                   onChange={(e) => setApiKey(e.target.value)}
                   onBlur={() => save()}
-                  placeholder="sk-..."
-                  className="h-8 pr-8 text-sm"
+                  placeholder={t("provider.form.apiKeyPlaceholder")}
+                  className="h-[2.4rem] rounded-[4px] pr-8 text-sm"
                 />
                 <button
                   type="button"
@@ -367,17 +359,41 @@ export function ProviderForm({ providerType }: ProviderFormProps) {
             </div>
           )}
 
-          {/* Base URL */}
-          <div className="flex flex-col gap-1.5">
-            <Label className="text-[13px]">API Base URL</Label>
-            <Input
-              value={baseUrl}
-              onChange={(e) => setBaseUrl(e.target.value)}
-              onBlur={() => save()}
-              placeholder={meta.defaultBaseUrl ?? "https://api.example.com"}
-              className="h-8 text-sm"
-            />
-          </div>
+          {/* Base URL：下拉（如 Moonshot 区域）或手动输入 */}
+          {meta.requiresBaseUrl && (
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-[13px]">
+                {meta.baseUrlOptions?.length
+                  ? t("provider.form.region")
+                  : t("provider.form.apiBaseUrl")}
+              </Label>
+              {meta.baseUrlOptions?.length ? (
+                <Select
+                  value={(baseUrl || meta.defaultBaseUrl) ?? ""}
+                  onValueChange={(v) => setBaseUrl(v)}
+                >
+                  <SelectTrigger className="h-[2.4rem] w-full rounded-[4px] text-sm">
+                    <SelectValue placeholder={t("provider.form.selectRegion")} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {meta.baseUrlOptions.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input
+                  value={baseUrl}
+                  onChange={(e) => setBaseUrl(e.target.value)}
+                  onBlur={() => save()}
+                  placeholder={meta.defaultBaseUrl ?? "https://api.example.com"}
+                  className="h-[2.4rem] rounded-[4px] text-sm"
+                />
+              )}
+            </div>
+          )}
 
           {/* Extra fields */}
           {meta.fields.map((field) => {
@@ -416,7 +432,7 @@ export function ProviderForm({ providerType }: ProviderFormProps) {
                   onChange={(e) => handleChange(e.target.value)}
                   onBlur={() => save()}
                   placeholder={field.placeholder}
-                  className="h-8 text-sm"
+                  className="h-[2.4rem] rounded-[4px] text-sm"
                 />
               </div>
             );
@@ -425,51 +441,160 @@ export function ProviderForm({ providerType }: ProviderFormProps) {
           {/* Models section */}
           {isConfigured && (
             <div className="flex flex-col gap-2">
+              <div className="flex items-center justify-between gap-2 pb-3">
+                <Label className="text-[13px]">{t("provider.form.models")}</Label>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={modelsLoading}
+                  onClick={handleFetchModels}
+                  className="h-8 cursor-pointer gap-1.5 rounded-[4px]"
+                >
+                  {modelsLoading ? (
+                    <Loader2 className="size-3.5 animate-spin" strokeWidth={1.5} />
+                  ) : (
+                    <Download className="size-3.5" strokeWidth={1.5} />
+                  )}
+                  {t("provider.form.fetch")}
+                </Button>
+              </div>
               {modelsLoading && models.length === 0 && (
                 <div className="flex items-center gap-2 py-2 text-[13px] text-muted-foreground">
                   <Loader2 className="size-3.5 animate-spin" strokeWidth={1.5} />
-                  Fetching models...
+                  {t("provider.form.fetchingModels")}
                 </div>
               )}
-
               {fetchError && !modelsLoading && models.length === 0 && (
                 <p className="text-[13px] text-destructive">{fetchError}</p>
               )}
-
               {models.length > 0 && (
                 <>
-                  <div className="flex items-center justify-between">
-                    <Label className="text-[13px]">
-                      Models ({enabledModelCount}/{models.length})
-                    </Label>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={modelsLoading}
-                      onClick={handleRefresh}
-                      className="h-6 w-6 p-0 cursor-pointer"
+                  <Input
+                    placeholder={t("provider.form.searchModels")}
+                    value={modelSearch}
+                    onChange={(e) => setModelSearch(e.target.value)}
+                    className="h-[2.4rem] rounded-[4px] text-sm"
+                  />
+                  <p className="text-[12px] text-muted-foreground">
+                    {t("provider.form.showingModels", { count: models.length })}
+                  </p>
+                  <div className="h-[260px] rounded-[4px] overflow-hidden flex">
+                    <ScrollArea
+                      className="h-full flex-1 min-w-0"
+                      viewportClassName="border border-border rounded-l-[4px]"
                     >
-                      <RefreshCw
-                        className={`size-3.5 ${modelsLoading ? "animate-spin" : ""}`}
-                        strokeWidth={1.5}
-                      />
-                    </Button>
-                  </div>
-                  <div className="flex flex-col gap-0.5">
-                    {models.map((modelId) => (
-                      <label
-                        key={modelId}
-                        className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-accent/5 cursor-pointer"
-                      >
-                        <Checkbox
-                          checked={!disabledModels.has(modelId)}
-                          onCheckedChange={(checked) =>
-                            handleToggleModel(modelId, !!checked)
-                          }
-                        />
-                        <span className="truncate">{modelId}</span>
-                      </label>
-                    ))}
+                      <div className="flex flex-col">
+                    {(() => {
+                      const filtered = modelSearch.trim()
+                        ? models.filter((m) =>
+                            m.toLowerCase().includes(modelSearch.trim().toLowerCase()),
+                          )
+                        : models;
+                      const sorted = [...filtered].sort((a, b) => {
+                        const aEnabled = !disabledModels.has(a);
+                        const bEnabled = !disabledModels.has(b);
+                        if (aEnabled !== bEnabled) return aEnabled ? -1 : 1;
+                        return 0;
+                      });
+                      const config: ProviderConfig = existing?.config
+                        ? (() => {
+                            try {
+                              return JSON.parse(existing.config) as ProviderConfig;
+                            } catch {
+                              return {};
+                            }
+                          })()
+                        : {};
+                      const capabilityIcons: {
+                        key: keyof Pick<ModelOption, "vision" | "image_in" | "image_output" | "tool_calling" | "reasoning" | "embedding">;
+                        Icon: React.ComponentType<{ className?: string; strokeWidth?: number }>;
+                      }[] = [
+                        { key: "vision", Icon: Eye },
+                        { key: "image_in", Icon: ImagePlus },
+                        { key: "image_output", Icon: Image },
+                        { key: "tool_calling", Icon: Wrench },
+                        { key: "reasoning", Icon: Brain },
+                        { key: "embedding", Icon: Database },
+                      ];
+                      return sorted.map((modelId) => {
+                        const isTesting = testingModelId === modelId;
+                        const result = testResult?.modelId === modelId ? testResult : null;
+                        const details: Partial<ModelOption> = { ...meta.knownModelDetails?.[modelId], ...config.model_options?.[modelId] };
+                        const ctx = details?.context_window;
+                        const contextLabel = ctx != null ? (ctx >= 1000 ? `${ctx / 1000}K` : String(ctx)) : null;
+                        return (
+                          <div
+                            key={modelId}
+                            className="flex items-center gap-3 border-b border-border px-3 py-2.5 text-sm last:border-b-0 hover:bg-accent/5"
+                          >
+                            <div className="min-w-0 flex-1">
+                              <div className="font-medium truncate">{modelId}</div>
+                              <div className="mt-1 flex items-center gap-1.5 text-[10px] text-muted-foreground">
+                                <TooltipProvider delayDuration={200}>
+                                  {capabilityIcons.map(
+                                    ({ key, Icon }) =>
+                                      details[key] && (
+                                        <Tooltip key={key}>
+                                          <TooltipTrigger asChild>
+                                            <span className="inline-flex cursor-default items-center">
+                                              <Icon className="size-3 shrink-0" strokeWidth={1.5} />
+                                            </span>
+                                          </TooltipTrigger>
+                                          <TooltipContent side="top" sideOffset={4}>
+                                            {t(`provider.capability.${key}`)}
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      ),
+                                  )}
+                                </TooltipProvider>
+                                {contextLabel != null && <span>{contextLabel}</span>}
+                              </div>
+                            </div>
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              className="size-7 shrink-0 cursor-pointer"
+                              onClick={() => handleTestModel(modelId)}
+                              disabled={isTesting || !existing}
+                              title={t("provider.form.testConnection")}
+                            >
+                              {isTesting ? (
+                                <Loader2 className="size-3.5 animate-spin" strokeWidth={1.5} />
+                              ) : result ? (
+                                result.ok ? (
+                                  <Check className="size-3.5 text-success" strokeWidth={1.5} />
+                                ) : (
+                                  <X className="size-3.5 text-destructive" strokeWidth={1.5} />
+                                )
+                              ) : (
+                                <Zap className="size-3.5" strokeWidth={1.5} />
+                              )}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="icon-sm"
+                              className="size-7 shrink-0 cursor-pointer"
+                              onClick={() => {
+                                setModelOptionsModelId(modelId);
+                                setModelOptionsOpen(true);
+                              }}
+                              title={t("provider.form.modelOptionsButton")}
+                            >
+                              <Settings2 className="size-3.5" strokeWidth={1.5} />
+                            </Button>
+                            <Switch
+                            size="sm"
+                            checked={!disabledModels.has(modelId)}
+                            onCheckedChange={(checked) =>
+                              handleToggleModel(modelId, !!checked)
+                            }
+                          />
+                        </div>
+                        );
+                      });
+                    })()}
+                      </div>
+                    </ScrollArea>
                   </div>
                 </>
               )}
@@ -477,6 +602,15 @@ export function ProviderForm({ providerType }: ProviderFormProps) {
           )}
         </div>
       </ScrollArea>
+      {existing && (
+        <ModelOptionsForm
+          open={modelOptionsOpen}
+          onOpenChange={setModelOptionsOpen}
+          providerId={existing.id}
+          providerType={providerType}
+          modelId={modelOptionsModelId}
+        />
+      )}
     </div>
   );
 }

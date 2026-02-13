@@ -1,7 +1,3 @@
-/**
- * Phase 7: 完整 Markdown 渲染管线
- * - GFM、代码高亮、数学公式、Collapsible directive、代码块复制/HTML/Mermaid 预览
- */
 import "katex/dist/katex.min.css";
 import React, { useCallback, useState } from "react";
 import ReactMarkdown from "react-markdown";
@@ -33,7 +29,24 @@ import "prismjs/components/prism-markdown";
 const COPY_FEEDBACK_MS = 1500;
 
 const remarkPlugins = [remarkGfm, remarkBreaks, remarkMath, remarkDirective, remarkDirectiveRehype];
-const rehypePlugins = [rehypeKatex];
+const rehypePluginsBase = [rehypeKatex];
+
+/** 在最后一个块级子元素的末尾插入「光标」占位 span，用于流式时光标紧跟文字 */
+function rehypeInjectCursor() {
+  return (tree: { children?: unknown[] }) => {
+    const children = tree.children;
+    if (!Array.isArray(children) || children.length === 0) return;
+    const last = children[children.length - 1] as { type?: string; children?: unknown[] };
+    if (last?.type === "element" && Array.isArray(last.children)) {
+      last.children.push({
+        type: "element",
+        tagName: "span",
+        properties: { className: ["streaming-cursor-placeholder"] },
+        children: [],
+      });
+    }
+  };
+}
 
 /** 将 React 子节点安全转为字符串，避免对象被渲染成 [object Object] */
 function reactNodeToDisplayString(node: React.ReactNode): string {
@@ -296,25 +309,110 @@ const markdownComponents: Components & { collapsible?: React.ComponentType<{ tit
   collapsible: ({ title, children }: { title?: string; children?: React.ReactNode }) => (
     <CollapsibleDirective title={title}>{children}</CollapsibleDirective>
   ),
+  span: ({ className, children, ...props }: { className?: string; children?: React.ReactNode }) => {
+    if (className?.includes("streaming-cursor-placeholder")) {
+      return (
+        <span className="cursor-blink ml-0.5 inline-block h-4 w-0.5 bg-brand align-middle" aria-hidden />
+      );
+    }
+    return <span className={className} {...props}>{children}</span>;
+  },
 };
 
 export interface MarkdownContentProps {
   source: string;
   className?: string;
+  /** 流式时在文末渲染打字机光标（紧跟文字） */
+  trailingCursor?: boolean;
 }
 
-export function MarkdownContent({ source, className }: MarkdownContentProps) {
+/**
+ * Memoized markdown renderer for the "settled" portion (complete lines).
+ * Only re-parses when the settled text actually changes — i.e. when a new
+ * `\n` enters the typewriter output — not on every frame.
+ */
+const SettledMarkdown = React.memo(function SettledMarkdown({ source }: { source: string }) {
+  return (
+    <ReactMarkdown
+      remarkPlugins={remarkPlugins}
+      rehypePlugins={rehypePluginsBase}
+      components={markdownComponents as Components}
+    >
+      {source}
+    </ReactMarkdown>
+  );
+});
+
+const CURSOR_EL = (
+  <span
+    className="cursor-blink ml-0.5 inline-block h-4 w-0.5 bg-brand align-middle"
+    aria-hidden
+  />
+);
+
+export function MarkdownContent({ source, className, trailingCursor }: MarkdownContentProps) {
   const trimmed = source.trim();
   if (!trimmed) return null;
 
+  const wrapperCls = cn(
+    "markdown-body mb-4 text-[14px] leading-relaxed select-text",
+    className,
+  );
+
+  /*
+   * Streaming mode (trailingCursor): split content into two layers.
+   *
+   * 1. **Settled** — everything up to the last `\n`. Rendered with full
+   *    Markdown. Only re-parses when a new line completes → huge perf win.
+   * 2. **Pending** — the current partial line. Rendered as plain text so
+   *    the user sees a smooth character-by-character typewriter and never
+   *    encounters broken markdown syntax (unclosed `**`, partial ```).
+   *
+   * When no `\n` exists yet (first line), fall back to full markdown +
+   * rehype cursor injection (existing behaviour).
+   */
+  if (trailingCursor) {
+    const lastNl = trimmed.lastIndexOf("\n");
+
+    if (lastNl >= 0) {
+      const settled = trimmed.slice(0, lastNl + 1);
+      const pending = trimmed.slice(lastNl + 1);
+
+      return (
+        <div className={wrapperCls} data-md>
+          <SettledMarkdown source={settled} />
+          {pending ? (
+            <p className="mb-0 last:mb-0">
+              {pending}
+              {CURSOR_EL}
+            </p>
+          ) : (
+            CURSOR_EL
+          )}
+        </div>
+      );
+    }
+
+    // No line breaks yet — single line, use full markdown + cursor injection
+    return (
+      <div className={wrapperCls} data-md>
+        <ReactMarkdown
+          remarkPlugins={remarkPlugins}
+          rehypePlugins={rehypePluginsWithCursor}
+          components={markdownComponents as Components}
+        >
+          {trimmed}
+        </ReactMarkdown>
+      </div>
+    );
+  }
+
+  // Not streaming — render everything with full markdown
   return (
-    <div
-      className={cn("markdown-body mt-4 mb-4 text-[14px] leading-relaxed select-text", className)}
-      data-md
-    >
+    <div className={wrapperCls} data-md>
       <ReactMarkdown
         remarkPlugins={remarkPlugins}
-        rehypePlugins={rehypePlugins}
+        rehypePlugins={rehypePluginsBase}
         components={markdownComponents as Components}
       >
         {trimmed}
@@ -322,6 +420,9 @@ export function MarkdownContent({ source, className }: MarkdownContentProps) {
     </div>
   );
 }
+
+/** Pre-built rehype plugin list with cursor injection (avoids re-creating per render) */
+const rehypePluginsWithCursor = [...rehypePluginsBase, rehypeInjectCursor()];
 
 export type { ThinkBlock } from "@/lib/splitThinkBlocks";
 export { splitThinkBlocks } from "@/lib/splitThinkBlocks";

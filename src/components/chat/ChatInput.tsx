@@ -11,21 +11,22 @@ import {
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { useChatStore } from "@/stores/chatStore";
+import { useDataStore } from "@/stores/dataStore";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useSkillsStore } from "@/stores/skillsStore";
+import { getModelOption } from "@/lib/ai/model-service";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { listSkills } from "@/lib/ai/skills/loader";
 import { WorkspacePopover } from "./WorkspacePopover";
 import { SkillsPopover } from "./SkillsPopover";
-import { ProviderIcon } from "@/components/common/ProviderIcon";
+import { ModelSelector } from "./ModelSelector";
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
 
 /** IME 刚结束组合后的一小段时间内不把 Enter 当作发送（避免确认拼音/英文时误发） */
 const IME_COMMIT_GRACE_MS = 150;
@@ -67,19 +68,28 @@ function ContextRing({ percent }: { percent: number }) {
 }
 
 export function ChatInput({
-  onOpenModelSelector,
+  modelSelectorOpen: modelSelectorOpenProp,
+  onModelSelectorOpenChange,
 }: {
-  onOpenModelSelector?: () => void;
+  modelSelectorOpen?: boolean;
+  onModelSelectorOpenChange?: (open: boolean) => void;
 } = {}) {
   const { t } = useTranslation();
   const [message, setMessage] = useState("");
+  const [modelSelectorOpenLocal, setModelSelectorOpenLocal] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const lastCompositionEndRef = useRef<number>(0);
   const sendMessage = useChatStore((s) => s.sendMessage);
   const stopGeneration = useChatStore((s) => s.stopGeneration);
   const isStreaming = useChatStore((s) => s.isStreaming);
   const modelId = useChatStore((s) => s.modelId);
-  const providerType = useChatStore((s) => s.providerType);
+  const providerId = useChatStore((s) => s.providerId);
+  const providers = useDataStore((s) => s.providers);
+
+  const modelSelectorOpen =
+    onModelSelectorOpenChange != null ? (modelSelectorOpenProp ?? false) : modelSelectorOpenLocal;
+  const setModelSelectorOpen =
+    onModelSelectorOpenChange ?? setModelSelectorOpenLocal;
   const messages = useChatStore((s) => s.messages);
   const error = useChatStore((s) => s.error);
   const sendMessageShortcut = useSettingsStore((s) => s.sendMessageShortcut);
@@ -88,12 +98,22 @@ export function ChatInput({
     (sum, m) => sum + (m.tokens_input ?? 0) + (m.tokens_output ?? 0),
     0,
   );
-  const CONTEXT_LIMIT = 128_000;
-  const contextPercent = Math.min(100, Math.round((sessionTokens / CONTEXT_LIMIT) * 100));
-  const formatContextNum = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : String(n));
+  const contextLimit = useMemo(() => {
+    if (!modelId || !providerId) return 128_000;
+    const provider = providers.find((p) => p.id === providerId);
+    if (!provider) return 128_000;
+    const opt = getModelOption(provider, modelId);
+    return opt?.context_window ?? 128_000;
+  }, [modelId, providerId, providers]);
+  const contextPercent = Math.min(
+    100,
+    Math.round((sessionTokens / contextLimit) * 100),
+  );
+  const formatContextNum = (n: number) =>
+    n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : String(n);
   const contextTooltip = t("chat.contextUsedFormula", {
     used: formatContextNum(sessionTokens),
-    limit: formatContextNum(CONTEXT_LIMIT),
+    limit: formatContextNum(contextLimit),
     percent: contextPercent,
   });
 
@@ -285,26 +305,11 @@ export function ChatInput({
             <ToolbarIcon icon={<Paperclip />} title={t("chat.attachFiles")} />
             <ToolbarIcon icon={<Globe />} title={t("chat.webSearch")} />
             <SkillsPopover />
-            {/* 模型选择 */}
-            {onOpenModelSelector && (
-              <button
-                type="button"
-                onClick={onOpenModelSelector}
-                className={cn(
-                  "ml-2 mr-1 flex h-7 shrink-0 items-center gap-1.5 rounded-md pl-2.5 pr-2 text-muted-foreground transition-colors hover:bg-background-tertiary hover:text-foreground",
-                  !modelId &&
-                    "border border-dashed border-muted-foreground/40 bg-muted/30 hover:border-muted-foreground/60 hover:bg-muted/50",
-                )}
-                title={modelId ?? t("chat.selectModel")}
-              >
-                {providerType && (
-                  <ProviderIcon type={providerType} className="size-4 shrink-0" />
-                )}
-                <span className="max-w-[300px] truncate text-[11px] font-medium leading-none -translate-y-px">
-                  {modelId ?? t("chat.selectModel")}
-                </span>
-              </button>
-            )}
+            {/* 模型选择：卡片 Popover，与 Skills 同风格 */}
+            <ModelSelector
+              open={modelSelectorOpen}
+              onOpenChange={setModelSelectorOpen}
+            />
 
             {/* Context window 圆环：红框位置，hover 显示用量 */}
             <TooltipProvider delayDuration={300}>

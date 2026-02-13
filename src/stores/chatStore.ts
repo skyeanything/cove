@@ -5,6 +5,7 @@ import { providerRepo } from "@/db/repos/providerRepo";
 import { settingsRepo } from "@/db/repos/settingsRepo";
 import { useDataStore } from "./dataStore";
 import { getModel } from "@/lib/ai/provider-factory";
+import { getModelOption } from "@/lib/ai/model-service";
 import { runAgent, toModelMessages } from "@/lib/ai/agent";
 import {
   createAgentRunMetrics,
@@ -57,6 +58,8 @@ interface ChatState {
 
   loadMessages: (conversationId: string) => Promise<void>;
   selectModel: (providerId: string, modelId: string, providerType: string) => void;
+  /** 清除当前选中的模型（如 provider 被关闭时若当前选中该 provider 则调用） */
+  clearModelSelection: () => Promise<void>;
   /** 应用启动时从 settings 恢复上次使用的模型（当前未选模型时调用） */
   restoreLastModel: () => Promise<void>;
   sendMessage: (content: string) => Promise<void>;
@@ -91,6 +94,11 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       LAST_MODEL_KEY,
       JSON.stringify({ providerId, modelId, providerType }),
     );
+  },
+
+  async clearModelSelection() {
+    set({ modelId: null, providerId: null, providerType: null });
+    await settingsRepo.delete(LAST_MODEL_KEY);
   },
 
   async restoreLastModel() {
@@ -178,8 +186,11 @@ export const useChatStore = create<ChatState>()((set, get) => ({
           .catch(() => {});
       }
 
-      // Update conversation timestamp
-      await conversationRepo.update(conversationId, {});
+      // 更新会话时间戳，并写入当前使用的 provider/model，侧栏图标据此显示
+      await conversationRepo.update(conversationId, {
+        provider_type: providerType ?? undefined,
+        model_override: modelId,
+      });
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to create message";
       set({ error: errorMessage });
@@ -207,6 +218,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       const modelMessages = toModelMessages(updatedMessages);
       const enabledSkillNames = await getEnabledSkillNames();
       const tools = getAgentTools(enabledSkillNames);
+      const modelOption = getModelOption(provider, modelId);
 
       const result = runAgent({
         model,
@@ -216,6 +228,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         }),
         tools,
         abortSignal: abortController.signal,
+        maxOutputTokens: modelOption?.max_output_tokens,
       });
       const streamResult = await handleAgentStream(
         result,
@@ -366,6 +379,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       const modelMessages = toModelMessages(remaining);
       const enabledSkillNames = await getEnabledSkillNames();
       const tools = getAgentTools(enabledSkillNames);
+      const modelOption = getModelOption(provider, modelId);
 
       const result = runAgent({
         model,
@@ -375,6 +389,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         }),
         tools,
         abortSignal: abortController.signal,
+        maxOutputTokens: modelOption?.max_output_tokens,
       });
       const streamResult = await handleAgentStream(
         result,
@@ -490,6 +505,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       const modelMessages = toModelMessages(updatedMessages);
       const enabledSkillNames = await getEnabledSkillNames();
       const tools = getAgentTools(enabledSkillNames);
+      const modelOption = getModelOption(provider, modelId);
 
       const result = runAgent({
         model,
@@ -499,6 +515,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         }),
         tools,
         abortSignal: abortController.signal,
+        maxOutputTokens: modelOption?.max_output_tokens,
       });
       const streamResult = await handleAgentStream(
         result,

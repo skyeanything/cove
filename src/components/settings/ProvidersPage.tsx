@@ -74,7 +74,7 @@ export function ProvidersPage() {
   return (
     <div className="flex flex-1 overflow-hidden">
       {/* Left: Provider list */}
-      <div className="flex w-[220px] shrink-0 flex-col border-r">
+      <div className="flex w-[180px] shrink-0 flex-col border-r">
         <ScrollArea className="flex-1 pt-2">
           <div className="flex flex-col gap-0.5 px-2">
             {/* Built-in providers */}

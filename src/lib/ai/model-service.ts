@@ -1,4 +1,4 @@
-import type { Provider, ProviderConfig, ModelInfo } from "@/db/types";
+import type { Provider, ProviderConfig, ModelInfo, ModelOption } from "@/db/types";
 import { PROVIDER_METAS } from "./provider-meta";
 
 const CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
@@ -52,6 +52,51 @@ async function fetchOpenAICompatibleModels(
 
   const data = (await res.json()) as { data: Array<{ id: string }> };
   return data.data.map((m) => m.id).sort();
+}
+
+/** Moonshot 模型列表返回 context_length、supports_image_in、supports_reasoning 等，需解析并写入 model_options */
+interface MoonshotModelItem {
+  id: string;
+  context_length?: number;
+  supports_image_in?: boolean;
+  supports_reasoning?: boolean;
+}
+
+async function fetchMoonshotModels(
+  baseUrl: string,
+  apiKey?: string,
+): Promise<{ modelIds: string[]; modelOptions: Record<string, Partial<ModelOption>> }> {
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (apiKey) {
+    headers["Authorization"] = `Bearer ${apiKey}`;
+  }
+
+  const res = await fetch(`${baseUrl}/v1/models`, { headers });
+  if (!res.ok) {
+    const detail = await extractErrorMessage(res);
+    throw new Error(`Failed to fetch models (${res.status}): ${detail}`);
+  }
+
+  const data = (await res.json()) as { data: MoonshotModelItem[] };
+  const modelIds = data.data.map((m) => m.id).sort();
+  const modelOptions: Record<string, Partial<ModelOption>> = {};
+  for (const m of data.data) {
+    const opt: Partial<ModelOption> = {};
+    if (m.context_length != null) opt.context_window = m.context_length;
+    if (m.supports_image_in === true) opt.image_in = true;
+    if (m.supports_reasoning === true) opt.reasoning = true;
+    // Moonshot 特殊：id 含 thinking 的模型支持推理
+    if (m.id.includes("thinking")) opt.reasoning = true;
+    // kimi-k2.5 支持图片输入与推理（API 可能已返回，此处兜底）
+    if (m.id.includes("k2.5")) {
+      opt.image_in = true;
+      opt.reasoning = true;
+    }
+    if (Object.keys(opt).length > 0) modelOptions[m.id] = opt;
+  }
+  return { modelIds, modelOptions };
 }
 
 async function fetchOllamaModels(baseUrl: string): Promise<string[]> {
@@ -169,6 +214,13 @@ export async function fetchModels(provider: Provider): Promise<string[]> {
           provider.base_url || "http://localhost:11434",
         );
       }
+      if (provider.type === "moonshot") {
+        const { modelIds } = await fetchMoonshotModels(
+          provider.base_url || meta.defaultBaseUrl || "",
+          provider.api_key,
+        );
+        return modelIds;
+      }
       return await fetchOpenAICompatibleModels(
         provider.base_url || meta.defaultBaseUrl || "",
         provider.api_key,
@@ -179,6 +231,12 @@ export async function fetchModels(provider: Provider): Promise<string[]> {
   }
 
   return meta.knownModels;
+}
+
+/** 读取某 provider 下某模型的可选配置（能力、上下文窗口、最大输出 tokens 等） */
+export function getModelOption(provider: Provider, modelId: string): ModelOption | undefined {
+  const config = parseConfig(provider);
+  return config.model_options?.[modelId];
 }
 
 export function getModelsForProviders(providers: Provider[]): ModelInfo[] {
@@ -215,14 +273,24 @@ export function getModelsForProviders(providers: Provider[]): ModelInfo[] {
  * Verify credentials and fetch models. Errors propagate to the caller.
  * For providers with model listing — fetches real models (validates key implicitly).
  * For others — verifies the API key, then returns known models.
+ * Moonshot 会额外返回 modelOptions（context_window、image_in），供表单合并到 config。
  */
-export async function verifyAndFetchModels(provider: Provider): Promise<string[]> {
+export type VerifyAndFetchResult =
+  | string[]
+  | { modelIds: string[]; modelOptions: Record<string, Partial<ModelOption>> };
+
+export async function verifyAndFetchModels(
+  provider: Provider,
+): Promise<VerifyAndFetchResult> {
   const meta = PROVIDER_METAS[provider.type];
   const baseUrl = provider.base_url || meta.defaultBaseUrl || "";
 
   if (meta.supportsModelFetch) {
     if (provider.type === "ollama") {
       return await fetchOllamaModels(baseUrl || "http://localhost:11434");
+    }
+    if (provider.type === "moonshot") {
+      return await fetchMoonshotModels(baseUrl, provider.api_key);
     }
     return await fetchOpenAICompatibleModels(baseUrl, provider.api_key);
   }

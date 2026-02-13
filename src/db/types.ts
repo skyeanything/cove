@@ -8,6 +8,7 @@ export type ProviderType =
   | "deepseek"
   | "groq"
   | "mistral"
+  | "moonshot"
   | "openrouter"
   | "perplexity"
   | "together"
@@ -36,6 +37,18 @@ export interface ModelInfo {
   provider_type: ProviderType;
 }
 
+/** 单模型可选配置：能力开关、上下文窗口、最大输出 tokens */
+export interface ModelOption {
+  context_window?: number;
+  max_output_tokens?: number;
+  vision?: boolean;
+  image_in?: boolean;
+  image_output?: boolean;
+  tool_calling?: boolean;
+  reasoning?: boolean;
+  embedding?: boolean;
+}
+
 export interface ProviderConfig {
   // Azure
   deployment?: string;
@@ -49,6 +62,8 @@ export interface ProviderConfig {
   cached_models_at?: string;
   // Disabled models (user-toggled off)
   disabled_models?: string[];
+  // Per-model options (context, max tokens, capabilities)
+  model_options?: Record<string, ModelOption>;
   // Proxy
   proxy_url?: string;
 }

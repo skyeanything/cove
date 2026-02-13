@@ -216,9 +216,39 @@ body {
   cursor: default;
 }
 
-/* Markdown 渲染完成后的淡入，减轻卡顿感 */
+/* 打字机光标：柔和呼吸感，避免 step-end 造成的刺眼闪烁 */
+@keyframes cursor-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.cursor-blink {
+  animation: cursor-blink 1.2s ease-in-out infinite;
+}
+
+/* Markdown 渲染完成后的淡入；流式输出时禁用避免每次增量都闪一下 */
 [data-md] {
   animation: fade-in 0.2s ease-out;
+}
+.streaming-content [data-md] {
+  animation: none;
+}
+
+/* 流式输出时整块轻微呼吸感，表示正在输出 */
+@keyframes streaming-breathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.98; }
+}
+.streaming-content {
+  animation: streaming-breathe 2.5s ease-in-out infinite;
+}
+
+/* 每个 event 追加时的短暂高亮 */
+@keyframes streaming-append {
+  from { opacity: 0.97; }
+  to { opacity: 1; }
+}
+.streaming-just-appended {
+  animation: streaming-append 0.12s ease-out;
 }
 
 /* 代码块正文颜色改为绿色（覆盖 Prism 主题中的蓝色等） */

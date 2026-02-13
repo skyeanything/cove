@@ -48,6 +48,7 @@ export async function handleAgentStream(
   const toolCalls: ToolCallInfo[] = [];
   const parts: MessagePart[] = [];
 
+  try {
   for await (const part of stream.fullStream) {
     if (part.type === "text-delta") {
       onPartType?.("text-delta");
@@ -228,6 +229,14 @@ export async function handleAgentStream(
 
     if (part.type === "error") {
       streamError = String(part.error);
+    }
+  }
+  } catch (err) {
+    // Catch stream-level errors thrown by the SDK (e.g. AI_MissingToolResultsError
+    // from providers whose tool-call IDs don't match up across steps).
+    // Without this, the for-await loop hangs or crashes and the UI gets stuck.
+    if (!streamError) {
+      streamError = err instanceof Error ? err.message : String(err);
     }
   }
 

@@ -12,6 +12,8 @@ export interface AgentOptions {
   tools?: Record<AgentToolId, (typeof AGENT_TOOLS)[AgentToolId]>;
   abortSignal?: AbortSignal;
   maxSteps?: number;
+  /** 最大输出 token 数，来自 Provider 模型选项时可传入 */
+  maxOutputTokens?: number;
 }
 
 interface StoredTextPart {
@@ -95,19 +97,23 @@ function reconstructFromParts(partsJson: string, reasoning?: string | null): Mod
           input: part.args,
         });
 
-        if (part.result !== undefined) {
-          toolMessages.push({
-            role: "tool",
-            content: [
-              {
-                type: "tool-result",
-                toolCallId: part.id,
-                toolName: part.toolName,
-                output: normalizeToolOutput(part.result),
-              },
-            ],
-          } as unknown as ModelMessage);
-        }
+        // 必须始终创建 tool-result，否则 AI SDK 的 convertToLanguageModelPrompt
+        // 会因 tool-call 没有匹配的 tool-result 而抛出 MissingToolResultsError。
+        // 当 result 缺失时（如流式中断），使用合成的错误结果占位。
+        const output = part.result !== undefined
+          ? normalizeToolOutput(part.result)
+          : { type: "text" as const, value: "[Tool execution was interrupted]" };
+        toolMessages.push({
+          role: "tool",
+          content: [
+            {
+              type: "tool-result",
+              toolCallId: part.id,
+              toolName: part.toolName,
+              output,
+            },
+          ],
+        } as unknown as ModelMessage);
       }
     }
 
@@ -183,5 +189,8 @@ export function runAgent(options: AgentOptions) {
     tools: options.tools ?? AGENT_TOOLS,
     stopWhen: stepCountIs(maxSteps),
     abortSignal: options.abortSignal,
+    ...(options.maxOutputTokens != null && options.maxOutputTokens > 0
+      ? { maxOutputTokens: options.maxOutputTokens }
+      : {}),
   });
 }

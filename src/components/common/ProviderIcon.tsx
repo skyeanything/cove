@@ -9,6 +9,7 @@ import Copilot from "@lobehub/icons/es/Copilot";
 import Google from "@lobehub/icons/es/Google";
 import Groq from "@lobehub/icons/es/Groq";
 import Mistral from "@lobehub/icons/es/Mistral";
+import Moonshot from "@lobehub/icons/es/Moonshot";
 import Ollama from "@lobehub/icons/es/Ollama";
 import OpenAI from "@lobehub/icons/es/OpenAI";
 import OpenRouter from "@lobehub/icons/es/OpenRouter";
@@ -28,6 +29,7 @@ export const PROVIDER_ICONS: Record<string, SvgIcon> = {
   google: Google,
   groq: Groq,
   mistral: Mistral,
+  moonshot: Moonshot,
   ollama: Ollama,
   openai: OpenAI,
   openrouter: OpenRouter,

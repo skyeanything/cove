@@ -5,21 +5,42 @@ import { cn } from "@/lib/utils"
 
 function ScrollArea({
   className,
+  viewportClassName,
   children,
   ...props
-}: React.ComponentProps<typeof ScrollAreaPrimitive.Root>) {
+}: React.ComponentProps<typeof ScrollAreaPrimitive.Root> & {
+  /** 给 viewport 容器加样式（如 border），滚动条会作为兄弟节点画在边框外 */
+  viewportClassName?: string;
+}) {
+  const viewportEl = (
+    <ScrollAreaPrimitive.Viewport
+      data-slot="scroll-area-viewport"
+      className={cn(
+        "focus-visible:ring-ring/50 size-full min-w-0 rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:outline-1",
+        !viewportClassName && "rounded-[inherit]"
+      )}
+    >
+      {children}
+    </ScrollAreaPrimitive.Viewport>
+  );
+
   return (
     <ScrollAreaPrimitive.Root
       data-slot="scroll-area"
-      className={cn("relative", className)}
+      className={cn(
+        "relative",
+        viewportClassName ? "flex" : null,
+        className
+      )}
       {...props}
     >
-      <ScrollAreaPrimitive.Viewport
-        data-slot="scroll-area-viewport"
-        className="focus-visible:ring-ring/50 size-full rounded-[inherit] transition-[color,box-shadow] outline-none focus-visible:ring-[3px] focus-visible:outline-1"
-      >
-        {children}
-      </ScrollAreaPrimitive.Viewport>
+      {viewportClassName ? (
+        <div className={cn("flex-1 min-w-0 overflow-hidden", viewportClassName)}>
+          {viewportEl}
+        </div>
+      ) : (
+        viewportEl
+      )}
       <ScrollBar />
       <ScrollAreaPrimitive.Corner />
     </ScrollAreaPrimitive.Root>

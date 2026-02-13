@@ -69,6 +69,47 @@
   "common": {
     "settings": "Settings"
   },
+  "provider": {
+    "deepseek": {
+      "description": "Into the unknown"
+    },
+    "moonshot": {
+      "description": "Seeking the optimal conversion from energy to intelligence"
+    },
+    "capability": {
+      "vision": "Vision",
+      "image_in": "Image Input",
+      "image_output": "Image output",
+      "tool_calling": "Tool calling",
+      "reasoning": "Reasoning",
+      "embedding": "Embedding"
+    },
+    "modelOptions": {
+      "title": "Model Options",
+      "description": "Configure options for {{modelId}}",
+      "capabilitiesLabel": "Model Capabilities",
+      "capabilitiesHint": "Override the auto-detected capabilities for this model",
+      "contextWindow": "Context Window",
+      "maxOutputTokens": "Max Output Tokens",
+      "cancel": "Cancel",
+      "save": "Save"
+    },
+    "form": {
+      "apiKey": "API Key",
+      "apiKeyPlaceholder": "Your API key",
+      "region": "Region",
+      "apiBaseUrl": "API Base URL",
+      "selectRegion": "Select region",
+      "models": "Models",
+      "fetch": "Fetch Models",
+      "fetchingModels": "Fetching Models",
+      "searchModels": "Search Models",
+      "showingModels": "Showing {{count}} models",
+      "testConnection": "Test Connection",
+      "modelOptionsButton": "Model Options",
+      "active": "Active"
+    }
+  },
   "tool": {
     "pending": "Pending",
     "completed": "Completed",

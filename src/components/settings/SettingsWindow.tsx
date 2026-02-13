@@ -19,7 +19,7 @@ export function SettingsWindow() {
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-background">
       {/* Left nav */}
-      <div className="flex w-[180px] shrink-0 flex-col border-r bg-background-secondary">
+      <div className="flex w-[150px] shrink-0 flex-col border-r bg-background-secondary">
         {/* Drag region — leaves space for macOS traffic lights */}
         <div data-tauri-drag-region className="h-[52px] shrink-0" />
 

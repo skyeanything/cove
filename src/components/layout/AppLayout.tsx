@@ -6,7 +6,6 @@ import { LeftSidebar } from "@/components/sidebar/LeftSidebar";
 import { SearchMessagesDialog } from "@/components/sidebar/SearchMessagesDialog";
 import { ChatArea } from "@/components/chat/ChatArea";
 import { WindowControls } from "./WindowControls";
-import { ModelSelector } from "@/components/chat/ModelSelector";
 import { openSettingsWindow } from "@/lib/settings-window";
 import { useEffect, useState, useCallback } from "react";
 
@@ -80,13 +79,8 @@ export function AppLayout() {
 
       <ChatArea
         leftSidebarOpen={leftOpen}
-        onOpenModelSelector={() => setModelSelectorOpen(true)}
-      />
-
-      {/* Model selector command palette */}
-      <ModelSelector
-        open={modelSelectorOpen}
-        onOpenChange={setModelSelectorOpen}
+        modelSelectorOpen={modelSelectorOpen}
+        onModelSelectorOpenChange={setModelSelectorOpen}
       />
 
       <SearchMessagesDialog
