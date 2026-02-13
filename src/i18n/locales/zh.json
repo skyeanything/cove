@@ -1,0 +1,101 @@
+{
+  "settings": {
+    "tabs": {
+      "general": "通用",
+      "providers": "提供商",
+      "appearance": "外观"
+    },
+    "general": {
+      "language": "界面语言",
+      "sendShortcut": "发送消息快捷键",
+      "localeOption_zh": "简体中文",
+      "localeOption_en": "English",
+      "shortcutEnter": "Enter",
+      "shortcutModifierEnter": "⌘+Enter / Ctrl+Enter",
+      "skillDirs": "Skill 目录（额外）",
+      "skillDirsHint": "每行一个路径，支持 ~ 表示用户目录。内置已包含 ~/.claude/skills、~/.cursor/skills-cursor 等。"
+    },
+    "appearanceComingSoon": "外观设置即将推出"
+  },
+  "chat": {
+    "placeholder": "在此输入消息，按 {{shortcut}} 发送",
+    "placeholderNoModel": "请先选择模型开始对话",
+    "selectModel": "选择模型",
+    "workspace": "工作目录",
+    "copyPath": "复制当前路径",
+    "revealInFolder": "在文件夹中显示",
+    "attachFiles": "附加文件",
+    "webSearch": "网页搜索",
+    "tools": "工具",
+    "voiceInput": "语音输入",
+    "sendMessage": "发送消息",
+    "stopGeneration": "停止生成",
+    "noModel": "未选择模型",
+    "tokensIn": "输入",
+    "tokensOut": "输出",
+    "tokensLine": "{{in}} in · {{out}} out",
+    "sessionTokens": "会话用量",
+    "tokensTooltip": "输入 tokens：{{input}}，输出 tokens：{{output}}",
+    "copyTip": "复制为纯文本",
+    "copyMarkdownTip": "复制为Markdown）",
+    "regenerateTip": "重新生成",
+    "contextUsed": "已用 {{percent}}% 上下文",
+    "contextUsedFormula": "{{used}} / {{limit}} = {{percent}}%"
+  },
+  "sidebar": {
+    "pinned": "置顶",
+    "today": "今天",
+    "yesterday": "昨天",
+    "past7days": "过去 7 天",
+    "earlier": "更早",
+    "newChat": "新对话",
+    "searchPlaceholder": "搜索",
+    "noConversations": "暂无对话",
+    "untitled": "未命名",
+    "pinConversation": "置顶对话",
+    "unpinConversation": "取消置顶",
+    "rename": "重命名",
+    "delete": "删除",
+    "searchMessagesTitle": "搜索消息内容",
+    "searchMessagesPlaceholder": "在消息内容中搜索…",
+    "searching": "搜索中…",
+    "noSearchResults": "无匹配结果"
+  },
+  "modelSelector": {
+    "noProviders": "未配置提供商。请打开设置 (⌘,) 添加。",
+    "searchPlaceholder": "搜索模型",
+    "noModelsFound": "未找到模型"
+  },
+  "common": {
+    "settings": "设置"
+  },
+  "tool": {
+    "pending": "进行中",
+    "completed": "已完成",
+    "rejected": "已拒绝",
+    "path": "路径：",
+    "result": "结果：",
+    "content": "内容：",
+    "contentToWrite": "写入内容：",
+    "arguments": "参数：",
+    "oldString": "原字符串：",
+    "newString": "新字符串："
+  },
+  "permission": {
+    "title": "需要确认",
+    "write": "将要写入文件",
+    "edit": "将要编辑文件",
+    "bash": "将要执行命令",
+    "allow": "允许",
+    "deny": "拒绝",
+    "alwaysAllow": "始终允许（本会话）"
+  },
+  "skills": {
+    "title": "技能",
+    "tooltipEnabled": "技能（已选 {{count}} 个）",
+    "autoSelectHint": "AI 会按需使用您选择的技能",
+    "scanning": "正在扫描本机技能目录…",
+    "noSkills": "暂无可用技能",
+    "sourceApp": "App"
+  }
+}

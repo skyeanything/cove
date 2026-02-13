@@ -1,0 +1,101 @@
+{
+  "settings": {
+    "tabs": {
+      "general": "General",
+      "providers": "Providers",
+      "appearance": "Appearance"
+    },
+    "general": {
+      "language": "Interface Language",
+      "sendShortcut": "Send Message Shortcut Key",
+      "localeOption_zh": "简体中文",
+      "localeOption_en": "English",
+      "shortcutEnter": "Enter",
+      "shortcutModifierEnter": "⌘ Enter / Ctrl+Enter",
+      "skillDirs": "Skill directories (extra)",
+      "skillDirsHint": "One path per line; ~ for home. Built-in already includes ~/.claude/skills, ~/.cursor/skills-cursor, etc."
+    },
+    "appearanceComingSoon": "Appearance settings coming soon"
+  },
+  "chat": {
+    "placeholder": "Enter a message here, press {{shortcut}} to send",
+    "placeholderNoModel": "Select a model to start chatting",
+    "selectModel": "Select model",
+    "workspace": "Workspace",
+    "copyPath": "Copy path",
+    "revealInFolder": "Reveal in folder",
+    "attachFiles": "Attach files",
+    "webSearch": "Web search",
+    "tools": "Tools",
+    "voiceInput": "Voice input",
+    "sendMessage": "Send message",
+    "stopGeneration": "Stop generation",
+    "noModel": "No model",
+    "tokensIn": "In",
+    "tokensOut": "Out",
+    "tokensLine": "{{in}} in · {{out}} out",
+    "sessionTokens": "Session usage",
+    "tokensTooltip": "Input tokens: {{input}}, Output tokens: {{output}}",
+    "copyTip": "Copy as Plain Text",
+    "copyMarkdownTip": "Copy as Markdown",
+    "regenerateTip": "Regenerate",
+    "contextUsed": "{{percent}}% context used",
+    "contextUsedFormula": "{{used}} / {{limit}} = {{percent}}%"
+  },
+  "sidebar": {
+    "pinned": "Pinned",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "past7days": "Past 7 days",
+    "earlier": "Earlier",
+    "newChat": "New chat",
+    "searchPlaceholder": "Search",
+    "noConversations": "No conversations yet",
+    "untitled": "Untitled",
+    "pinConversation": "Pin conversation",
+    "unpinConversation": "Unpin conversation",
+    "rename": "Rename",
+    "delete": "Delete",
+    "searchMessagesTitle": "Search messages",
+    "searchMessagesPlaceholder": "Search in message content…",
+    "searching": "Searching…",
+    "noSearchResults": "No matches"
+  },
+  "modelSelector": {
+    "noProviders": "No providers configured. Open Settings (⌘,) to add a provider.",
+    "searchPlaceholder": "Search models...",
+    "noModelsFound": "No models found."
+  },
+  "common": {
+    "settings": "Settings"
+  },
+  "tool": {
+    "pending": "Pending",
+    "completed": "Completed",
+    "rejected": "Rejected",
+    "path": "Path:",
+    "result": "Result:",
+    "content": "Content:",
+    "contentToWrite": "Content to write:",
+    "arguments": "Arguments:",
+    "oldString": "Old string:",
+    "newString": "New string:"
+  },
+  "permission": {
+    "title": "Confirmation required",
+    "write": "About to write file",
+    "edit": "About to edit file",
+    "bash": "About to run command",
+    "allow": "Allow",
+    "deny": "Deny",
+    "alwaysAllow": "Always allow (this session)"
+  },
+  "skills": {
+    "title": "Skills",
+    "tooltipEnabled": "Skills ({{count}} enabled)",
+    "autoSelectHint": "AI automatically selects relevant skills",
+    "scanning": "Scanning local skill directories…",
+    "noSkills": "No skills available",
+    "sourceApp": "App"
+  }
+}

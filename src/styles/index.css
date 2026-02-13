@@ -1,0 +1,229 @@
+@import "tailwindcss";
+@import "prismjs/themes/prism-tomorrow.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  /* ===== shadcn/ui standard tokens (light) ===== */
+  --color-background: #ffffff;
+  --color-foreground: #09090b;
+
+  --color-card: #ffffff;
+  --color-card-foreground: #09090b;
+
+  --color-popover: #ffffff;
+  --color-popover-foreground: #09090b;
+
+  --color-primary: #18181b;
+  --color-primary-foreground: #fafafa;
+
+  --color-secondary: #f4f4f5;
+  --color-secondary-foreground: #18181b;
+
+  --color-muted: #f4f4f5;
+  --color-muted-foreground: #71717a;
+
+  --color-accent: #f4f4f5;
+  --color-accent-foreground: #18181b;
+
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: #ffffff;
+
+  --color-border: #e4e4e7;
+  --color-input: #e4e4e7;
+  --color-ring: #18181b;
+
+  /* ===== Extended custom tokens (light) ===== */
+  --color-background-secondary: #f9fafb;
+  --color-background-tertiary: #f4f4f5;
+
+  --color-foreground-secondary: #71717a;
+  --color-foreground-tertiary: #a1a1aa;
+
+  --color-border-subtle: #f4f4f5;
+
+  --color-brand: #2563eb;
+  --color-brand-hover: #1d4ed8;
+  --color-brand-foreground: #ffffff;
+  --color-brand-muted: #dbeafe;
+
+  --color-success: #10b981;
+  --color-warning: #f59e0b;
+
+  --color-sidebar: #fafafa;
+  --color-sidebar-foreground: #09090b;
+  --color-sidebar-border: #e4e4e7;
+  --color-sidebar-accent: #f4f4f5;
+  --color-sidebar-accent-foreground: #18181b;
+  --color-sidebar-ring: #18181b;
+
+  /* Typography */
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "SF Mono", "Cascadia Code", "Fira Code", ui-monospace, monospace;
+
+  /* Radii */
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+  --radius-xl: 12px;
+
+  /* Animations */
+  --animate-slide-in: slide-in 200ms ease-out;
+  --animate-slide-out: slide-out 150ms ease-in;
+  --animate-fade-in: fade-in 150ms ease-out;
+  --animate-accordion-down: accordion-down 200ms ease-out;
+  --animate-accordion-up: accordion-up 200ms ease-out;
+
+  @keyframes slide-in {
+    from { opacity: 0; transform: translateX(-8px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  @keyframes slide-out {
+    from { opacity: 1; transform: translateX(0); }
+    to { opacity: 0; transform: translateX(-8px); }
+  }
+
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+
+  @keyframes accordion-down {
+    from { height: 0; }
+    to { height: var(--radix-accordion-content-height); }
+  }
+
+  @keyframes accordion-up {
+    from { height: var(--radix-accordion-content-height); }
+    to { height: 0; }
+  }
+}
+
+/* ===== Dark mode ===== */
+.dark {
+  --color-background: #09090b;
+  --color-foreground: #fafafa;
+
+  --color-card: #09090b;
+  --color-card-foreground: #fafafa;
+
+  --color-popover: #09090b;
+  --color-popover-foreground: #fafafa;
+
+  --color-primary: #fafafa;
+  --color-primary-foreground: #18181b;
+
+  --color-secondary: #27272a;
+  --color-secondary-foreground: #fafafa;
+
+  --color-muted: #27272a;
+  --color-muted-foreground: #a1a1aa;
+
+  --color-accent: #27272a;
+  --color-accent-foreground: #fafafa;
+
+  --color-destructive: #ef4444;
+  --color-destructive-foreground: #ffffff;
+
+  --color-border: #27272a;
+  --color-input: #27272a;
+  --color-ring: #d4d4d8;
+
+  /* Extended */
+  --color-background-secondary: #111113;
+  --color-background-tertiary: #18181b;
+
+  --color-foreground-secondary: #a1a1aa;
+  --color-foreground-tertiary: #52525b;
+
+  --color-border-subtle: #1c1c1f;
+
+  --color-brand: #3b82f6;
+  --color-brand-hover: #60a5fa;
+  --color-brand-foreground: #ffffff;
+  --color-brand-muted: #1e3a5f;
+
+  --color-sidebar: #0f0f12;
+  --color-sidebar-foreground: #fafafa;
+  --color-sidebar-border: #27272a;
+  --color-sidebar-accent: #27272a;
+  --color-sidebar-accent-foreground: #fafafa;
+  --color-sidebar-ring: #d4d4d8;
+}
+
+/* ===== Base ===== */
+*,
+*::before,
+*::after {
+  border-color: var(--color-border);
+}
+
+html {
+  font-size: 14px;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-background);
+  color: var(--color-foreground);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow: hidden;
+  margin: 0;
+}
+
+/* Custom scrollbar — only show on hover */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+
+*:hover {
+  scrollbar-color: var(--color-foreground-tertiary) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 3px;
+}
+
+*:hover::-webkit-scrollbar-thumb {
+  background: var(--color-foreground-tertiary);
+}
+
+*:hover::-webkit-scrollbar-thumb:hover {
+  background: var(--color-foreground-secondary);
+}
+
+/* Non-selectable UI chrome */
+.no-select {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* Titlebar drag region — cursor hint */
+[data-tauri-drag-region] {
+  cursor: default;
+}
+
+/* Markdown 渲染完成后的淡入，减轻卡顿感 */
+[data-md] {
+  animation: fade-in 0.2s ease-out;
+}
+
+/* 代码块正文颜色改为绿色（覆盖 Prism 主题中的蓝色等） */
+[data-md] pre .token,
+[data-md] pre code,
+[data-md] pre code .token {
+  color: var(--color-success) !important;
+}
