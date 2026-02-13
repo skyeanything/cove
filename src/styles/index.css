@@ -233,13 +233,8 @@ body {
   animation: none;
 }
 
-/* 流式输出时整块轻微呼吸感，表示正在输出 */
-@keyframes streaming-breathe {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.98; }
-}
 .streaming-content {
-  animation: streaming-breathe 2.5s ease-in-out infinite;
+  animation: none;
 }
 
 /* 每个 event 追加时的短暂高亮 */

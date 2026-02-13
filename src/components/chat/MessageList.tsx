@@ -21,11 +21,10 @@ import {
   CircleGauge,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useChatStore } from "@/stores/chatStore";
 import type { ToolCallInfo, MessagePart } from "@/stores/chatStore";
-import { useTypewriter } from "@/hooks/useTypewriter";
 import type { Message } from "@/db/types";
 import { usePermissionStore } from "@/stores/permissionStore";
 import type { PendingPermission } from "@/stores/permissionStore";
@@ -56,25 +55,11 @@ class MarkdownErrorBoundary extends Component<
   }
 }
 
-/** Truncate the last text part by `charDelta` characters to keep parts in sync with the typewriter. */
-function truncateLastTextPart(parts: MessagePart[], charDelta: number): MessagePart[] {
-  if (charDelta <= 0 || parts.length === 0) return parts;
-  const result = [...parts];
-  for (let i = result.length - 1; i >= 0; i--) {
-    const part = result[i]!;
-    if (part.type === "text" && part.text) {
-      const newLen = Math.max(0, part.text.length - charDelta);
-      if (newLen !== part.text.length) {
-        result[i] = { ...part, text: part.text.slice(0, newLen) };
-      }
-      break;
-    }
-  }
-  return result;
-}
-
 export function MessageList() {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const autoScrollRafRef = useRef<number | null>(null);
+  const autoScrollLastTsRef = useRef<number | null>(null);
+  const shouldAutoFollowRef = useRef(true);
   const messages = useChatStore((s) => s.messages);
   const isStreaming = useChatStore((s) => s.isStreaming);
   const streamingContent = useChatStore((s) => s.streamingContent);
@@ -82,13 +67,73 @@ export function MessageList() {
   const streamingToolCalls = useChatStore((s) => s.streamingToolCalls);
   const streamingParts = useChatStore((s) => s.streamingParts);
 
-  // Smooth typewriter: reveals streaming text at a uniform rate
-  const smoothedContent = useTypewriter(streamingContent, isStreaming);
-  const charDelta = streamingContent.length - smoothedContent.length;
-  const smoothedParts = useMemo(
-    () => truncateLastTextPart(streamingParts, charDelta),
-    [streamingParts, charDelta],
-  );
+  // 不做缓冲/平滑：event 到达即渲染
+  const hasOrderedStreamingParts = streamingParts.length > 0;
+  const renderedContent = streamingContent;
+  const renderedReasoning = streamingReasoning;
+  const renderedParts = hasOrderedStreamingParts ? streamingParts : undefined;
+
+  const stopAutoScroll = useCallback(() => {
+    if (autoScrollRafRef.current != null) {
+      cancelAnimationFrame(autoScrollRafRef.current);
+      autoScrollRafRef.current = null;
+    }
+    autoScrollLastTsRef.current = null;
+  }, []);
+
+  const startAutoScroll = useCallback((viewport: HTMLElement) => {
+    if (autoScrollRafRef.current != null) return;
+
+    const step = (now: number) => {
+      if (!shouldAutoFollowRef.current) {
+        autoScrollRafRef.current = null;
+        autoScrollLastTsRef.current = null;
+        return;
+      }
+
+      const targetTop = viewport.scrollHeight - viewport.clientHeight;
+      const distance = targetTop - viewport.scrollTop;
+
+      // 距离很小时直接贴底，避免末端抖动
+      if (distance <= 0.8) {
+        viewport.scrollTop = targetTop;
+        autoScrollRafRef.current = null;
+        autoScrollLastTsRef.current = null;
+        return;
+      }
+
+      const prevTs = autoScrollLastTsRef.current ?? now;
+      const dt = Math.min(40, Math.max(8, now - prevTs));
+      autoScrollLastTsRef.current = now;
+
+      // 时间归一化缓动：更柔和，并且对不同帧率表现一致
+      const easing = 1 - Math.exp((-dt / 16) * 0.12);
+      const stepPx = Math.min(14, Math.max(0.25, distance * easing));
+      viewport.scrollTop += stepPx;
+      autoScrollRafRef.current = requestAnimationFrame(step);
+    };
+
+    autoScrollRafRef.current = requestAnimationFrame(step);
+  }, []);
+
+  useEffect(() => {
+    const root = scrollRef.current;
+    const viewport = root?.querySelector("[data-slot=scroll-area-viewport]") as HTMLElement | null;
+    if (!viewport) return;
+
+    const updateFollowState = () => {
+      const distanceFromBottom = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
+      shouldAutoFollowRef.current = distanceFromBottom <= AUTO_SCROLL_THRESHOLD_PX;
+      if (!shouldAutoFollowRef.current) stopAutoScroll();
+    };
+
+    updateFollowState();
+    viewport.addEventListener("scroll", updateFollowState, { passive: true });
+    return () => {
+      viewport.removeEventListener("scroll", updateFollowState);
+      stopAutoScroll();
+    };
+  }, [stopAutoScroll]);
 
   // 仅当用户已在底部附近时才自动滚到底部，避免上滑阅读时被拉回导致抖动
   const AUTO_SCROLL_THRESHOLD_PX = 120;
@@ -98,9 +143,10 @@ export function MessageList() {
     if (!viewport) return;
     const distanceFromBottom = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
     if (distanceFromBottom <= AUTO_SCROLL_THRESHOLD_PX) {
-      viewport.scrollTop = viewport.scrollHeight;
+      shouldAutoFollowRef.current = true;
+      startAutoScroll(viewport);
     }
-  }, [messages, smoothedContent, streamingReasoning, streamingToolCalls, smoothedParts]);
+  }, [messages, renderedContent, renderedReasoning, streamingToolCalls, renderedParts, startAutoScroll]);
 
   if (messages.length === 0 && !isStreaming) {
     return <EmptyState />;
@@ -115,10 +161,10 @@ export function MessageList() {
           ))}
           {isStreaming && (
             <AssistantMessage
-              content={smoothedContent}
-              reasoning={streamingReasoning}
+              content={renderedContent}
+              reasoning={renderedReasoning}
               toolCalls={streamingToolCalls}
-              parts={smoothedParts}
+              parts={renderedParts}
               isStreaming
             />
           )}
@@ -168,6 +214,7 @@ function UserMessage({ messageId, content }: { messageId: string; content: strin
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(content);
   const [copied, setCopied] = useState(false);
+  const [hovered, setHovered] = useState(false);
   const editAndResend = useChatStore((s) => s.editAndResend);
   const isStreaming = useChatStore((s) => s.isStreaming);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -244,7 +291,6 @@ function UserMessage({ messageId, content }: { messageId: string; content: strin
     );
   }
 
-  const [hovered, setHovered] = useState(false);
   return (
     <div
       className="mb-6 flex justify-end"

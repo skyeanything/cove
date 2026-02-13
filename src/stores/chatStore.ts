@@ -21,6 +21,47 @@ import { conversationRepo } from "@/db/repos/conversationRepo";
 import { useWorkspaceStore } from "./workspaceStore";
 
 const LAST_MODEL_KEY = "lastModel";
+const RETRYABLE_ATTEMPTS = 3;
+const RETRY_BASE_DELAY_MS = 1200;
+const RETRY_MAX_DELAY_MS = 8000;
+
+function isRateLimitErrorMessage(message: string | undefined): boolean {
+  if (!message) return false;
+  const m = message.toLowerCase();
+  return (
+    m.includes("429") ||
+    m.includes("rate limit") ||
+    m.includes("too many requests") ||
+    m.includes("quota exceeded")
+  );
+}
+
+function parseRetryAfterMs(message: string | undefined): number | null {
+  if (!message) return null;
+  const secMatch = message.match(/retry[-\s]?after[:=\s]+(\d+)/i);
+  if (secMatch?.[1]) {
+    const sec = Number(secMatch[1]);
+    if (!Number.isNaN(sec) && sec > 0) return sec * 1000;
+  }
+  const msMatch = message.match(/retry[-\s]?after[:=\s]+(\d+)\s*ms/i);
+  if (msMatch?.[1]) {
+    const ms = Number(msMatch[1]);
+    if (!Number.isNaN(ms) && ms > 0) return ms;
+  }
+  return null;
+}
+
+function backoffDelayMs(attempt: number, errMessage?: string): number {
+  const hinted = parseRetryAfterMs(errMessage);
+  if (hinted != null) return Math.min(RETRY_MAX_DELAY_MS, Math.max(600, hinted));
+  const exp = RETRY_BASE_DELAY_MS * 2 ** Math.max(0, attempt - 1);
+  const jitter = Math.floor(Math.random() * 300);
+  return Math.min(RETRY_MAX_DELAY_MS, exp + jitter);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 export interface ToolCallInfo {
   id: string;
@@ -220,26 +261,46 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       const tools = getAgentTools(enabledSkillNames);
       const modelOption = getModelOption(provider, modelId);
 
-      const result = runAgent({
-        model,
-        messages: modelMessages,
-        system: buildSystemPrompt({
-          workspacePath: useWorkspaceStore.getState().activeWorkspace?.path,
-        }),
-        tools,
-        abortSignal: abortController.signal,
-        maxOutputTokens: modelOption?.max_output_tokens,
-      });
-      const streamResult = await handleAgentStream(
-        result,
-        (streamingState) => set(streamingState),
-        (partType) => trackAgentPart(runMetrics, partType),
-      );
+      let streamResult: Awaited<ReturnType<typeof handleAgentStream>> | null = null;
+      for (let attempt = 1; attempt <= RETRYABLE_ATTEMPTS; attempt++) {
+        const attemptResult = runAgent({
+          model,
+          messages: modelMessages,
+          system: buildSystemPrompt({
+            workspacePath: useWorkspaceStore.getState().activeWorkspace?.path,
+          }),
+          tools,
+          abortSignal: abortController.signal,
+          maxOutputTokens: modelOption?.max_output_tokens,
+        });
+        const current = await handleAgentStream(
+          attemptResult,
+          (streamingState) => set(streamingState),
+          (partType) => trackAgentPart(runMetrics, partType),
+          {
+            label: `send:${provider.type}/${modelId}:try${attempt}`,
+          },
+        );
+        streamResult = current;
+        if (!current.error || !isRateLimitErrorMessage(current.error) || attempt >= RETRYABLE_ATTEMPTS) {
+          break;
+        }
+        set({
+          error: `请求过于频繁，正在自动重试（${attempt}/${RETRYABLE_ATTEMPTS - 1}）...`,
+        });
+        await sleep(backoffDelayMs(attempt, current.error));
+      }
+      if (!streamResult) {
+        throw new Error("Stream result unavailable");
+      }
 
       if (streamResult.error) {
+        const finalError = isRateLimitErrorMessage(streamResult.error)
+          ? "请求过于频繁（429），请稍后重试，或切换到 DeepSeek。"
+          : streamResult.error;
         reportAgentRunMetrics(runMetrics, { error: streamResult.error });
         set({
-          error: streamResult.error,
+          error: finalError,
           isStreaming: false,
           streamingContent: "",
           streamingReasoning: "",
@@ -381,25 +442,45 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       const tools = getAgentTools(enabledSkillNames);
       const modelOption = getModelOption(provider, modelId);
 
-      const result = runAgent({
-        model,
-        messages: modelMessages,
-        system: buildSystemPrompt({
-          workspacePath: useWorkspaceStore.getState().activeWorkspace?.path,
-        }),
-        tools,
-        abortSignal: abortController.signal,
-        maxOutputTokens: modelOption?.max_output_tokens,
-      });
-      const streamResult = await handleAgentStream(
-        result,
-        (streamingState) => set(streamingState),
-        (partType) => trackAgentPart(runMetrics, partType),
-      );
+      let streamResult: Awaited<ReturnType<typeof handleAgentStream>> | null = null;
+      for (let attempt = 1; attempt <= RETRYABLE_ATTEMPTS; attempt++) {
+        const attemptResult = runAgent({
+          model,
+          messages: modelMessages,
+          system: buildSystemPrompt({
+            workspacePath: useWorkspaceStore.getState().activeWorkspace?.path,
+          }),
+          tools,
+          abortSignal: abortController.signal,
+          maxOutputTokens: modelOption?.max_output_tokens,
+        });
+        const current = await handleAgentStream(
+          attemptResult,
+          (streamingState) => set(streamingState),
+          (partType) => trackAgentPart(runMetrics, partType),
+          {
+            label: `regenerate:${provider.type}/${modelId}:try${attempt}`,
+          },
+        );
+        streamResult = current;
+        if (!current.error || !isRateLimitErrorMessage(current.error) || attempt >= RETRYABLE_ATTEMPTS) {
+          break;
+        }
+        set({
+          error: `请求过于频繁，正在自动重试（${attempt}/${RETRYABLE_ATTEMPTS - 1}）...`,
+        });
+        await sleep(backoffDelayMs(attempt, current.error));
+      }
+      if (!streamResult) {
+        throw new Error("Stream result unavailable");
+      }
 
       if (streamResult.error) {
+        const finalError = isRateLimitErrorMessage(streamResult.error)
+          ? "请求过于频繁（429），请稍后重试，或切换到 DeepSeek。"
+          : streamResult.error;
         reportAgentRunMetrics(runMetrics, { error: streamResult.error });
-        set({ error: streamResult.error, isStreaming: false, streamingContent: "", streamingReasoning: "", streamingToolCalls: [], streamingParts: [], abortController: null });
+        set({ error: finalError, isStreaming: false, streamingContent: "", streamingReasoning: "", streamingToolCalls: [], streamingParts: [], abortController: null });
         return;
       }
       reportAgentRunMetrics(runMetrics, {
@@ -507,25 +588,45 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       const tools = getAgentTools(enabledSkillNames);
       const modelOption = getModelOption(provider, modelId);
 
-      const result = runAgent({
-        model,
-        messages: modelMessages,
-        system: buildSystemPrompt({
-          workspacePath: useWorkspaceStore.getState().activeWorkspace?.path,
-        }),
-        tools,
-        abortSignal: abortController.signal,
-        maxOutputTokens: modelOption?.max_output_tokens,
-      });
-      const streamResult = await handleAgentStream(
-        result,
-        (streamingState) => set(streamingState),
-        (partType) => trackAgentPart(runMetrics, partType),
-      );
+      let streamResult: Awaited<ReturnType<typeof handleAgentStream>> | null = null;
+      for (let attempt = 1; attempt <= RETRYABLE_ATTEMPTS; attempt++) {
+        const attemptResult = runAgent({
+          model,
+          messages: modelMessages,
+          system: buildSystemPrompt({
+            workspacePath: useWorkspaceStore.getState().activeWorkspace?.path,
+          }),
+          tools,
+          abortSignal: abortController.signal,
+          maxOutputTokens: modelOption?.max_output_tokens,
+        });
+        const current = await handleAgentStream(
+          attemptResult,
+          (streamingState) => set(streamingState),
+          (partType) => trackAgentPart(runMetrics, partType),
+          {
+            label: `edit_resend:${provider.type}/${modelId}:try${attempt}`,
+          },
+        );
+        streamResult = current;
+        if (!current.error || !isRateLimitErrorMessage(current.error) || attempt >= RETRYABLE_ATTEMPTS) {
+          break;
+        }
+        set({
+          error: `请求过于频繁，正在自动重试（${attempt}/${RETRYABLE_ATTEMPTS - 1}）...`,
+        });
+        await sleep(backoffDelayMs(attempt, current.error));
+      }
+      if (!streamResult) {
+        throw new Error("Stream result unavailable");
+      }
 
       if (streamResult.error) {
+        const finalError = isRateLimitErrorMessage(streamResult.error)
+          ? "请求过于频繁（429），请稍后重试，或切换到 DeepSeek。"
+          : streamResult.error;
         reportAgentRunMetrics(runMetrics, { error: streamResult.error });
-        set({ error: streamResult.error, isStreaming: false, streamingContent: "", streamingReasoning: "", streamingToolCalls: [], streamingParts: [], abortController: null });
+        set({ error: finalError, isStreaming: false, streamingContent: "", streamingReasoning: "", streamingToolCalls: [], streamingParts: [], abortController: null });
         return;
       }
       reportAgentRunMetrics(runMetrics, {

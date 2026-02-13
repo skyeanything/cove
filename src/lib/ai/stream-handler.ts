@@ -37,19 +37,124 @@ export interface StreamUpdate {
   streamingParts?: MessagePart[];
 }
 
+interface StreamDebugOptions {
+  enabled?: boolean;
+  label?: string;
+  previewChars?: number;
+}
+
+function isStreamDebugEnabled(explicitEnabled?: boolean): boolean {
+  if (typeof explicitEnabled === "boolean") return explicitEnabled;
+  try {
+    return globalThis.localStorage?.getItem("cove.streamDebug") === "1";
+  } catch {
+    return false;
+  }
+}
+
+function createStreamDebugLogger(options?: StreamDebugOptions) {
+  const enabled = isStreamDebugEnabled(options?.enabled);
+  const label = options?.label ?? "stream";
+  const previewChars = options?.previewChars ?? 24;
+
+  let startedAt = 0;
+  let lastAt = 0;
+  let totalEvents = 0;
+  let textDeltaEvents = 0;
+  let reasoningDeltaEvents = 0;
+  let textChars = 0;
+  let reasoningChars = 0;
+
+  const now = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
+  const safePreview = (s: string) => s.replace(/\n/g, "\\n").slice(0, previewChars);
+
+  const log = (message: string, payload?: Record<string, unknown>) => {
+    if (!enabled) return;
+    if (payload) console.debug(`[stream-debug][${label}] ${message}`, payload);
+    else console.debug(`[stream-debug][${label}] ${message}`);
+  };
+
+  return {
+    start() {
+      if (!enabled) return;
+      startedAt = now();
+      lastAt = startedAt;
+      log("start");
+    },
+    event(part: { type: string; text?: string; delta?: string }) {
+      if (!enabled) return;
+      const t = now();
+      const dt = Math.round(t - lastAt);
+      lastAt = t;
+      totalEvents += 1;
+
+      if (part.type === "text-delta") {
+        const text = part.text ?? "";
+        textDeltaEvents += 1;
+        textChars += text.length;
+        log("text-delta", {
+          event: totalEvents,
+          dt_ms: dt,
+          chunk_chars: text.length,
+          chunk_preview: safePreview(text),
+          text_delta_events: textDeltaEvents,
+          text_chars_total: textChars,
+        });
+        return;
+      }
+
+      if (part.type === "reasoning-delta" || part.type === "reasoning") {
+        const text = part.text ?? part.delta ?? "";
+        reasoningDeltaEvents += 1;
+        reasoningChars += text.length;
+        log("reasoning-delta", {
+          event: totalEvents,
+          dt_ms: dt,
+          chunk_chars: text.length,
+          chunk_preview: safePreview(text),
+          reasoning_delta_events: reasoningDeltaEvents,
+          reasoning_chars_total: reasoningChars,
+        });
+        return;
+      }
+
+      log(part.type, { event: totalEvents, dt_ms: dt });
+    },
+    finish(extra?: { contentChars?: number; reasoningChars?: number; error?: string }) {
+      if (!enabled) return;
+      const elapsed = Math.round(now() - startedAt);
+      log("finish", {
+        elapsed_ms: elapsed,
+        total_events: totalEvents,
+        text_delta_events: textDeltaEvents,
+        reasoning_delta_events: reasoningDeltaEvents,
+        text_chars_total: textChars,
+        reasoning_chars_total: reasoningChars,
+        content_chars_final: extra?.contentChars,
+        reasoning_chars_final: extra?.reasoningChars,
+        error: extra?.error,
+      });
+    },
+  };
+}
+
 export async function handleAgentStream(
   stream: StreamLike,
   onUpdate: (state: StreamUpdate) => void,
   onPartType?: (partType: "text-delta" | "reasoning-delta" | "tool-call" | "tool-result") => void,
+  debugOptions?: StreamDebugOptions,
 ): Promise<StreamResult> {
   let fullContent = "";
   let fullReasoning = "";
   let streamError: string | undefined;
   const toolCalls: ToolCallInfo[] = [];
   const parts: MessagePart[] = [];
+  const debug = createStreamDebugLogger(debugOptions);
+  debug.start();
 
   try {
   for await (const part of stream.fullStream) {
+    debug.event(part);
     if (part.type === "text-delta") {
       onPartType?.("text-delta");
       const text = part.text ?? "";
@@ -241,6 +346,11 @@ export async function handleAgentStream(
   }
 
   if (streamError) {
+    debug.finish({
+      contentChars: fullContent.length,
+      reasoningChars: fullReasoning.length,
+      error: streamError,
+    });
     return {
       content: fullContent,
       reasoning: fullReasoning,
@@ -260,6 +370,10 @@ export async function handleAgentStream(
     // usage 可能不可用
   }
 
+  debug.finish({
+    contentChars: fullContent.length,
+    reasoningChars: fullReasoning.length,
+  });
   return {
     content: fullContent,
     reasoning: fullReasoning,

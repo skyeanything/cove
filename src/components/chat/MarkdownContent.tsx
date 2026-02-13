@@ -31,23 +31,6 @@ const COPY_FEEDBACK_MS = 1500;
 const remarkPlugins = [remarkGfm, remarkBreaks, remarkMath, remarkDirective, remarkDirectiveRehype];
 const rehypePluginsBase = [rehypeKatex];
 
-/** 在最后一个块级子元素的末尾插入「光标」占位 span，用于流式时光标紧跟文字 */
-function rehypeInjectCursor() {
-  return (tree: { children?: unknown[] }) => {
-    const children = tree.children;
-    if (!Array.isArray(children) || children.length === 0) return;
-    const last = children[children.length - 1] as { type?: string; children?: unknown[] };
-    if (last?.type === "element" && Array.isArray(last.children)) {
-      last.children.push({
-        type: "element",
-        tagName: "span",
-        properties: { className: ["streaming-cursor-placeholder"] },
-        children: [],
-      });
-    }
-  };
-}
-
 /** 将 React 子节点安全转为字符串，避免对象被渲染成 [object Object] */
 function reactNodeToDisplayString(node: React.ReactNode): string {
   if (node == null) return "";
@@ -351,8 +334,8 @@ const CURSOR_EL = (
 );
 
 export function MarkdownContent({ source, className, trailingCursor }: MarkdownContentProps) {
-  const trimmed = source.trim();
-  if (!trimmed) return null;
+  const hasVisibleContent = source.trim().length > 0;
+  if (!hasVisibleContent) return null;
 
   const wrapperCls = cn(
     "markdown-body mb-4 text-[14px] leading-relaxed select-text",
@@ -368,15 +351,14 @@ export function MarkdownContent({ source, className, trailingCursor }: MarkdownC
    *    the user sees a smooth character-by-character typewriter and never
    *    encounters broken markdown syntax (unclosed `**`, partial ```).
    *
-   * When no `\n` exists yet (first line), fall back to full markdown +
-   * rehype cursor injection (existing behaviour).
+   * 当首行尚未出现 `\n` 时，优先纯文本渲染，避免高频全量 markdown parse。
    */
   if (trailingCursor) {
-    const lastNl = trimmed.lastIndexOf("\n");
+    const lastNl = source.lastIndexOf("\n");
 
     if (lastNl >= 0) {
-      const settled = trimmed.slice(0, lastNl + 1);
-      const pending = trimmed.slice(lastNl + 1);
+      const settled = source.slice(0, lastNl + 1);
+      const pending = source.slice(lastNl + 1);
 
       return (
         <div className={wrapperCls} data-md>
@@ -393,16 +375,13 @@ export function MarkdownContent({ source, className, trailingCursor }: MarkdownC
       );
     }
 
-    // No line breaks yet — single line, use full markdown + cursor injection
+    // 还没有换行时，先按纯文本渲染，避免每个字符都触发完整 Markdown 解析导致卡顿
     return (
       <div className={wrapperCls} data-md>
-        <ReactMarkdown
-          remarkPlugins={remarkPlugins}
-          rehypePlugins={rehypePluginsWithCursor}
-          components={markdownComponents as Components}
-        >
-          {trimmed}
-        </ReactMarkdown>
+        <p className="mb-0 last:mb-0 whitespace-pre-wrap break-words">
+          {source}
+          {CURSOR_EL}
+        </p>
       </div>
     );
   }
@@ -415,14 +394,11 @@ export function MarkdownContent({ source, className, trailingCursor }: MarkdownC
         rehypePlugins={rehypePluginsBase}
         components={markdownComponents as Components}
       >
-        {trimmed}
+        {source}
       </ReactMarkdown>
     </div>
   );
 }
-
-/** Pre-built rehype plugin list with cursor injection (avoids re-creating per render) */
-const rehypePluginsWithCursor = [...rehypePluginsBase, rehypeInjectCursor()];
 
 export type { ThinkBlock } from "@/lib/splitThinkBlocks";
 export { splitThinkBlocks } from "@/lib/splitThinkBlocks";
