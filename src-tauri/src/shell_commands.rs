@@ -43,10 +43,26 @@ pub fn run_command(args: RunCommandArgs) -> Result<RunCommandResult, String> {
     #[cfg(windows)]
     let (shell, shell_arg) = ("cmd", "/c");
 
+    // 将 ~/.officellm/bin 等常用工具目录追加到 PATH，
+    // 因为 sh -c 不加载用户 shell profile。
+    let extra_paths: Vec<std::path::PathBuf> = dirs::home_dir()
+        .into_iter()
+        .flat_map(|home| [home.join(".officellm/bin"), home.join(".local/bin")])
+        .filter(|p| p.is_dir())
+        .collect();
+    let path_env = if extra_paths.is_empty() {
+        std::env::var("PATH").unwrap_or_default()
+    } else {
+        let extra: Vec<String> = extra_paths.iter().map(|p| p.to_string_lossy().into_owned()).collect();
+        let current = std::env::var("PATH").unwrap_or_default();
+        format!("{}:{current}", extra.join(":"))
+    };
+
     let mut child = Command::new(shell)
         .arg(shell_arg)
         .arg(&args.command)
         .current_dir(&workdir_path)
+        .env("PATH", &path_env)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .stdin(Stdio::null())

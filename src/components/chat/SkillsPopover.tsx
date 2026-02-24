@@ -66,7 +66,8 @@ export function SkillsPopover({
     }
   }, [open, workspacePath, loadExternalSkills, loadEnabledSkillNames]);
 
-  const enabledCount = enabledSkillNames.length;
+  const visibleNames = new Set(skills.map((s) => s.meta.name));
+  const enabledCount = enabledSkillNames.filter((n) => visibleNames.has(n)).length;
   const defaultTrigger = (
     <button
       type="button"

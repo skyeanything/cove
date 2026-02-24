@@ -12,6 +12,7 @@ const DEFAULT_SKILL_ROOTS: &[(&str, &str)] = &[
     (".agents/skills", "agents"),
     (".cursor/skills-cursor", "cursor"),
     (".opencode/skill", "opencode"),
+    (".officellm/skills", "officellm"),
 ];
 
 const SKILL_FILENAME: &str = "SKILL.md";
@@ -60,6 +61,25 @@ fn expand_path(p: &str) -> PathBuf {
 
 fn scan_skill_root(root: &Path, source: &str) -> Vec<ExternalSkillEntry> {
     let mut out = Vec::new();
+
+    // 平铺布局：SKILL.md 直接位于 root（如 ~/.officellm/skills/SKILL.md）
+    let flat_md = root.join(SKILL_FILENAME);
+    if flat_md.is_file() {
+        if let Ok(content) = read_skill_file(&flat_md) {
+            let name = root
+                .file_name()
+                .map(|n| n.to_string_lossy().into_owned())
+                .unwrap_or_else(|| source.to_string());
+            out.push(ExternalSkillEntry {
+                source: source.to_string(),
+                name,
+                path: flat_md.to_string_lossy().into_owned(),
+                content,
+            });
+        }
+    }
+
+    // 嵌套布局：每个子目录内有 SKILL.md（如 ~/.claude/skills/my-skill/SKILL.md）
     let read_dir = match fs::read_dir(root) {
         Ok(d) => d,
         Err(_) => return out,

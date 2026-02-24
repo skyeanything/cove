@@ -16,6 +16,7 @@ const SAFE_PREFIXES = [
   "git status", "git log", "git diff", "git show",
   "npm test", "npm run", "pnpm ", "pnpm test", "pnpm run",
   "cargo build", "cargo test", "python -c", "node -e",
+  "officellm ",
 ];
 
 /** block：拒绝执行 */

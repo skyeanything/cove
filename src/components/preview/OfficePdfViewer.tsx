@@ -70,7 +70,7 @@ function PdfPage({ doc, pageNum, width }: PdfPageProps) {
         if (!ctx || cancelled) return;
         ctx.scale(dpr, dpr);
 
-        renderTask = page.render({ canvasContext: ctx, viewport: vp });
+        renderTask = page.render({ canvasContext: ctx, viewport: vp, canvas });
         return renderTask.promise.then(() => page.cleanup());
       })
       .catch(() => {
@@ -99,7 +99,7 @@ function PdfPage({ doc, pageNum, width }: PdfPageProps) {
 // ── 主组件 ────────────────────────────────────────────────────────────────────
 export interface OfficePdfViewerProps {
   dataUrl: string;
-  /** Tauri 后端命令名，如 "docx_to_pdf_via_pages" 或 "pptx_to_pdf" */
+  /** Tauri 后端命令名，如 "docx_to_pdf" 或 "pptx_to_pdf" */
   command: string;
   /** 转换中显示的主提示，如 "正在使用 Pages 转换文档…" */
   convertingLabel: string;

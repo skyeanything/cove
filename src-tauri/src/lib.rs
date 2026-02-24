@@ -102,7 +102,7 @@ pub fn run() {
       workspace_watcher::watch_workspace_command,
       shell_commands::run_command,
       skill_discovery::discover_external_skills,
-      docx_commands::docx_to_pdf_via_pages,
+      docx_commands::docx_to_pdf,
       docx_commands::pptx_to_pdf,
     ])
     .run(tauri::generate_context!())

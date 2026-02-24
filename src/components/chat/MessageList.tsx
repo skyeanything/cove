@@ -856,11 +856,16 @@ function ResultContent({ result, toolName }: { result: unknown; toolName?: strin
   );
 }
 
-/** 工具返回结果是否表示用户拒绝（未执行） */
+/** 工具返回结果是否表示用户拒绝（未执行）——仅匹配工具实际返回的拒绝前缀 */
+const REJECTED_PREFIXES = [
+  "用户拒绝了",
+  "该命令被拒绝执行",
+  "this skill is not enabled",
+];
 function isToolResultRejected(result: unknown): boolean {
   if (typeof result !== "string") return false;
   const s = result.toLowerCase();
-  return s.includes("拒绝") || s.includes("denied") || s.includes("rejected");
+  return REJECTED_PREFIXES.some((p) => s.startsWith(p.toLowerCase()));
 }
 
 const TOOL_ICON_MAP: Record<string, typeof Wrench> = {
