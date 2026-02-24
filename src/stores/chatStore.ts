@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import type { Message } from "@/db/types";
 import { messageRepo } from "@/db/repos/messageRepo";
+import { attachmentRepo } from "@/db/repos/attachmentRepo";
+import type { Attachment } from "@/db/types";
 import { providerRepo } from "@/db/repos/providerRepo";
 import { settingsRepo } from "@/db/repos/settingsRepo";
 import { useDataStore } from "./dataStore";
@@ -19,6 +21,46 @@ import { getAgentTools } from "@/lib/ai/tools";
 import { getEnabledSkillNames } from "./skillsStore";
 import { conversationRepo } from "@/db/repos/conversationRepo";
 import { useWorkspaceStore } from "./workspaceStore";
+import { isImageAttachment, isPdfAttachment } from "@/lib/attachment-utils";
+import { extractUrls, buildFetchBlockFromResults, type FetchUrlResult } from "@/lib/url-utils";
+import { invoke } from "@tauri-apps/api/core";
+import type { ModelMessage } from "ai";
+
+/** 根据用户文本中的 URL 抓取并返回要注入的「抓取内容」块 */
+async function getFetchBlockForText(text: string): Promise<string> {
+  const urls = extractUrls(text);
+  if (urls.length === 0) return "";
+  const results: FetchUrlResult[] = [];
+  for (const url of urls) {
+    try {
+      const res = await invoke<FetchUrlResult>("fetch_url", {
+        args: { url, timeoutMs: 15000, maxChars: 120000 },
+      });
+      results.push(res);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      results.push({ ok: false, error: msg, source: url });
+    }
+  }
+  if (import.meta.env.DEV) {
+    console.debug("[chatStore] URL 抓取", { urlCount: urls.length, partCount: results.length });
+  }
+  return buildFetchBlockFromResults(results);
+}
+
+/** 将抓取块追加到 modelMessages 中最后一条 user 消息的文本后 */
+function injectFetchBlockIntoLastUserMessage(modelMessages: ModelMessage[], fetchBlock: string): void {
+  if (!fetchBlock) return;
+  const latestUserIndex = [...modelMessages]
+    .reverse()
+    .findIndex((message) => message.role === "user");
+  if (latestUserIndex < 0) return;
+  const index = modelMessages.length - 1 - latestUserIndex;
+  const msg = modelMessages[index] as { role: string; content: Array<{ type: string; text?: string }> };
+  if (Array.isArray(msg.content) && msg.content[0]?.type === "text" && typeof msg.content[0].text === "string") {
+    msg.content[0].text = msg.content[0].text + fetchBlock;
+  }
+}
 
 const LAST_MODEL_KEY = "lastModel";
 const RETRYABLE_ATTEMPTS = 3;
@@ -77,6 +119,16 @@ export interface ToolCallInfo {
   argsJsonStream?: string;
 }
 
+export interface DraftAttachment {
+  id: string;
+  type: Attachment["type"];
+  name?: string;
+  path?: string;
+  mime_type?: string;
+  size?: number;
+  content?: string;
+}
+
 /** 一条消息内的有序片段：文本与工具调用按出现顺序交错 */
 export type MessagePart =
   | { type: "text"; text: string }
@@ -85,6 +137,8 @@ export type MessagePart =
 
 interface ChatState {
   messages: Message[];
+  attachmentsByMessage: Record<string, Attachment[]>;
+  draftAttachments: DraftAttachment[];
   isStreaming: boolean;
   streamingContent: string;
   streamingReasoning: string;
@@ -104,6 +158,9 @@ interface ChatState {
   /** 应用启动时从 settings 恢复上次使用的模型（当前未选模型时调用） */
   restoreLastModel: () => Promise<void>;
   sendMessage: (content: string) => Promise<void>;
+  addDraftAttachments: (attachments: DraftAttachment[]) => void;
+  removeDraftAttachment: (attachmentId: string) => void;
+  clearDraftAttachments: () => void;
   stopGeneration: () => void;
   regenerateMessage: (messageId: string) => Promise<void>;
   editAndResend: (messageId: string, newContent: string) => Promise<void>;
@@ -112,6 +169,8 @@ interface ChatState {
 
 export const useChatStore = create<ChatState>()((set, get) => ({
   messages: [],
+  attachmentsByMessage: {},
+  draftAttachments: [],
   isStreaming: false,
   streamingContent: "",
   streamingReasoning: "",
@@ -125,7 +184,16 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 
   async loadMessages(conversationId: string) {
     const messages = await messageRepo.getByConversation(conversationId);
-    set({ messages, error: null });
+    const attachmentsByMessage: Record<string, Attachment[]> = {};
+    await Promise.all(
+      messages.map(async (message) => {
+        const attachments = await attachmentRepo.getByMessage(message.id);
+        if (attachments.length > 0) {
+          attachmentsByMessage[message.id] = attachments;
+        }
+      }),
+    );
+    set({ messages, attachmentsByMessage, draftAttachments: [], error: null });
     await useWorkspaceStore.getState().loadFromConversation(conversationId);
   },
 
@@ -161,7 +229,19 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   },
 
   async sendMessage(content: string) {
-    const { modelId, providerId, providerType, messages } = get();
+    const { modelId, providerId, providerType, messages, draftAttachments } = get();
+    const trimmedContent = content.trim();
+    const titleSource =
+      trimmedContent ||
+      (draftAttachments.length > 0
+        ? `附件：${draftAttachments
+            .map((attachment) => attachment.name || "未命名文件")
+            .slice(0, 3)
+            .join("、")}`
+        : "");
+    if (!trimmedContent && draftAttachments.length === 0) {
+      return;
+    }
     if (!modelId) {
       set({ error: "Please select a model first." });
       return;
@@ -194,7 +274,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       if (!conversationId) {
         isNewConversation = true;
         conversationId = crypto.randomUUID();
-        const title = content.slice(0, 50);
+        const title = titleSource.slice(0, 50) || "New Chat";
         const activeWs = useWorkspaceStore.getState().activeWorkspace;
         await conversationRepo.create({
           id: conversationId,
@@ -206,6 +286,14 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         });
         dataStore.setActiveConversation(conversationId);
         await dataStore.loadConversations();
+        if (import.meta.env.DEV) {
+          console.debug("[chatStore] 新会话已创建", {
+            conversationId,
+            titleSeed: title,
+            hasText: !!trimmedContent,
+            attachmentCount: draftAttachments.length,
+          });
+        }
       }
 
       // Create user message
@@ -213,18 +301,62 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         id: crypto.randomUUID(),
         conversation_id: conversationId,
         role: "user",
-        content,
+        content: trimmedContent,
       };
       await messageRepo.create(userMsg);
+      if (draftAttachments.length > 0) {
+        await Promise.all(
+          draftAttachments.map(async (attachment) => {
+            await attachmentRepo.create({
+              id: attachment.id,
+              message_id: userMsg.id,
+              type: attachment.type,
+              name: attachment.name,
+              path: attachment.path,
+              mime_type: attachment.mime_type,
+              size: attachment.size,
+              content: attachment.content,
+            });
+          }),
+        );
+      }
 
       updatedMessages = [...messages, { ...userMsg, created_at: new Date().toISOString() }];
-      set({ messages: updatedMessages, error: null });
+      set((state) => ({
+        messages: updatedMessages,
+        draftAttachments: [],
+        attachmentsByMessage:
+          draftAttachments.length === 0
+            ? state.attachmentsByMessage
+            : {
+                ...state.attachmentsByMessage,
+                [userMsg.id]: draftAttachments.map((attachment) => ({
+                  ...attachment,
+                  message_id: userMsg.id,
+                  created_at: new Date().toISOString(),
+                })),
+              },
+        error: null,
+      }));
 
       // 新会话：用用户首条问题异步生成标题
       if (isNewConversation && provider) {
-        void generateConversationTitleFromUserQuestion(conversationId, content, { provider, modelId })
-          .then(() => useDataStore.getState().loadConversations())
-          .catch(() => {});
+        void generateConversationTitleFromUserQuestion(conversationId, titleSource, { provider, modelId })
+          .then(() => {
+            if (import.meta.env.DEV) {
+              console.debug("[chatStore] 会话标题生成成功", { conversationId, titleSource });
+            }
+            return useDataStore.getState().loadConversations();
+          })
+          .catch((err) => {
+            if (import.meta.env.DEV) {
+              console.warn("[chatStore] 会话标题生成失败", {
+                conversationId,
+                titleSource,
+                error: err instanceof Error ? err.message : String(err),
+              });
+            }
+          });
       }
 
       // 更新会话时间戳，并写入当前使用的 provider/model，侧栏图标据此显示
@@ -256,10 +388,75 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 
     try {
       const model = getModel(provider, modelId);
+      const modelOption = getModelOption(provider, modelId);
+      const modelSupportsPdfNative = modelOption?.pdf_native === true;
       const modelMessages = toModelMessages(updatedMessages);
+
+      // 从用户消息中识别 URL 并抓取，将结果拼成块注入最后一条 user 消息
+      const fetchBlock = await getFetchBlockForText(trimmedContent);
+
+      if (draftAttachments.length > 0) {
+        const latestUserIndex = [...modelMessages]
+          .reverse()
+          .findIndex((message) => message.role === "user");
+        if (latestUserIndex >= 0) {
+          const index = modelMessages.length - 1 - latestUserIndex;
+          const imageAttachments = draftAttachments.filter((a) => isImageAttachment(a));
+          const pdfAttachments = draftAttachments.filter((a) => isPdfAttachment(a));
+          const otherTextAttachments = draftAttachments.filter(
+            (a) => !isImageAttachment(a) && !isPdfAttachment(a),
+          );
+          const textAttachmentsForManifest = modelSupportsPdfNative
+            ? otherTextAttachments
+            : draftAttachments.filter((a) => !isImageAttachment(a));
+          const manifest =
+            textAttachmentsForManifest.length > 0
+              ? `\n\n可用附件（按需读取）：\n${textAttachmentsForManifest
+                  .map((a) => `- attachmentId=${a.id} name=${a.name ?? "unknown"}`)
+                  .join("\n")}\n如需读取附件内容，请调用 parse_document 工具并传入 attachmentId。可按需设置 mode=summary/chunks/full，以及 pageRange（仅 PDF）。`
+              : "";
+          const userText = `${trimmedContent}${manifest}${fetchBlock}`.trim();
+          const nextContent: Array<Record<string, unknown>> = [];
+          if (userText) {
+            nextContent.push({ type: "text", text: userText });
+          }
+          for (const attachment of imageAttachments) {
+            if (attachment.content?.startsWith("data:image/")) {
+              nextContent.push({ type: "image", image: attachment.content });
+            }
+          }
+          if (modelSupportsPdfNative && pdfAttachments.length > 0) {
+            for (const attachment of pdfAttachments) {
+              try {
+                const dataUrl =
+                  attachment.content?.startsWith("data:") && attachment.content.includes("application/pdf")
+                    ? attachment.content
+                    : await invoke<{ data_url: string }>("read_attachment_as_data_url", {
+                        args: { path: attachment.path },
+                      }).then((r) => r.data_url);
+                nextContent.push({
+                  type: "file",
+                  data: dataUrl,
+                  mediaType: "application/pdf",
+                });
+              } catch {
+                // 单 PDF 读取失败时跳过（如超大小），该 PDF 不会以原生发送
+              }
+            }
+          }
+          if (nextContent.length > 0) {
+            const original = modelMessages[index] as Record<string, unknown>;
+            modelMessages[index] = {
+              ...original,
+              content: nextContent,
+            } as (typeof modelMessages)[number];
+          }
+        }
+      } else {
+        injectFetchBlockIntoLastUserMessage(modelMessages, fetchBlock);
+      }
       const enabledSkillNames = await getEnabledSkillNames();
       const tools = getAgentTools(enabledSkillNames);
-      const modelOption = getModelOption(provider, modelId);
 
       let streamResult: Awaited<ReturnType<typeof handleAgentStream>> | null = null;
       for (let attempt = 1; attempt <= RETRYABLE_ATTEMPTS; attempt++) {
@@ -385,6 +582,23 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     }
   },
 
+  addDraftAttachments(attachments: DraftAttachment[]) {
+    if (attachments.length === 0) return;
+    set((state) => ({
+      draftAttachments: [...state.draftAttachments, ...attachments],
+    }));
+  },
+
+  removeDraftAttachment(attachmentId: string) {
+    set((state) => ({
+      draftAttachments: state.draftAttachments.filter((attachment) => attachment.id !== attachmentId),
+    }));
+  },
+
+  clearDraftAttachments() {
+    set({ draftAttachments: [] });
+  },
+
   async regenerateMessage(messageId: string) {
     const { messages } = get();
     const msgIndex = messages.findIndex((m) => m.id === messageId);
@@ -405,7 +619,11 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 
     // Keep messages before the deleted one
     const remaining = messages.slice(0, msgIndex);
-    set({ messages: remaining });
+    const remainingIds = new Set(remaining.map((m) => m.id));
+    const prunedAttachments = Object.fromEntries(
+      Object.entries(get().attachmentsByMessage).filter(([messageId]) => remainingIds.has(messageId)),
+    );
+    set({ messages: remaining, attachmentsByMessage: prunedAttachments });
 
     // We need to re-run the agent with the remaining messages (which include the user msg)
     const { modelId, providerId, providerType } = get();
@@ -438,6 +656,13 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     try {
       const model = getModel(provider, modelId);
       const modelMessages = toModelMessages(remaining);
+      const lastUserContent =
+        remaining[remaining.length - 1]?.role === "user"
+          ? (remaining[remaining.length - 1]!.content ?? "")
+          : "";
+      const fetchBlockRegen = await getFetchBlockForText(lastUserContent);
+      injectFetchBlockIntoLastUserMessage(modelMessages, fetchBlockRegen);
+
       const enabledSkillNames = await getEnabledSkillNames();
       const tools = getAgentTools(enabledSkillNames);
       const modelOption = getModelOption(provider, modelId);
@@ -538,7 +763,11 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 
     // Keep messages before the deleted one
     const remaining = messages.slice(0, msgIndex);
-    set({ messages: remaining });
+    const remainingIds = new Set(remaining.map((m) => m.id));
+    const prunedAttachments = Object.fromEntries(
+      Object.entries(get().attachmentsByMessage).filter(([messageId]) => remainingIds.has(messageId)),
+    );
+    set({ messages: remaining, attachmentsByMessage: prunedAttachments });
 
     // Send the new content as if it were a new message
     // But we need to manually create the user message and run agent
@@ -584,6 +813,9 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     try {
       const model = getModel(provider, modelId);
       const modelMessages = toModelMessages(updatedMessages);
+      const fetchBlockEdit = await getFetchBlockForText(newContent);
+      injectFetchBlockIntoLastUserMessage(modelMessages, fetchBlockEdit);
+
       const enabledSkillNames = await getEnabledSkillNames();
       const tools = getAgentTools(enabledSkillNames);
       const modelOption = getModelOption(provider, modelId);
@@ -681,6 +913,8 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   reset() {
     set({
       messages: [],
+      attachmentsByMessage: {},
+      draftAttachments: [],
       isStreaming: false,
       streamingContent: "",
       streamingReasoning: "",

@@ -57,14 +57,7 @@ export const useDataStore = create<DataState>()((set, get) => ({
       get().loadPrompts(),
       useWorkspaceStore.getState().init(),
     ]);
-    const savedId = typeof localStorage !== "undefined" ? localStorage.getItem("office_chat_active_conversation_id") : null;
-    if (savedId) {
-      const convs = get().conversations;
-      if (convs.some((c) => c.id === savedId)) {
-        set({ activeConversationId: savedId });
-        await get().loadMessages(savedId);
-      }
-    }
+    // 刚进入应用时不恢复上次选中的会话，保持左侧不选中、右侧为新会话状态，避免「左侧高亮一条、右侧却是新窗口」的不一致
     set({ initialized: true });
   },
 

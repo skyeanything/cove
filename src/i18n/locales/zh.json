@@ -40,7 +40,18 @@
     "copyMarkdownTip": "复制为Markdown）",
     "regenerateTip": "重新生成",
     "contextUsed": "已用 {{percent}}% 上下文",
-    "contextUsedFormula": "{{used}} / {{limit}} = {{percent}}%"
+    "contextUsedFormula": "{{used}} / {{limit}} = {{percent}}%",
+    "visionNotSupported": "当前模型不支持图片输入，请移除图片或更换支持 vision 的模型后再发送。",
+    "welcomeGreeting": "{{time}}好，有什么可以帮你？",
+    "timeDawn": "凌晨",
+    "timeEarlyMorning": "清晨",
+    "timeMorning": "早上",
+    "timeLateMorning": "上午",
+    "timeNoon": "中午",
+    "timeAfternoon": "下午",
+    "timeDusk": "傍晚",
+    "timeEvening": "晚上",
+    "timeNight": "夜里"
   },
   "sidebar": {
     "pinned": "置顶",
@@ -51,7 +62,7 @@
     "newChat": "新对话",
     "searchPlaceholder": "搜索",
     "noConversations": "暂无对话",
-    "untitled": "未命名",
+    "untitled": "新对话",
     "pinConversation": "置顶对话",
     "unpinConversation": "取消置顶",
     "rename": "重命名",
@@ -66,15 +77,67 @@
     "searchPlaceholder": "搜索模型",
     "noModelsFound": "未找到模型"
   },
+  "explorer": {
+    "copy": "复制",
+    "cut": "剪切",
+    "paste": "粘贴",
+    "newFolder": "新建文件夹",
+    "create": "创建",
+    "rename": "重命名",
+    "revealInFinder": "在访达中显示",
+    "copyRelativePath": "复制相对路径",
+    "copyAbsolutePath": "复制绝对路径",
+    "delete": "删除",
+    "deleteConfirmTitle": "删除",
+    "deleteConfirmDescription": "确定要删除「{{name}}」吗？此操作无法撤销。",
+    "folderAlreadyExists": "该名称已存在，请使用其他名称"
+  },
+  "preview": {
+    "openFilePanel": "打开文件面板",
+    "closeFilePanel": "关闭文件面板",
+    "workspace": "工作目录",
+    "explorer": "资源管理器",
+    "showHidden": "显示隐藏文件",
+    "hideHidden": "隐藏隐藏文件",
+    "refreshDir": "重新加载目录",
+    "selectWorkspace": "请先选择工作目录",
+    "emptyDir": "空目录",
+    "selectFile": "在左侧选择文件",
+    "fileDeleted": "文件已被删除",
+    "unsupported": "暂不支持预览此文件类型",
+    "loading": "加载中…",
+    "previewTab": "Preview",
+    "codeTab": "Code",
+    "openDefault": "使用默认应用打开",
+    "openInApp": "在 {{app}} 中打开",
+    "openInNativeWindow": "在新窗口用系统预览打开",
+    "docxUseSystemPreview": "DOCX 请使用系统预览查看正确分页",
+    "docxLoading": "加载 DOCX…",
+    "docxLoadError": "DOCX 解析失败",
+    "docxRenderError": "DOCX 渲染失败",
+    "pageNumber": "第 {{current}} / {{total}} 页"
+  },
   "common": {
     "settings": "设置"
   },
   "provider": {
+    "aliyun": {
+      "description": "阿里云百炼（通义千问）OpenAI 兼容接口"
+    },
     "deepseek": {
       "description": "探索未至之境"
     },
     "moonshot": {
       "description": "寻求将能源转化为智能的最优解"
+    },
+    "minimax": {
+      "description": "与所有人共创智能"
+    },
+    "tencentCloud": {
+      "description": "腾讯云混元 OpenAI 兼容接口"
+    },
+    "volcengineArk": {
+      "description": "火山方舟大模型服务平台 OpenAI 兼容接口"
     },
     "capability": {
       "vision": "视觉",
@@ -138,5 +201,16 @@
     "scanning": "正在扫描本机技能目录…",
     "noSkills": "暂无可用技能",
     "sourceApp": "App"
+  },
+  "workspace": {
+    "title": "工作目录",
+    "description": "所有工具操作将以此目录为工作目录。",
+    "default": "默认",
+    "selectDirectory": "选择目录…",
+    "removeTitle": "移除工作目录",
+    "removeDescription": "从工作目录列表中移除「{{name}}」？不会删除磁盘上的任何文件。",
+    "cancel": "取消",
+    "remove": "移除",
+    "removeButtonTitle": "从列表中移除"
   }
 }

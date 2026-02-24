@@ -21,7 +21,7 @@ interface SettingsState {
 
 export const useSettingsStore = create<SettingsState>()((set) => ({
   tab: "providers",
-  selectedProviderType: "anthropic",
+  selectedProviderType: "deepseek",
   sendMessageShortcut: "enter",
 
   setTab(tab) {

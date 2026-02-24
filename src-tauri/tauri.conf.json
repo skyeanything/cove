@@ -23,11 +23,21 @@
         "decorations": true,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true,
-        "trafficLightPosition": { "x": 13, "y": 28 }
+        "trafficLightPosition": {
+          "x": 13,
+          "y": 28
+        }
       }
     ],
     "security": {
-      "csp": null
+      "csp": null,
+      "assetProtocol": {
+        "scope": {
+          "allow": [
+            "**"
+          ]
+        }
+      }
     }
   },
   "bundle": {

@@ -1,6 +1,5 @@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
-  Bot,
   Copy,
   RotateCcw,
   Pencil,
@@ -25,17 +24,49 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useChatStore } from "@/stores/chatStore";
 import type { ToolCallInfo, MessagePart } from "@/stores/chatStore";
-import type { Message } from "@/db/types";
+import type { Message, Attachment } from "@/db/types";
 import { usePermissionStore } from "@/stores/permissionStore";
 import type { PendingPermission } from "@/stores/permissionStore";
-import { ProviderIcon } from "@/components/common/ProviderIcon";
 import { cn, stripMarkdown } from "@/lib/utils";
-import { Component, lazy, Suspense } from "react";
+import { Component } from "react";
 import { splitThinkBlocks } from "@/lib/splitThinkBlocks";
+import { FileTypeBadge, getAttachmentPreviewSrc } from "./AttachmentVisual";
+import { MarkdownContent } from "@/components/chat/MarkdownContent";
+import Prism from "prismjs";
+import { Highlight } from "prism-react-renderer";
 
-const MarkdownContent = lazy(() =>
-  import("@/components/chat/MarkdownContent").then((m) => ({ default: m.MarkdownContent })),
-);
+import "prismjs/components/prism-bash";
+
+const BASH_HIGHLIGHT_THEME = {
+  plain: {
+    color: "#9ca3af",
+    backgroundColor: "transparent",
+  },
+  styles: [
+    {
+      types: ["comment"],
+      style: { color: "#9ca3af" },
+    },
+    {
+      types: ["keyword", "builtin", "function"],
+      style: { color: "#2563eb", fontWeight: "600" as const },
+    },
+    {
+      types: ["string", "attr-value", "char"],
+      style: { color: "#15803d" },
+    },
+    {
+      types: ["operator", "punctuation"],
+      style: { color: "#8b95a7" },
+    },
+    {
+      types: ["number", "boolean", "constant"],
+      style: { color: "#7c3aed" },
+    },
+  ],
+};
+
+const EMPTY_ATTACHMENTS: Attachment[] = [];
 
 /** Markdown 渲染出错时回退显示纯文本，避免白屏 */
 class MarkdownErrorBoundary extends Component<
@@ -44,6 +75,11 @@ class MarkdownErrorBoundary extends Component<
 > {
   state = { hasError: false };
   static getDerivedStateFromError = () => ({ hasError: true });
+  componentDidUpdate(prevProps: { fallback: string }) {
+    if (this.state.hasError && prevProps.fallback !== this.props.fallback) {
+      this.setState({ hasError: false });
+    }
+  }
   render() {
     if (this.state.hasError)
       return (
@@ -59,7 +95,14 @@ export function MessageList() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const autoScrollRafRef = useRef<number | null>(null);
   const autoScrollLastTsRef = useRef<number | null>(null);
-  const shouldAutoFollowRef = useRef(true);
+  /** 是否跟随到底：仅在有新内容且用户未主动上滑时为 true，避免加载/切会话时强制贴底 */
+  const shouldAutoFollowRef = useRef(false);
+  const lastScrollTopRef = useRef(0);
+
+  /** 距离底部小于等于此值视为「在底部」，恢复跟随（用户手动滑回底部时） */
+  const FOLLOW_AT_BOTTOM_PX = 50;
+  /** 流式输出时：若距离底部在此范围内仍视为「在跟」，避免新内容刚渲染时误判为已离开底部 */
+  const STREAMING_FOLLOW_THRESHOLD_PX = 200;
   const messages = useChatStore((s) => s.messages);
   const isStreaming = useChatStore((s) => s.isStreaming);
   const streamingContent = useChatStore((s) => s.streamingContent);
@@ -90,7 +133,6 @@ export function MessageList() {
         autoScrollLastTsRef.current = null;
         return;
       }
-
       const targetTop = viewport.scrollHeight - viewport.clientHeight;
       const distance = targetTop - viewport.scrollTop;
 
@@ -119,34 +161,54 @@ export function MessageList() {
   useEffect(() => {
     const root = scrollRef.current;
     const viewport = root?.querySelector("[data-slot=scroll-area-viewport]") as HTMLElement | null;
-    if (!viewport) return;
+    if (!root || !viewport) return;
 
     const updateFollowState = () => {
+      const prevTop = lastScrollTopRef.current;
+      const currTop = viewport.scrollTop;
+      const scrolledUp = currTop < prevTop - 0.5;
       const distanceFromBottom = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
-      shouldAutoFollowRef.current = distanceFromBottom <= AUTO_SCROLL_THRESHOLD_PX;
+      if (scrolledUp) {
+        shouldAutoFollowRef.current = false;
+      }
+      if (distanceFromBottom <= FOLLOW_AT_BOTTOM_PX) {
+        shouldAutoFollowRef.current = true;
+      }
+      lastScrollTopRef.current = currTop;
       if (!shouldAutoFollowRef.current) stopAutoScroll();
     };
 
+    const onWheel = (e: WheelEvent) => {
+      if (e.deltaY < 0) {
+        shouldAutoFollowRef.current = false;
+        stopAutoScroll();
+      }
+    };
+
+    lastScrollTopRef.current = viewport.scrollTop;
     updateFollowState();
     viewport.addEventListener("scroll", updateFollowState, { passive: true });
+    root.addEventListener("wheel", onWheel, { passive: true, capture: true });
     return () => {
       viewport.removeEventListener("scroll", updateFollowState);
+      root.removeEventListener("wheel", onWheel, { capture: true });
       stopAutoScroll();
     };
   }, [stopAutoScroll]);
 
-  // 仅当用户已在底部附近时才自动滚到底部，避免上滑阅读时被拉回导致抖动
-  const AUTO_SCROLL_THRESHOLD_PX = 120;
+  // 仅在流式输出且「用户当前在底部附近」时自动滚动；用户一旦上滑则停止跟随，直到再次滑到底部
   useEffect(() => {
+    if (!isStreaming) return;
     const root = scrollRef.current;
     const viewport = root?.querySelector("[data-slot=scroll-area-viewport]") as HTMLElement | null;
     if (!viewport) return;
     const distanceFromBottom = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
-    if (distanceFromBottom <= AUTO_SCROLL_THRESHOLD_PX) {
+    if (distanceFromBottom <= STREAMING_FOLLOW_THRESHOLD_PX) {
       shouldAutoFollowRef.current = true;
-      startAutoScroll(viewport);
     }
-  }, [messages, renderedContent, renderedReasoning, streamingToolCalls, renderedParts, startAutoScroll]);
+    if (!shouldAutoFollowRef.current) return;
+    startAutoScroll(viewport);
+  }, [isStreaming, messages, renderedContent, renderedReasoning, streamingToolCalls, renderedParts, startAutoScroll]);
 
   if (messages.length === 0 && !isStreaming) {
     return <EmptyState />;
@@ -216,6 +278,7 @@ function UserMessage({ messageId, content }: { messageId: string; content: strin
   const [copied, setCopied] = useState(false);
   const [hovered, setHovered] = useState(false);
   const editAndResend = useChatStore((s) => s.editAndResend);
+  const attachments = useChatStore((s) => s.attachmentsByMessage[messageId] ?? EMPTY_ATTACHMENTS);
   const isStreaming = useChatStore((s) => s.isStreaming);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -298,9 +361,14 @@ function UserMessage({ messageId, content }: { messageId: string; content: strin
       onMouseLeave={() => setHovered(false)}
     >
       <div className="flex max-w-[85%] flex-col items-end">
-        <div className="rounded-[4px] bg-background-tertiary px-3 py-1.5 text-[14px] leading-relaxed whitespace-pre-wrap">
-          {content}
-        </div>
+        {attachments.length > 0 && (
+          <UserAttachmentList attachments={attachments} />
+        )}
+        {content.trim() && (
+          <div className="rounded-[4px] bg-background-tertiary px-3 py-1.5 text-[14px] leading-relaxed whitespace-pre-wrap">
+            {content}
+          </div>
+        )}
         {/* 操作图标：仅悬停时渲染 DOM，避免 CSS 被覆盖导致不隐藏 */}
         <div className="mt-1 mb-2 min-h-8">
           {hovered && (
@@ -315,6 +383,37 @@ function UserMessage({ messageId, content }: { messageId: string; content: strin
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function UserAttachmentItem({ attachment }: { attachment: Attachment }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const previewSrc = getAttachmentPreviewSrc(attachment);
+  const showImage = !!previewSrc && !imageFailed;
+  return (
+    <div className="inline-flex max-w-[260px] items-center gap-2 rounded-md border border-border bg-background-secondary px-2 py-1">
+      {showImage ? (
+        <img
+          src={previewSrc}
+          alt={attachment.name ?? "attachment"}
+          className="size-8 rounded object-cover"
+          onError={() => setImageFailed(true)}
+        />
+      ) : (
+        <FileTypeBadge attachment={attachment} />
+      )}
+      <span className="truncate text-[12px] text-foreground">{attachment.name}</span>
+    </div>
+  );
+}
+
+function UserAttachmentList({ attachments }: { attachments: Attachment[] }) {
+  return (
+    <div className="mb-2 flex max-w-[560px] flex-wrap justify-end gap-2">
+      {attachments.map((attachment) => (
+        <UserAttachmentItem key={attachment.id} attachment={attachment} />
+      ))}
     </div>
   );
 }
@@ -438,18 +537,12 @@ function AssistantMessage({
             </div>
           )}
 
-          <MarkdownErrorBoundary fallback={content ?? ""}>
-            <Suspense
-              fallback={
-                <div className="text-[14px] leading-relaxed whitespace-pre-wrap">{content}</div>
-              }
-            >
-              <div
-                className={cn(
-                  streaming && "streaming-content",
-                  justAppended && "streaming-just-appended",
-                )}
-              >
+          <div
+            className={cn(
+              streaming && "streaming-content",
+              justAppended && "streaming-just-appended",
+            )}
+          >
               {hasOrderedParts ? (
               <div className="space-y-2">
                 {orderedParts!.map((part, index) =>
@@ -497,9 +590,7 @@ function AssistantMessage({
                 </div>
               </>
             )}
-              </div>
-            </Suspense>
-          </MarkdownErrorBoundary>
+          </div>
 
           {!streaming && (copyContent || showTokens) && (
             <div className={cn(
@@ -617,9 +708,7 @@ function ReasoningSegment({
       >
         <div className="min-h-0 overflow-hidden">
           <div className="mt-0.5 px-2 py-1 text-[12px] leading-[1.875] tracking-[0.02em] text-muted-foreground/80">
-            <Suspense fallback={<span className="whitespace-pre-wrap">{text}</span>}>
-              <MarkdownContent source={text} className="text-[12px] leading-[1.875] tracking-[0.02em]" />
-            </Suspense>
+            <MarkdownContent source={text} className="text-[12px] leading-[1.875] tracking-[0.02em]" />
           </div>
         </div>
       </div>
@@ -665,11 +754,57 @@ function extractDiffLines(text: string): { intro: string; diffLines: string[] } 
 }
 
 /** 文件操作结果用 diff 样式渲染：+ 行绿底，- 行红底 */
-function ResultContent({ result }: { result: unknown }) {
+function ResultContent({ result, toolName }: { result: unknown; toolName?: string }) {
   const { t } = useTranslation();
+  const resultTextColorClass = toolName === "bash" ? "text-foreground" : "text-foreground-secondary";
+  if (toolName === "parse_document" && typeof result === "string") {
+    try {
+      const parsed = JSON.parse(result) as {
+        attachmentId?: string;
+        name?: string;
+        path?: string;
+        mode?: string;
+        chunkCount?: number;
+        truncated?: boolean;
+        warnings?: string[];
+        summary?: string;
+      };
+      const modeLabel =
+        parsed.mode === "summary"
+          ? "文档总结"
+          : parsed.mode === "chunks"
+            ? "分块读取"
+            : "文档全文";
+      return (
+        <div className="space-y-1">
+          <div className="rounded bg-background-tertiary/10 p-2 text-[11px] space-y-1">
+            <div><span className="text-foreground-secondary">附件 ID：</span>{parsed.attachmentId ?? "—"}</div>
+            <div><span className="text-foreground-secondary">文件名：</span>{parsed.name ?? "—"}</div>
+            <div className="break-all"><span className="text-foreground-secondary">文件路径：</span>{parsed.path ?? "—"}</div>
+            <div><span className="text-foreground-secondary">读取模式：</span>{modeLabel}</div>
+            <div><span className="text-foreground-secondary">分块数量：</span>{parsed.chunkCount ?? 0}</div>
+            <div><span className="text-foreground-secondary">是否截断：</span>{parsed.truncated ? "是" : "否"}</div>
+            {parsed.warnings && parsed.warnings.length > 0 && (
+              <div><span className="text-foreground-secondary">提示：</span>{parsed.warnings.join("；")}</div>
+            )}
+          </div>
+          {parsed.summary && (
+            <>
+              <div className="text-[11px] font-medium text-foreground-secondary">摘要预览</div>
+              <pre className="rounded bg-background-tertiary/50 p-2 text-[11px] overflow-x-auto max-h-[200px] overflow-y-auto whitespace-pre-wrap">
+                {parsed.summary}
+              </pre>
+            </>
+          )}
+        </div>
+      );
+    } catch {
+      // ignore and fallback
+    }
+  }
   if (typeof result !== "string") {
     return (
-      <pre className="rounded bg-background-tertiary p-2 text-[11px] overflow-x-auto max-h-[300px] overflow-y-auto">
+      <pre className={cn("rounded bg-background-tertiary/50 p-2 text-[11px] overflow-x-auto max-h-[300px] overflow-y-auto", resultTextColorClass)}>
         {JSON.stringify(result, null, 2)}
       </pre>
     );
@@ -677,7 +812,12 @@ function ResultContent({ result }: { result: unknown }) {
   const diff = extractDiffLines(result);
   if (!diff) {
     return (
-      <pre className="rounded bg-background-tertiary p-2 text-[11px] overflow-x-auto max-h-[300px] overflow-y-auto whitespace-pre-wrap">
+      <pre
+        className={cn(
+          "rounded bg-background-tertiary/50 p-2 text-[11px] overflow-x-auto max-h-[300px] overflow-y-auto whitespace-pre-wrap",
+          resultTextColorClass,
+        )}
+      >
         {result}
       </pre>
     );
@@ -688,18 +828,23 @@ function ResultContent({ result }: { result: unknown }) {
         <p className="text-[11px] text-muted-foreground mb-1">{diff.intro}</p>
       )}
       <div className="mb-1 text-[11px] font-medium uppercase text-foreground-secondary">{t("tool.content")}</div>
-      <div className="rounded bg-background-tertiary p-2 text-[11px] overflow-x-auto max-h-[300px] overflow-y-auto font-mono">
+      <div
+        className={cn(
+          "rounded bg-background-tertiary/50 p-2 text-[11px] overflow-x-auto max-h-[300px] overflow-y-auto font-mono",
+          resultTextColorClass,
+        )}
+      >
         {diff.diffLines.map((line, i) => {
           if (line.startsWith("+") && !line.startsWith("+++")) {
             return (
-              <div key={i} className="bg-success/15 text-foreground">
+              <div key={i} className={cn("bg-success/15", resultTextColorClass)}>
                 {line}
               </div>
             );
           }
           if (line.startsWith("-") && !line.startsWith("---")) {
             return (
-              <div key={i} className="bg-destructive/15 text-foreground">
+              <div key={i} className={cn("bg-destructive/15", resultTextColorClass)}>
                 {line}
               </div>
             );
@@ -727,6 +872,20 @@ const TOOL_ICON_MAP: Record<string, typeof Wrench> = {
 function ToolCallIcon({ toolName }: { toolName: string }) {
   const Icon = TOOL_ICON_MAP[toolName] ?? Wrench;
   return <Icon className="size-3.5 shrink-0 text-muted-foreground" strokeWidth={1.5} />;
+}
+
+/** 标题栏摘要：让用户一眼知道工具正在处理什么 */
+function getToolHeaderSummary(toolName: string, args: Record<string, unknown> | undefined): string | null {
+  if (!args) return null;
+  if (toolName === "bash") {
+    const desc = args.description;
+    return typeof desc === "string" && desc.trim() ? desc.trim() : null;
+  }
+  if (toolName === "read" || toolName === "edit") {
+    const path = args.filePath;
+    return typeof path === "string" && path.trim() ? path.trim() : null;
+  }
+  return null;
 }
 
 /** 流式展示文本：按行逐行显示，模拟输出效果 */
@@ -757,31 +916,72 @@ function ToolCallArgsDisplay({
   streamReveal?: boolean;
 }) {
   const { t } = useTranslation();
-  const preClass = "rounded bg-background-tertiary p-2 text-[11px] overflow-x-auto font-mono";
+  const preClass = "rounded bg-background-tertiary p-2 text-[11px] text-foreground-tertiary overflow-x-auto font-mono";
+  const bashPreClass =
+    "rounded bg-background-tertiary/50 px-3 py-2 text-[13px] leading-relaxed overflow-x-auto font-mono text-foreground-tertiary";
   const renderPre = (content: string, extraClass = "") =>
     streamReveal ? (
       <StreamRevealText text={content} className={cn(preClass, extraClass)} />
     ) : (
       <pre className={cn(preClass, extraClass)}>{content}</pre>
     );
+  const renderBashCommand = (command: string) =>
+    streamReveal ? (
+      <StreamRevealText text={command} className={bashPreClass} />
+    ) : (
+      <div className={bashPreClass}>
+        <Highlight prism={Prism} language="bash" code={command} theme={BASH_HIGHLIGHT_THEME}>
+          {({ tokens, getLineProps, getTokenProps }) => (
+            <span className="block whitespace-pre-wrap">
+              {tokens.map((line, i) => (
+                <span key={i} {...getLineProps({ line })} className="block">
+                  {line.map((token, k) => (
+                    <span key={k} {...getTokenProps({ token })} />
+                  ))}
+                </span>
+              ))}
+            </span>
+          )}
+        </Highlight>
+      </div>
+    );
 
-  if (toolName === "bash") {
-    const description = args.description as string | undefined;
-    const command = (args.command as string) ?? "—";
+  if (toolName === "parse_document") {
+    const attachmentId = (args.attachmentId as string | undefined) ?? "—";
+    const mode = (args.mode as string | undefined) ?? "full";
+    const pageRange = args.pageRange as string | undefined;
+    const maxBytes = args.maxBytes as number | undefined;
+    const modeLabel =
+      mode === "summary"
+        ? "文档总结"
+        : mode === "chunks"
+          ? "分块读取"
+          : "文档全文";
     return (
       <div className="mb-2 space-y-1">
-        {description && (
-          <div className="text-[11px] font-medium text-foreground-secondary font-mono">
-            {streamReveal ? <StreamRevealText text={`# ${description}`} className="" /> : `# ${description}`}
-          </div>
+        <div className="text-[11px] font-medium text-foreground-secondary">附件 ID</div>
+        {renderPre(attachmentId)}
+        <div className="text-[11px] font-medium text-foreground-secondary">读取模式</div>
+        {renderPre(modeLabel)}
+        {pageRange && (
+          <>
+            <div className="text-[11px] font-medium text-foreground-secondary">页码范围（仅 PDF）</div>
+            {renderPre(pageRange)}
+          </>
         )}
-        {streamReveal ? (
-          <StreamRevealText text={command} className={preClass} />
-        ) : (
-          <pre className={preClass}>{command}</pre>
+        {maxBytes != null && (
+          <>
+            <div className="text-[11px] font-medium text-foreground-secondary">最大读取字节</div>
+            {renderPre(String(maxBytes))}
+          </>
         )}
       </div>
     );
+  }
+
+  if (toolName === "bash") {
+    const command = (args.command as string) ?? "—";
+    return <div className="mb-2">{renderBashCommand(command)}</div>;
   }
   if (toolName === "read") {
     const filePath = args.filePath as string | undefined;
@@ -796,15 +996,7 @@ function ToolCallArgsDisplay({
       </div>
     );
   }
-  if (toolName === "write") {
-    const filePath = (args.filePath as string) ?? "—";
-    return (
-      <div className="mb-2 space-y-1">
-        <div className="text-[11px] font-medium text-foreground-secondary">{t("tool.path")}</div>
-        {streamReveal ? <StreamRevealText text={filePath} className={preClass} /> : <pre className={preClass}>{filePath}</pre>}
-      </div>
-    );
-  }
+  if (toolName === "write") return null;
   if (toolName === "edit") {
     const filePath = args.filePath as string | undefined;
     const oldString = args.oldString as string | undefined;
@@ -851,6 +1043,7 @@ function ToolCallBlock({ toolCall, pendingAsk }: { toolCall: ToolCallInfo; pendi
   const { t } = useTranslation();
   const respond = usePermissionStore((s) => s.respond);
   const toolDisplayName = (typeof toolCall.toolName === "string" ? toolCall.toolName : "tool").replace(/_/g, " ");
+  const toolSummary = getToolHeaderSummary(toolCall.toolName, toolCall.args);
   const showPermissionBar = toolCall.isLoading && isToolCallPending(toolCall, pendingAsk);
   const isDone = !toolCall.isLoading && toolCall.result !== undefined;
   const isRejected = isDone && isToolResultRejected(toolCall.result);
@@ -863,7 +1056,12 @@ function ToolCallBlock({ toolCall, pendingAsk }: { toolCall: ToolCallInfo; pendi
         className="flex min-h-10 w-full items-center gap-2 px-3 py-2 text-[13px] hover:bg-background-tertiary/50 transition-colors"
       >
         <ToolCallIcon toolName={toolCall.toolName} />
-        <span className="font-medium capitalize">{toolDisplayName}</span>
+        <span className="text-[13px] leading-none font-semibold capitalize">{toolDisplayName}</span>
+        {toolSummary && (
+          <span className="min-w-0 max-w-[420px] truncate text-[13px] leading-none font-normal text-foreground-secondary">
+            {toolSummary}
+          </span>
+        )}
         <div className="flex-1 min-w-0" />
         {toolCall.isLoading ? (
           <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-foreground">
@@ -931,7 +1129,7 @@ function ToolCallBlock({ toolCall, pendingAsk }: { toolCall: ToolCallInfo; pendi
                 {toolCall.result !== undefined && (
                   <>
                     <div className="mb-1 text-[11px] font-medium text-foreground-secondary">{t("tool.result")}</div>
-                    <ResultContent result={toolCall.result} />
+                    <ResultContent result={toolCall.result} toolName={toolCall.toolName} />
                   </>
                 )}
               </div>
@@ -1012,11 +1210,12 @@ function renderMessageContent(
         }
         const isLast = isLastSegment && i === blocks.length - 1;
         return (
-          <MarkdownContent
-            key={`md-${i}`}
-            source={block.content}
-            trailingCursor={isStreaming && isLast}
-          />
+          <MarkdownErrorBoundary key={`md-${i}`} fallback={block.content ?? ""}>
+            <MarkdownContent
+              source={block.content}
+              trailingCursor={isStreaming && isLast}
+            />
+          </MarkdownErrorBoundary>
         );
       })}
     </>
@@ -1068,22 +1267,47 @@ function ActionButton({
   );
 }
 
+/** 根据当前小时返回时段 key（用于 welcomeGreeting 的 time 插值） */
+function getTimeOfDayKey(): string {
+  const h = new Date().getHours();
+  if (h >= 0 && h < 5) return "timeDawn";       // 凌晨
+  if (h >= 5 && h < 8) return "timeEarlyMorning"; // 清晨
+  if (h >= 8 && h < 10) return "timeMorning";    // 早上
+  if (h >= 10 && h < 12) return "timeLateMorning"; // 上午
+  if (h >= 12 && h < 14) return "timeNoon";      // 中午
+  if (h >= 14 && h < 17) return "timeAfternoon"; // 下午
+  if (h >= 17 && h < 19) return "timeDusk";      // 傍晚
+  if (h >= 19 && h < 22) return "timeEvening";   // 晚上
+  return "timeNight";                            // 夜里
+}
+
+/** 空状态：产品 logo + 国际化引导语（按时段：上午好/中午好/晚上好等） */
 function EmptyState() {
-  const providerType = useChatStore((s) => s.providerType);
+  const { t } = useTranslation();
+  const timeKey = getTimeOfDayKey();
+  const timeLabel = t(`chat.${timeKey}`);
+  const greeting = t("chat.welcomeGreeting", { time: timeLabel });
+
   return (
-    <div className="flex flex-1 items-center justify-center">
-      <div className="text-center">
-        <div className="mx-auto mb-4 flex size-12 items-center justify-center rounded-2xl bg-brand/10">
-          {providerType ? (
-            <ProviderIcon type={providerType} className="size-6 text-brand" />
-          ) : (
-            <Bot className="size-6 text-brand" />
-          )}
+    <div className="flex flex-1 items-center justify-center px-6">
+      {/* 用 text-center 统一居中 logo 与问候语，保证同一水平中线 */}
+      <div className="w-full max-w-sm text-center">
+        <div className="-ml-12 mb-4 inline-flex items-center">
+          <img
+            src="/logo.png"
+            alt=""
+            className="h-20 w-auto shrink-0 object-contain object-center"
+            aria-hidden
+          />
+          <span
+            className="-ml-5 -mt-1 text-3xl font-semibold leading-none"
+            style={{ fontFamily: '"Rubik", sans-serif' }}
+          >
+            <span style={{ color: '#54C2F6' }}>o</span>
+            <span style={{ color: '#2563EB' }}>ve</span>
+          </span>
         </div>
-        <h2 className="text-lg font-semibold">Start a conversation</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Choose a model and send a message to get started.
-        </p>
+        <p className="text-xl font-semibold" style={{ color: '#060a26' }}>{greeting}</p>
       </div>
     </div>
   );

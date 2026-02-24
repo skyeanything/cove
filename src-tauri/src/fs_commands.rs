@@ -5,6 +5,7 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
+use tauri::Emitter;
 
 // ---------------------------------------------------------------------------
 // 错误类型
@@ -145,7 +146,63 @@ fn is_binary_content(mut reader: impl Read) -> Result<bool, std::io::Error> {
 // ---------------------------------------------------------------------------
 
 const READ_MAX_BYTES: u64 = 250 * 1024; // 250KB
+const READ_DATA_URL_MAX_BYTES: u64 = 25 * 1024 * 1024; // 25MB
 const LINE_MAX_CHARS: usize = 2000;
+
+// ---------------------------------------------------------------------------
+// MIME 检测：优先 magic bytes，扩展名 fallback
+// ---------------------------------------------------------------------------
+
+fn mime_from_magic(bytes: &[u8]) -> Option<&'static str> {
+    if bytes.len() < 12 {
+        return None;
+    }
+    // PNG
+    if bytes.starts_with(&[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) {
+        return Some("image/png");
+    }
+    // JPEG
+    if bytes.starts_with(&[0xFF, 0xD8, 0xFF]) {
+        return Some("image/jpeg");
+    }
+    // GIF
+    if bytes.starts_with(b"GIF87a") || bytes.starts_with(b"GIF89a") {
+        return Some("image/gif");
+    }
+    // WebP: RIFF....WEBP
+    if bytes.len() >= 12 && bytes[0..4] == [0x52, 0x49, 0x46, 0x46] && bytes[8..12] == *b"WEBP" {
+        return Some("image/webp");
+    }
+    // PDF
+    if bytes.starts_with(b"%PDF") {
+        return Some("application/pdf");
+    }
+    // ZIP (含 docx/xlsx/pptx)
+    if bytes.len() >= 4 && bytes[0..2] == [0x50, 0x4B] && (bytes[2] == 0x03 || bytes[2] == 0x05) {
+        return Some("application/zip");
+    }
+    // SVG (文本，可选按内容判断；此处不检测，交给扩展名)
+    None
+}
+
+fn mime_from_extension(p: &Path) -> &'static str {
+    let ext = p
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|s| s.to_lowercase());
+    match ext.as_deref() {
+        Some("png") => "image/png",
+        Some("jpg") | Some("jpeg") => "image/jpeg",
+        Some("gif") => "image/gif",
+        Some("webp") => "image/webp",
+        Some("svg") => "image/svg+xml",
+        Some("pdf") => "application/pdf",
+        Some("docx") => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        Some("xlsx") => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        Some("pptx") => "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        _ => "application/octet-stream",
+    }
+}
 
 // ---------------------------------------------------------------------------
 // Tauri 命令（前端传 camelCase，用 serde rename 对齐）
@@ -232,6 +289,180 @@ pub fn write_file(args: WriteFileArgs) -> Result<(), FsError> {
     Ok(())
 }
 
+// --------------- list_dir ---------------
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListDirArgs {
+    pub workspace_root: String,
+    /// 相对工作区根的目录路径，空字符串表示根
+    pub path: String,
+    /// 是否包含以 . 开头的隐藏文件，默认 true
+    pub include_hidden: Option<bool>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ListDirEntry {
+    pub name: String,
+    /// 相对工作区根的路径
+    pub path: String,
+    pub is_dir: bool,
+    pub mtime_secs: i64,
+}
+
+#[tauri::command]
+pub fn list_dir(args: ListDirArgs) -> Result<Vec<ListDirEntry>, FsError> {
+    let root = Path::new(&args.workspace_root)
+        .canonicalize()
+        .map_err(|_| FsError::NotFound)?
+        .into_os_string()
+        .into_string()
+        .map_err(|_| FsError::Io("workspace path invalid utf-8".into()))?;
+
+    let dir_path = if args.path.trim().is_empty() {
+        root.clone()
+    } else {
+        let resolved = Path::new(&root).join(&args.path);
+        let canonical = resolved.canonicalize().map_err(|e| {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                FsError::NotFound
+            } else {
+                FsError::Io(e.to_string())
+            }
+        })?;
+        canonical
+            .into_os_string()
+            .into_string()
+            .map_err(|_| FsError::Io("path invalid utf-8".into()))?
+    };
+
+    if !dir_path.starts_with(&root) {
+        return Err(FsError::OutsideWorkspace);
+    }
+    let meta = fs::metadata(&dir_path).map_err(FsError::from)?;
+    if !meta.is_dir() {
+        return Err(FsError::NotAllowed("not a directory".into()));
+    }
+
+    let root_path = Path::new(&root);
+    let mut entries = Vec::new();
+    for e in fs::read_dir(&dir_path).map_err(FsError::from)? {
+        let e = e.map_err(FsError::from)?;
+        let entry_path = e.path();
+        let canonical = match entry_path.canonicalize() {
+            Ok(p) => p,
+            Err(_) => continue,
+        };
+        let canonical_str = match canonical.into_os_string().into_string() {
+            Ok(s) => s,
+            Err(_) => continue,
+        };
+        if !canonical_str.starts_with(&root) {
+            continue;
+        }
+        let name = e
+            .file_name()
+            .into_string()
+            .map_err(|_| FsError::Io("entry name invalid utf-8".into()))?;
+        if args.include_hidden == Some(false) && name.starts_with('.') {
+            continue;
+        }
+        let rel = Path::new(&canonical_str)
+            .strip_prefix(root_path)
+            .map_err(|_| FsError::Io("strip prefix".into()))?;
+        let path = rel.to_string_lossy().replace('\\', "/");
+        let meta = fs::metadata(&canonical_str).map_err(FsError::from)?;
+        let is_dir = meta.is_dir();
+        let mtime_secs = meta
+            .modified()
+            .map(|t| t.duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs() as i64)
+            .unwrap_or(0);
+        entries.push(ListDirEntry {
+            name,
+            path,
+            is_dir,
+            mtime_secs,
+        });
+    }
+    entries.sort_by(|a, b| {
+        match (a.is_dir, b.is_dir) {
+            (true, false) => std::cmp::Ordering::Less,
+            (false, true) => std::cmp::Ordering::Greater,
+            _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
+        }
+    });
+    Ok(entries)
+}
+
+// --------------- read_file_raw ---------------
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReadFileRawArgs {
+    pub workspace_root: String,
+    pub path: String,
+}
+
+#[tauri::command]
+pub fn read_file_raw(args: ReadFileRawArgs) -> Result<String, FsError> {
+    let abs = ensure_inside_workspace_exists(&args.workspace_root, &args.path)?;
+    let meta = fs::metadata(&abs).map_err(FsError::from)?;
+    if meta.is_dir() {
+        return Err(FsError::NotAllowed("is a directory".into()));
+    }
+    if meta.len() > READ_MAX_BYTES {
+        return Err(FsError::TooLarge);
+    }
+    if path_has_binary_extension(&abs) {
+        return Err(FsError::BinaryFile);
+    }
+    let mut f = fs::File::open(&abs).map_err(FsError::from)?;
+    if is_binary_content(&mut f).map_err(FsError::from)? {
+        return Err(FsError::BinaryFile);
+    }
+    f = fs::File::open(&abs).map_err(FsError::from)?;
+    let mut content = String::new();
+    f.read_to_string(&mut content).map_err(FsError::from)?;
+    Ok(content)
+}
+
+// --------------- read_file_as_data_url ---------------
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReadFileAsDataUrlArgs {
+    pub workspace_root: String,
+    pub path: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ReadFileAsDataUrlResult {
+    pub data_url: String,
+}
+
+#[tauri::command]
+pub fn read_file_as_data_url(args: ReadFileAsDataUrlArgs) -> Result<ReadFileAsDataUrlResult, FsError> {
+    let abs = ensure_inside_workspace_exists(&args.workspace_root, &args.path)?;
+    let meta = fs::metadata(&abs).map_err(FsError::from)?;
+    if meta.is_dir() {
+        return Err(FsError::NotAllowed("is a directory".into()));
+    }
+    if meta.len() > READ_DATA_URL_MAX_BYTES {
+        return Err(FsError::TooLarge);
+    }
+    let bytes = fs::read(&abs).map_err(FsError::from)?;
+    let mime = mime_from_magic(&bytes).unwrap_or_else(|| mime_from_extension(&abs));
+    use base64::engine::general_purpose::STANDARD as BASE64;
+    use base64::Engine;
+    let b64 = BASE64.encode(&bytes);
+    let data_url = format!("data:{};base64,{}", mime, b64);
+    Ok(ReadFileAsDataUrlResult { data_url })
+}
+
+// --------------- stat_file ---------------
+
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct StatFileArgs {
@@ -275,6 +506,241 @@ pub fn stat_file(args: StatFileArgs) -> Result<StatFileResult, FsError> {
         is_dir,
         is_binary,
     })
+}
+
+// --------------- open_with_app ---------------
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OpenWithAppArgs {
+    pub workspace_root: String,
+    pub path: String,
+    /// 可选：指定用哪个应用打开（macOS 上为 app 名称或 bundle path）
+    #[serde(default)]
+    pub open_with: Option<String>,
+}
+
+#[tauri::command]
+pub fn open_with_app(args: OpenWithAppArgs) -> Result<(), FsError> {
+    let abs = ensure_inside_workspace_exists(&args.workspace_root, &args.path)?;
+    let abs_str = abs.to_str().ok_or_else(|| FsError::Io("path invalid utf-8".into()))?;
+
+    let mut cmd = std::process::Command::new("open");
+    if let Some(app) = &args.open_with {
+        cmd.arg("-a").arg(app);
+    }
+    cmd.arg(abs_str);
+    cmd.spawn().map_err(|e| FsError::Io(e.to_string()))?;
+    Ok(())
+}
+
+// --------------- create_dir ---------------
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateDirArgs {
+    pub workspace_root: String,
+    /// 父目录相对工作区根的路径，空字符串表示工作区根
+    pub path: String,
+    /// 新文件夹名称
+    pub name: String,
+}
+
+#[tauri::command]
+pub fn create_dir(app: tauri::AppHandle, args: CreateDirArgs) -> Result<(), FsError> {
+    let parent_path = if args.path.trim().is_empty() {
+        ".".to_string()
+    } else {
+        args.path.clone()
+    };
+    let parent = ensure_inside_workspace_exists(&args.workspace_root, &parent_path)?;
+    let name = args.name.trim();
+    if name.is_empty() || name.contains('/') || name.contains('\\') {
+        return Err(FsError::NotAllowed("invalid folder name".into()));
+    }
+    let new_dir = parent.join(name);
+    if new_dir.exists() {
+        return Err(FsError::NotAllowed("already exists".into()));
+    }
+    fs::create_dir(&new_dir).map_err(FsError::from)?;
+    let root = Path::new(&args.workspace_root).canonicalize().map_err(FsError::from)?;
+    let rel = new_dir
+        .strip_prefix(&root)
+        .map(|p| p.to_string_lossy().replace('\\', "/"))
+        .map_err(|_| FsError::Io("strip prefix".into()))?;
+    let _ = app.emit(
+        crate::workspace_watcher::EVENT_WORKSPACE_FILE_CHANGED,
+        crate::workspace_watcher::WorkspaceFileChangedPayload {
+            path: rel,
+            kind: crate::workspace_watcher::FileChangeKind::Create,
+        },
+    );
+    Ok(())
+}
+
+// --------------- move_file (含重命名) ---------------
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MoveFileArgs {
+    pub workspace_root: String,
+    pub from_path: String,
+    pub to_path: String,
+}
+
+#[tauri::command]
+pub fn move_file(app: tauri::AppHandle, args: MoveFileArgs) -> Result<(), FsError> {
+    let from_abs = ensure_inside_workspace_exists(&args.workspace_root, &args.from_path)?;
+    let to_abs = ensure_inside_workspace_may_not_exist(&args.workspace_root, &args.to_path)?;
+    if from_abs == to_abs {
+        return Ok(());
+    }
+    if to_abs.exists() {
+        return Err(FsError::NotAllowed("destination already exists".into()));
+    }
+    if let Some(parent) = to_abs.parent() {
+        if !parent.exists() {
+            fs::create_dir_all(parent).map_err(FsError::from)?;
+        }
+    }
+    fs::rename(&from_abs, &to_abs).map_err(FsError::from)?;
+    let root = Path::new(&args.workspace_root).canonicalize().map_err(FsError::from)?;
+    let from_rel = from_abs
+        .strip_prefix(&root)
+        .map(|p| p.to_string_lossy().replace('\\', "/"))
+        .unwrap_or_else(|_| args.from_path.clone());
+    let to_rel = to_abs
+        .strip_prefix(&root)
+        .map(|p| p.to_string_lossy().replace('\\', "/"))
+        .unwrap_or_else(|_| args.to_path.clone());
+    let _ = app.emit(
+        crate::workspace_watcher::EVENT_WORKSPACE_FILE_CHANGED,
+        crate::workspace_watcher::WorkspaceFileChangedPayload {
+            path: from_rel,
+            kind: crate::workspace_watcher::FileChangeKind::Rename,
+        },
+    );
+    let _ = app.emit(
+        crate::workspace_watcher::EVENT_WORKSPACE_FILE_CHANGED,
+        crate::workspace_watcher::WorkspaceFileChangedPayload {
+            path: to_rel,
+            kind: crate::workspace_watcher::FileChangeKind::Create,
+        },
+    );
+    Ok(())
+}
+
+// --------------- remove_entry (文件或目录) ---------------
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RemoveEntryArgs {
+    pub workspace_root: String,
+    pub path: String,
+}
+
+#[tauri::command]
+pub fn remove_entry(app: tauri::AppHandle, args: RemoveEntryArgs) -> Result<(), FsError> {
+    let abs = ensure_inside_workspace_exists(&args.workspace_root, &args.path)?;
+    let meta = fs::metadata(&abs).map_err(FsError::from)?;
+    if meta.is_dir() {
+        fs::remove_dir_all(&abs).map_err(FsError::from)?;
+    } else {
+        fs::remove_file(&abs).map_err(FsError::from)?;
+    }
+    let _ = app.emit(
+        crate::workspace_watcher::EVENT_WORKSPACE_FILE_CHANGED,
+        crate::workspace_watcher::WorkspaceFileChangedPayload {
+            path: args.path.clone(),
+            kind: crate::workspace_watcher::FileChangeKind::Remove,
+        },
+    );
+    Ok(())
+}
+
+// --------------- reveal_in_finder ---------------
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RevealInFinderArgs {
+    pub workspace_root: String,
+    pub path: String,
+}
+
+#[tauri::command]
+pub fn reveal_in_finder(args: RevealInFinderArgs) -> Result<(), FsError> {
+    let abs = ensure_inside_workspace_exists(&args.workspace_root, &args.path)?;
+    let abs_str = abs.to_str().ok_or_else(|| FsError::Io("path invalid utf-8".into()))?;
+
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg("-R")
+            .arg(abs_str)
+            .spawn()
+            .map_err(|e| FsError::Io(e.to_string()))?;
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        let arg = format!("/select,{}", abs_str);
+        std::process::Command::new("explorer").arg(arg).spawn().map_err(|e| FsError::Io(e.to_string()))?;
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        if let Some(parent) = abs.parent() {
+            if let Some(p) = parent.to_str() {
+                let _ = std::process::Command::new("xdg-open").arg(p).spawn();
+            }
+        }
+    }
+
+    Ok(())
+}
+
+// --------------- detect_office_apps ---------------
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OfficeAppInfo {
+    /// 应用标识符，用于 open -a 参数
+    pub id: String,
+    /// 显示名称
+    pub name: String,
+    /// 应用路径
+    pub path: String,
+}
+
+#[tauri::command]
+pub fn detect_office_apps() -> Vec<OfficeAppInfo> {
+    let mut apps = Vec::new();
+
+    #[cfg(target_os = "macos")]
+    {
+        let candidates: &[(&str, &str, &[&str])] = &[
+            ("wpsoffice", "WPS Office", &["/Applications/wpsoffice.app"]),
+            ("Microsoft Word", "Microsoft Word", &["/Applications/Microsoft Word.app"]),
+            ("Microsoft Excel", "Microsoft Excel", &["/Applications/Microsoft Excel.app"]),
+            ("Microsoft PowerPoint", "Microsoft PowerPoint", &["/Applications/Microsoft PowerPoint.app"]),
+            ("LibreOffice", "LibreOffice", &["/Applications/LibreOffice.app"]),
+        ];
+
+        for &(id, name, paths) in candidates {
+            for &p in paths {
+                if Path::new(p).exists() {
+                    apps.push(OfficeAppInfo {
+                        id: id.to_string(),
+                        name: name.to_string(),
+                        path: p.to_string(),
+                    });
+                    break;
+                }
+            }
+        }
+    }
+
+    apps
 }
 
 // ---------------------------------------------------------------------------

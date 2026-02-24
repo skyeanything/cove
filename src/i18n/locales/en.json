@@ -40,7 +40,18 @@
     "copyMarkdownTip": "Copy as Markdown",
     "regenerateTip": "Regenerate",
     "contextUsed": "{{percent}}% context used",
-    "contextUsedFormula": "{{used}} / {{limit}} = {{percent}}%"
+    "contextUsedFormula": "{{used}} / {{limit}} = {{percent}}%",
+    "visionNotSupported": "The current model does not support image input. Remove images or switch to a vision-capable model to send.",
+    "welcomeGreeting": "Good {{time}}, how can I help you?",
+    "timeDawn": "morning",
+    "timeEarlyMorning": "early morning",
+    "timeMorning": "morning",
+    "timeLateMorning": "late morning",
+    "timeNoon": "afternoon",
+    "timeAfternoon": "afternoon",
+    "timeDusk": "evening",
+    "timeEvening": "evening",
+    "timeNight": "night"
   },
   "sidebar": {
     "pinned": "Pinned",
@@ -48,10 +59,10 @@
     "yesterday": "Yesterday",
     "past7days": "Past 7 days",
     "earlier": "Earlier",
-    "newChat": "New chat",
+    "newChat": "New Chat",
     "searchPlaceholder": "Search",
     "noConversations": "No conversations yet",
-    "untitled": "Untitled",
+    "untitled": "New Chat",
     "pinConversation": "Pin conversation",
     "unpinConversation": "Unpin conversation",
     "rename": "Rename",
@@ -66,15 +77,67 @@
     "searchPlaceholder": "Search models...",
     "noModelsFound": "No models found."
   },
+  "explorer": {
+    "copy": "Copy",
+    "cut": "Cut",
+    "paste": "Paste",
+    "newFolder": "New Folder",
+    "create": "Create",
+    "rename": "Rename",
+    "revealInFinder": "Reveal in Finder",
+    "copyRelativePath": "Copy Relative Path",
+    "copyAbsolutePath": "Copy Absolute Path",
+    "delete": "Delete",
+    "deleteConfirmTitle": "Delete",
+    "deleteConfirmDescription": "Are you sure you want to delete \"{{name}}\"? This cannot be undone.",
+    "folderAlreadyExists": "A folder with this name already exists."
+  },
+  "preview": {
+    "openFilePanel": "Open file panel",
+    "closeFilePanel": "Close file panel",
+    "workspace": "WORKSPACE",
+    "explorer": "EXPLORER",
+    "showHidden": "Show hidden files",
+    "hideHidden": "Hide hidden files",
+    "refreshDir": "Refresh directory",
+    "selectWorkspace": "Select a workspace first",
+    "emptyDir": "Empty directory",
+    "selectFile": "Select a file on the left",
+    "fileDeleted": "File has been deleted",
+    "unsupported": "Preview not supported for this file type",
+    "loading": "Loading…",
+    "previewTab": "Preview",
+    "codeTab": "Code",
+    "openDefault": "Open with default app",
+    "openInApp": "Open in {{app}}",
+    "openInNativeWindow": "Open in system preview window",
+    "docxUseSystemPreview": "Open DOCX in system preview for correct pagination",
+    "docxLoading": "Loading DOCX…",
+    "docxLoadError": "Failed to parse DOCX",
+    "docxRenderError": "Failed to render DOCX",
+    "pageNumber": "Page {{current}} / {{total}}"
+  },
   "common": {
     "settings": "Settings"
   },
   "provider": {
+    "aliyun": {
+      "description": "Alibaba Cloud Model Studio (Qwen) via OpenAI-compatible API"
+    },
     "deepseek": {
       "description": "Into the unknown"
     },
     "moonshot": {
       "description": "Seeking the optimal conversion from energy to intelligence"
+    },
+    "minimax": {
+      "description": "co-create intelligence with everyone"
+    },
+    "tencentCloud": {
+      "description": "Tencent Hunyuan models via OpenAI-compatible API"
+    },
+    "volcengineArk": {
+      "description": "Volcengine Ark model service via OpenAI-compatible API"
     },
     "capability": {
       "vision": "Vision",
@@ -138,5 +201,16 @@
     "scanning": "Scanning local skill directories…",
     "noSkills": "No skills available",
     "sourceApp": "App"
+  },
+  "workspace": {
+    "title": "WORKSPACE",
+    "description": "All tool operations will use this directory as working directory.",
+    "default": "Default",
+    "selectDirectory": "Select Directory...",
+    "removeTitle": "Remove workspace",
+    "removeDescription": "Remove {{name}} from the workspace list? This won't delete any files on disk.",
+    "cancel": "Cancel",
+    "remove": "Remove",
+    "removeButtonTitle": "Remove workspace"
   }
 }

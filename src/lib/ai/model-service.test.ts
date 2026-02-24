@@ -158,6 +158,35 @@ describe("getModelsForProviders", () => {
     expect(result.every((m) => m.provider_type === "anthropic")).toBe(true);
   });
 
+  it("handles MiniMax provider with knownModels", () => {
+    const provider = makeProvider({
+      id: "mm-1",
+      name: "MiniMax",
+      type: "minimax",
+      api_key: "sk-mm-test",
+      base_url: "https://api.minimaxi.com",
+    });
+    const result = getModelsForProviders([provider]);
+    expect(result).toHaveLength(5);
+    expect(result.every((m) => m.provider_type === "minimax")).toBe(true);
+  });
+
+  it("handles MiniMax provider with cached_models", () => {
+    const provider = makeProvider({
+      id: "mm-1",
+      name: "MiniMax",
+      type: "minimax",
+      api_key: "sk-mm-test",
+      base_url: "https://api.minimaxi.com",
+      config: JSON.stringify({
+        cached_models: ["MiniMax-M2.5", "MiniMax-M2"],
+      }),
+    });
+    const result = getModelsForProviders([provider]);
+    expect(result).toHaveLength(2);
+    expect(result.map((m) => m.id)).toEqual(["MiniMax-M2.5", "MiniMax-M2"]);
+  });
+
   it("handles Ollama provider with no knownModels and no cached_models", () => {
     const provider = makeProvider({
       id: "ollama-1",

@@ -1,9 +1,10 @@
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Sun, Moon } from "lucide-react";
+import { Sun, Moon, LayoutPanelLeft } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useThemeStore } from "@/stores/themeStore";
 import { useDataStore } from "@/stores/dataStore";
+import { useLayoutStore } from "@/stores/layoutStore";
 
 interface ChatHeaderProps {
   leftSidebarOpen: boolean;
@@ -24,6 +25,9 @@ export function ChatHeader({ leftSidebarOpen }: ChatHeaderProps) {
     theme === "dark" ||
     (theme === "system" &&
       window.matchMedia("(prefers-color-scheme: dark)").matches);
+
+  const filePanelOpen = useLayoutStore((s) => s.filePanelOpen);
+  const toggleFilePanel = useLayoutStore((s) => s.toggleFilePanel);
 
   return (
     <div className="shrink-0">
@@ -48,15 +52,27 @@ export function ChatHeader({ leftSidebarOpen }: ChatHeaderProps) {
           variant="ghost"
           size="icon-sm"
           onClick={() => setTheme(isDark ? "light" : "dark")}
-          className="text-muted-foreground hover:text-foreground"
+          className="size-6 text-muted-foreground hover:text-foreground"
           title={isDark ? "Switch to light mode" : "Switch to dark mode"}
         >
           {isDark ? (
-            <Sun className="size-[18px]" strokeWidth={1.5} />
+            <Sun className="size-[16px]" strokeWidth={1.5} />
           ) : (
-            <Moon className="size-[18px]" strokeWidth={1.5} />
+            <Moon className="size-[16px]" strokeWidth={1.5} />
           )}
         </Button>
+
+        {!filePanelOpen && (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={toggleFilePanel}
+            className="size-6 text-muted-foreground hover:text-foreground"
+            title={t("preview.openFilePanel")}
+          >
+            <LayoutPanelLeft className="size-[16px]" strokeWidth={1.5} />
+          </Button>
+        )}
       </div>
       <Separator />
     </div>

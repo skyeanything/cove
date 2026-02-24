@@ -37,6 +37,7 @@ async function fetchOpenAICompatibleModels(
   baseUrl: string,
   apiKey?: string,
 ): Promise<string[]> {
+  const normalizedBase = normalizeOpenAIBaseUrl(baseUrl);
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
@@ -44,7 +45,7 @@ async function fetchOpenAICompatibleModels(
     headers["Authorization"] = `Bearer ${apiKey}`;
   }
 
-  const res = await fetch(`${baseUrl}/v1/models`, { headers });
+  const res = await fetch(`${normalizedBase}/v1/models`, { headers });
   if (!res.ok) {
     const detail = await extractErrorMessage(res);
     throw new Error(`Failed to fetch models (${res.status}): ${detail}`);
@@ -52,6 +53,16 @@ async function fetchOpenAICompatibleModels(
 
   const data = (await res.json()) as { data: Array<{ id: string }> };
   return data.data.map((m) => m.id).sort();
+}
+
+function normalizeMinimaxBaseUrl(baseUrl: string): string {
+  const clean = baseUrl.replace(/\/+$/, "");
+  return clean.endsWith("/v1") ? clean.slice(0, -3) : clean;
+}
+
+function normalizeOpenAIBaseUrl(baseUrl: string): string {
+  const clean = baseUrl.replace(/\/+$/, "");
+  return clean.endsWith("/v1") ? clean.slice(0, -3) : clean;
 }
 
 /** Moonshot 模型列表返回 context_length、supports_image_in、supports_reasoning 等，需解析并写入 model_options */
@@ -174,12 +185,110 @@ async function verifyApiKey(provider: Provider): Promise<void> {
       return;
     }
 
+    case "minimax": {
+      const normalizedBase = normalizeMinimaxBaseUrl(baseUrl);
+      const res = await fetch(`${normalizedBase}/v1/text/chatcompletion_v2`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${provider.api_key || ""}`,
+        },
+        body: JSON.stringify({
+          model: "MiniMax-M2.5",
+          max_tokens: 1,
+          messages: [{ role: "user", content: "ping" }],
+        }),
+      });
+      if (res.status === 401 || res.status === 403) {
+        const detail = await extractErrorMessage(res);
+        throw new Error(`Invalid API key: ${detail}`);
+      }
+      if (!res.ok) {
+        const detail = await extractErrorMessage(res);
+        throw new Error(`Connection failed (${res.status}): ${detail}`);
+      }
+      return;
+    }
+
+    case "aliyun": {
+      const res = await fetch(`${baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${provider.api_key || ""}`,
+        },
+        body: JSON.stringify({
+          model: "qwen-plus",
+          max_tokens: 1,
+          messages: [{ role: "user", content: "ping" }],
+        }),
+      });
+      if (res.status === 401 || res.status === 403) {
+        const detail = await extractErrorMessage(res);
+        throw new Error(`Invalid API key: ${detail}`);
+      }
+      if (!res.ok) {
+        const detail = await extractErrorMessage(res);
+        throw new Error(`Connection failed (${res.status}): ${detail}`);
+      }
+      return;
+    }
+
+    case "tencent-cloud": {
+      const res = await fetch(`${baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${provider.api_key || ""}`,
+        },
+        body: JSON.stringify({
+          model: "hunyuan-turbos-latest",
+          max_tokens: 1,
+          messages: [{ role: "user", content: "ping" }],
+        }),
+      });
+      if (res.status === 401 || res.status === 403) {
+        const detail = await extractErrorMessage(res);
+        throw new Error(`Invalid API key: ${detail}`);
+      }
+      if (!res.ok) {
+        const detail = await extractErrorMessage(res);
+        throw new Error(`Connection failed (${res.status}): ${detail}`);
+      }
+      return;
+    }
+
+    case "volcengine-ark": {
+      const res = await fetch(`${baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${provider.api_key || ""}`,
+        },
+        body: JSON.stringify({
+          model: "seed-1-6-250915",
+          max_tokens: 1,
+          messages: [{ role: "user", content: "ping" }],
+        }),
+      });
+      if (res.status === 401 || res.status === 403) {
+        const detail = await extractErrorMessage(res);
+        throw new Error(`Invalid API key: ${detail}`);
+      }
+      if (!res.ok) {
+        const detail = await extractErrorMessage(res);
+        throw new Error(`Connection failed (${res.status}): ${detail}`);
+      }
+      return;
+    }
+
     case "bedrock": {
       return;
     }
 
     default: {
-      const res = await fetch(`${baseUrl}/v1/models`, {
+      const normalizedBase = normalizeOpenAIBaseUrl(baseUrl);
+      const res = await fetch(`${normalizedBase}/v1/models`, {
         headers: {
           Authorization: `Bearer ${provider.api_key || ""}`,
         },
@@ -233,10 +342,14 @@ export async function fetchModels(provider: Provider): Promise<string[]> {
   return meta.knownModels;
 }
 
-/** 读取某 provider 下某模型的可选配置（能力、上下文窗口、最大输出 tokens 等） */
+/** 读取某 provider 下某模型的可选配置（能力、上下文窗口、最大输出 tokens 等）。优先使用 config（如 Moonshot API 拉取的 model_options），再回退到 meta 的 knownModelDetails。 */
 export function getModelOption(provider: Provider, modelId: string): ModelOption | undefined {
   const config = parseConfig(provider);
-  return config.model_options?.[modelId];
+  const meta = PROVIDER_METAS[provider.type];
+  const fromMeta = meta?.knownModelDetails?.[modelId];
+  const fromConfig = config.model_options?.[modelId];
+  const merged: Partial<ModelOption> = { ...fromMeta, ...fromConfig };
+  return Object.keys(merged).length > 0 ? (merged as ModelOption) : undefined;
 }
 
 export function getModelsForProviders(providers: Provider[]): ModelInfo[] {

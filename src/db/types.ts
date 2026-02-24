@@ -1,13 +1,17 @@
 export type ProviderType =
   | "openai"
+  | "aliyun"
   | "anthropic"
   | "google"
   | "ollama"
+  | "tencent-cloud"
+  | "volcengine-ark"
   | "azure"
   | "bedrock"
   | "deepseek"
   | "groq"
   | "mistral"
+  | "minimax"
   | "moonshot"
   | "openrouter"
   | "perplexity"
@@ -47,6 +51,8 @@ export interface ModelOption {
   tool_calling?: boolean;
   reasoning?: boolean;
   embedding?: boolean;
+  /** 是否支持原生 PDF 文件输入（Claude/Gemini/GPT-4o 等） */
+  pdf_native?: boolean;
 }
 
 export interface ProviderConfig {

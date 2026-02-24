@@ -145,7 +145,7 @@ export function LeftSidebar({ open }: LeftSidebarProps) {
       className={cn(
         "no-select flex flex-col overflow-hidden bg-sidebar",
         "transition-[width,min-width] duration-300 ease-out",
-        open ? "w-[260px] min-w-[260px]" : "w-0 min-w-0 border-r-0",
+        open ? "w-full min-w-0" : "w-0 min-w-0 border-r-0",
         open && "border-r border-sidebar-border",
       )}
     >

@@ -12,7 +12,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { useChatStore } from "@/stores/chatStore";
 import { providerRepo } from "@/db/repos/providerRepo";
 import { getModelsForProviders, getModelOption } from "@/lib/ai/model-service";
-import { PROVIDER_METAS } from "@/lib/ai/provider-meta";
+import { BUILTIN_PROVIDER_TYPES, PROVIDER_METAS } from "@/lib/ai/provider-meta";
 import type { ModelInfo, Provider, ModelOption } from "@/db/types";
 import { ProviderIcon } from "@/components/common/ProviderIcon";
 import { cn } from "@/lib/utils";
@@ -65,7 +65,9 @@ export function ModelSelector({ open, onOpenChange }: ModelSelectorProps) {
     }
   }, [open, loadFromDb]);
 
-  const enabledProviders = providers.filter((p) => p.enabled);
+  const enabledProviders = providers.filter(
+    (p) => p.enabled && BUILTIN_PROVIDER_TYPES.includes(p.type),
+  );
   const models = useMemo(
     () => getModelsForProviders(enabledProviders),
     [enabledProviders],
@@ -115,7 +117,7 @@ export function ModelSelector({ open, onOpenChange }: ModelSelectorProps) {
       {providerType && (
         <ProviderIcon type={providerType} className="size-4 shrink-0" />
       )}
-      <span className="min-w-0 max-w-[380px] truncate text-[11px] font-medium leading-snug">
+      <span className="min-w-0 max-w-[380px] truncate text-[11px] font-medium leading-snug -translate-y-px">
         {currentModelId ?? t("chat.selectModel")}
       </span>
     </button>

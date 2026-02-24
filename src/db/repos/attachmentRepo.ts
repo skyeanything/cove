@@ -2,6 +2,12 @@ import { getDb } from "../index";
 import type { Attachment } from "../types";
 
 export const attachmentRepo = {
+  async getById(id: string): Promise<Attachment | undefined> {
+    const db = await getDb();
+    const rows: Attachment[] = await db.select("SELECT * FROM attachments WHERE id = $1", [id]);
+    return rows[0];
+  },
+
   async getByMessage(messageId: string): Promise<Attachment[]> {
     const db = await getDb();
     return db.select("SELECT * FROM attachments WHERE message_id = $1", [messageId]);

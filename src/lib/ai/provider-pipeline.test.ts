@@ -94,6 +94,7 @@ describe("Provider → Model pipeline (end-to-end logic)", () => {
         dbRow({ type: "deepseek", id: "ds-1" }),
         dbRow({ type: "anthropic", id: "ant-1" }),
         dbRow({ type: "openai", id: "oai-1" }),
+        dbRow({ type: "minimax", id: "mm-1" }),
       ];
 
       const models = getModelsForProviders(providers);
@@ -101,10 +102,12 @@ describe("Provider → Model pipeline (end-to-end logic)", () => {
       const dsModels = models.filter((m) => m.provider_type === "deepseek");
       const antModels = models.filter((m) => m.provider_type === "anthropic");
       const oaiModels = models.filter((m) => m.provider_type === "openai");
+      const mmModels = models.filter((m) => m.provider_type === "minimax");
 
       expect(dsModels).toHaveLength(PROVIDER_METAS.deepseek.knownModels.length);
       expect(antModels).toHaveLength(PROVIDER_METAS.anthropic.knownModels.length);
       expect(oaiModels).toHaveLength(PROVIDER_METAS.openai.knownModels.length);
+      expect(mmModels).toHaveLength(PROVIDER_METAS.minimax.knownModels.length);
     });
 
     it("skips disabled providers", () => {
@@ -188,15 +191,19 @@ describe("Provider → Model pipeline (end-to-end logic)", () => {
 
   describe("Every built-in provider with knownModels returns models", () => {
     const typesWithKnownModels: ProviderType[] = [
+      "aliyun",
       "anthropic",
       "deepseek",
       "google",
       "groq",
       "mistral",
+      "minimax",
       "openai",
       "openrouter",
       "perplexity",
+      "tencent-cloud",
       "together",
+      "volcengine-ark",
       "xai",
     ];
 

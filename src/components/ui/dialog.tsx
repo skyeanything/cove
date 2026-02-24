@@ -51,13 +51,23 @@ function DialogContent({
   className,
   children,
   showCloseButton = true,
+  hideOverlay = false,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & {
   showCloseButton?: boolean
+  /** 为 true 时不显示遮罩背景（透明） */
+  hideOverlay?: boolean
 }) {
   return (
     <DialogPortal data-slot="dialog-portal">
-      <DialogOverlay />
+      {hideOverlay ? (
+        <DialogPrimitive.Overlay
+          className="data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-transparent"
+          data-slot="dialog-overlay"
+        />
+      ) : (
+        <DialogOverlay />
+      )}
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(

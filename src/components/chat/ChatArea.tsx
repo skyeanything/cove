@@ -1,6 +1,6 @@
 import { ChatInput } from "./ChatInput";
-import { MessageList } from "./MessageList";
 import { ChatHeader } from "./ChatHeader";
+import { MessageList } from "./MessageList";
 
 interface ChatAreaProps {
   leftSidebarOpen: boolean;

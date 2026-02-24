@@ -1,16 +1,14 @@
 import "katex/dist/katex.min.css";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
-import remarkDirective from "remark-directive";
-import remarkDirectiveRehype from "remark-directive-rehype";
 import Prism from "prismjs";
 import { Highlight } from "prism-react-renderer";
 import type { Components } from "react-markdown";
-import { ChevronDown, ChevronRight, Copy, Check, Play } from "lucide-react";
+import { Copy, Check, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -28,7 +26,7 @@ import "prismjs/components/prism-markdown";
 
 const COPY_FEEDBACK_MS = 1500;
 
-const remarkPlugins = [remarkGfm, remarkBreaks, remarkMath, remarkDirective, remarkDirectiveRehype];
+const remarkPlugins = [remarkGfm, remarkBreaks, remarkMath];
 const rehypePluginsBase = [rehypeKatex];
 
 /** 将 React 子节点安全转为字符串，避免对象被渲染成 [object Object] */
@@ -200,45 +198,7 @@ function CodeBlock({
   );
 }
 
-/** Collapsible directive：:::collapsible{title="..."} ... ::: */
-function CollapsibleDirective({
-  title,
-  children,
-}: {
-  title?: string;
-  children?: React.ReactNode;
-}) {
-  const [open, setOpen] = useState(false);
-  const label = title ?? "折叠";
-  return (
-    <div className="my-2 rounded-lg border border-border overflow-hidden">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center gap-1.5 px-3 py-2 text-left text-[13px] text-foreground hover:bg-background-tertiary/50 transition-colors duration-150"
-      >
-        {open ? (
-          <ChevronDown className="size-3.5 shrink-0" strokeWidth={1.5} />
-        ) : (
-          <ChevronRight className="size-3.5 shrink-0" strokeWidth={1.5} />
-        )}
-        <span className="font-medium">{label}</span>
-      </button>
-      <div
-        className="grid transition-[grid-template-rows] duration-200 ease-out"
-        style={{ gridTemplateRows: open ? "1fr" : "0fr" }}
-      >
-        <div className="min-h-0 overflow-hidden">
-          <div className="border-t border-border px-3 py-2 text-[14px] leading-relaxed [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
-            {children}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-const markdownComponents: Components & { collapsible?: React.ComponentType<{ title?: string; children?: React.ReactNode }> } = {
+const markdownComponents: Components = {
   p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
   h1: ({ children }) => <h1 className="mb-2 mt-4 text-xl font-semibold">{children}</h1>,
   h2: ({ children }) => <h2 className="mb-2 mt-3 text-lg font-semibold">{children}</h2>,
@@ -288,10 +248,6 @@ const markdownComponents: Components & { collapsible?: React.ComponentType<{ tit
       {children}
     </a>
   ),
-  // remark-directive-rehype 将 :::collapsible{title="..."} 转为 <collapsible title="...">
-  collapsible: ({ title, children }: { title?: string; children?: React.ReactNode }) => (
-    <CollapsibleDirective title={title}>{children}</CollapsibleDirective>
-  ),
   span: ({ className, children, ...props }: { className?: string; children?: React.ReactNode }) => {
     if (className?.includes("streaming-cursor-placeholder")) {
       return (
@@ -320,6 +276,7 @@ const SettledMarkdown = React.memo(function SettledMarkdown({ source }: { source
       remarkPlugins={remarkPlugins}
       rehypePlugins={rehypePluginsBase}
       components={markdownComponents as Components}
+      skipHtml
     >
       {source}
     </ReactMarkdown>
@@ -333,8 +290,49 @@ const CURSOR_EL = (
   />
 );
 
+/**
+ * 某些模型会把 markdown 强调符转义成 \*\*text\*\*，导致前端显示字面量 **。
+ * 这里做一层保守修正：仅在“非代码块”文本中恢复常见强调标记。
+ */
+function normalizeEscapedMarkdown(source: string): string {
+  if (!source) return source;
+  // 包含 fenced code 时不做修正，避免改坏代码片段
+  if (source.includes("```")) return source;
+  return source
+    .replace(/\\\*\\\*(.+?)\\\*\\\*/g, "**$1**")
+    .replace(/\\\*(.+?)\\\*/g, "*$1*");
+}
+
+/**
+ * 防御性处理：把明显非法的 HTML 标签（如 <54>）转义为纯文本，
+ * 避免 React 创建元素时抛出 InvalidCharacterError。
+ */
+function sanitizeInvalidHtmlLikeTags(source: string): string {
+  if (!source) return source;
+  return source.replace(/<\s*\/?\s*([0-9][^>]*)>/g, (_, inner: string) => `&lt;${inner}&gt;`);
+}
+
 export function MarkdownContent({ source, className, trailingCursor }: MarkdownContentProps) {
-  const hasVisibleContent = source.trim().length > 0;
+  const normalizedSource = sanitizeInvalidHtmlLikeTags(normalizeEscapedMarkdown(source));
+  const hasVisibleContent = normalizedSource.trim().length > 0;
+
+  useEffect(() => {
+    if (!hasVisibleContent) return;
+    if (!import.meta.env.DEV) return;
+    if (source !== normalizedSource) {
+      console.debug("[MarkdownContent] 检测到转义 markdown，已标准化", {
+        sourcePreview: source.slice(0, 160),
+        normalizedPreview: normalizedSource.slice(0, 160),
+        trailingCursor: !!trailingCursor,
+      });
+    }
+    if (/<\s*[0-9][^>]*>/.test(source)) {
+      console.warn("[MarkdownContent] 检测到疑似非法 HTML 标签，已转义处理", {
+        sourcePreview: source.slice(0, 160),
+      });
+    }
+  }, [hasVisibleContent, source, normalizedSource, trailingCursor]);
+
   if (!hasVisibleContent) return null;
 
   const wrapperCls = cn(
@@ -354,11 +352,11 @@ export function MarkdownContent({ source, className, trailingCursor }: MarkdownC
    * 当首行尚未出现 `\n` 时，优先纯文本渲染，避免高频全量 markdown parse。
    */
   if (trailingCursor) {
-    const lastNl = source.lastIndexOf("\n");
+    const lastNl = normalizedSource.lastIndexOf("\n");
 
     if (lastNl >= 0) {
-      const settled = source.slice(0, lastNl + 1);
-      const pending = source.slice(lastNl + 1);
+      const settled = normalizedSource.slice(0, lastNl + 1);
+      const pending = normalizedSource.slice(lastNl + 1);
 
       return (
         <div className={wrapperCls} data-md>
@@ -379,7 +377,7 @@ export function MarkdownContent({ source, className, trailingCursor }: MarkdownC
     return (
       <div className={wrapperCls} data-md>
         <p className="mb-0 last:mb-0 whitespace-pre-wrap break-words">
-          {source}
+          {normalizedSource}
           {CURSOR_EL}
         </p>
       </div>
@@ -393,8 +391,9 @@ export function MarkdownContent({ source, className, trailingCursor }: MarkdownC
         remarkPlugins={remarkPlugins}
         rehypePlugins={rehypePluginsBase}
         components={markdownComponents as Components}
+        skipHtml
       >
-        {source}
+        {normalizedSource}
       </ReactMarkdown>
     </div>
   );

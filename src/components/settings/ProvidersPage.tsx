@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { useDataStore } from "@/stores/dataStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -31,9 +32,9 @@ import { ProviderIcon } from "@/components/common/ProviderIcon";
 
 /** Non-built-in types that can be added via the + button. */
 const ADDABLE_TYPES: { type: ProviderType; label: string }[] = [
-  { type: "custom", label: "OpenAI Compatible" },
-  { type: "bedrock", label: "Amazon Bedrock" },
-  { type: "github-models", label: "GitHub Models" },
+  // { type: "custom", label: "OpenAI Compatible" },
+  // { type: "bedrock", label: "Amazon Bedrock" },
+  // { type: "github-models", label: "GitHub Models" },
 ];
 
 export function ProvidersPage() {
@@ -43,13 +44,17 @@ export function ProvidersPage() {
   const selectedType = useSettingsStore((s) => s.selectedProviderType);
   const setSelectedProvider = useSettingsStore((s) => s.setSelectedProvider);
 
-  // Custom (non-built-in) providers that have been added
-  const customProviders = providers.filter(
-    (p) => !PROVIDER_METAS[p.type]?.builtIn,
-  );
+  // 暂时只展示白名单内的内置 provider，其他 provider 入口先隐藏
+  const customProviders: typeof providers = [];
 
   const selectedMeta = selectedType ? PROVIDER_METAS[selectedType] : null;
   const isSelectedCustom = selectedMeta && !selectedMeta.builtIn;
+
+  useEffect(() => {
+    if (selectedType && !BUILTIN_PROVIDER_TYPES.includes(selectedType)) {
+      setSelectedProvider("deepseek");
+    }
+  }, [selectedType, setSelectedProvider]);
 
   async function handleAddCustom(type: ProviderType) {
     const meta = PROVIDER_METAS[type];
@@ -68,7 +73,7 @@ export function ProvidersPage() {
     if (provider) {
       await deleteProvider(provider.id);
     }
-    setSelectedProvider("anthropic");
+    setSelectedProvider("deepseek");
   }
 
   return (
@@ -145,24 +150,35 @@ export function ProvidersPage() {
 
         {/* Bottom toolbar: + / - */}
         <div className="flex items-center gap-0.5 border-t px-2 py-1.5">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon-sm" className="size-7">
-                <Plus className="size-3.5" strokeWidth={1.5} />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" side="top">
-              {ADDABLE_TYPES.map((item) => (
-                <DropdownMenuItem
-                  key={item.type}
-                  onClick={() => handleAddCustom(item.type)}
-                  className="text-sm"
-                >
-                  {item.label}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
+          {ADDABLE_TYPES.length > 0 ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon-sm" className="size-7">
+                  <Plus className="size-3.5" strokeWidth={1.5} />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" side="top">
+                {ADDABLE_TYPES.map((item) => (
+                  <DropdownMenuItem
+                    key={item.type}
+                    onClick={() => handleAddCustom(item.type)}
+                    className="text-sm"
+                  >
+                    {item.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="size-7"
+              disabled
+            >
+              <Plus className="size-3.5" strokeWidth={1.5} />
+            </Button>
+          )}
 
           {isSelectedCustom ? (
             <AlertDialog>

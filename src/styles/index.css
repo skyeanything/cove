@@ -60,6 +60,8 @@
   /* Typography */
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "SF Mono", "Cascadia Code", "Fira Code", ui-monospace, monospace;
+  /* 文件预览区（目录树 + 代码）使用 Rubik */
+  --font-preview: "Rubik", var(--font-sans);
 
   /* Radii */
   --radius-sm: 6px;
@@ -173,36 +175,24 @@ body {
   margin: 0;
 }
 
-/* Custom scrollbar — only show on hover */
+/* 隐藏滚动条（保留滚动能力） */
 * {
-  scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
-}
-
-*:hover {
-  scrollbar-color: var(--color-foreground-tertiary) transparent;
+  scrollbar-width: none;
 }
 
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 0;
+  height: 0;
+  display: none;
 }
 
 ::-webkit-scrollbar-track {
   background: transparent;
 }
 
-::-webkit-scrollbar-thumb {
-  background: transparent;
-  border-radius: 3px;
-}
-
-*:hover::-webkit-scrollbar-thumb {
-  background: var(--color-foreground-tertiary);
-}
-
-*:hover::-webkit-scrollbar-thumb:hover {
-  background: var(--color-foreground-secondary);
+/* Radix ScrollArea 的自定义滚动条一并隐藏 */
+[data-slot="scroll-area-scrollbar"] {
+  display: none;
 }
 
 /* Non-selectable UI chrome */
@@ -251,4 +241,170 @@ body {
 [data-md] pre code,
 [data-md] pre code .token {
   color: var(--color-success) !important;
+}
+
+/* ===== 文件预览：目录树与代码区使用 Rubik，代码主题加深 ===== */
+.file-preview-tree {
+  font-family: var(--font-preview);
+}
+.file-preview-header-path {
+  font-family: var(--font-preview);
+}
+.file-preview-code {
+  font-family: var(--font-preview);
+}
+/* 行号颜色加深 */
+.file-preview-code .file-preview-line-num {
+  color: var(--color-foreground-tertiary);
+}
+.dark .file-preview-code .file-preview-line-num {
+  color: var(--color-foreground-tertiary);
+}
+/* 代码预览语法高亮加深（仅文件预览区，不影响 Markdown 内代码块） */
+.file-preview-code .token.comment,
+.file-preview-code .token.block-comment,
+.file-preview-code .token.prolog,
+.file-preview-code .token.doctype,
+.file-preview-code .token.cdata {
+  color: #6b7280;
+}
+.file-preview-code .token.punctuation {
+  color: var(--color-foreground);
+}
+.file-preview-code .token.keyword,
+.file-preview-code .token.builtin {
+  color: #1d4ed8;
+}
+.file-preview-code .token.string,
+.file-preview-code .token.char,
+.file-preview-code .token.attr-value {
+  color: #b45309;
+}
+.file-preview-code .token.number,
+.file-preview-code .token.boolean,
+.file-preview-code .token.function {
+  color: #c2410c;
+}
+.file-preview-code .token.property,
+.file-preview-code .token.class-name,
+.file-preview-code .token.constant,
+.file-preview-code .token.symbol {
+  color: #a16207;
+}
+.file-preview-code .token.tag,
+.file-preview-code .token.attr-name,
+.file-preview-code .token.selector,
+.file-preview-code .token.atrule {
+  color: #7c3aed;
+}
+.file-preview-code .token.operator,
+.file-preview-code .token.entity,
+.file-preview-code .token.url {
+  color: #0d9488;
+}
+.file-preview-code .token.function-name {
+  color: #0369a1;
+}
+.dark .file-preview-code .token.comment,
+.dark .file-preview-code .token.block-comment,
+.dark .file-preview-code .token.prolog,
+.dark .file-preview-code .token.doctype,
+.dark .file-preview-code .token.cdata {
+  color: #a1a1aa;
+}
+.dark .file-preview-code .token.punctuation {
+  color: #d4d4d8;
+}
+.dark .file-preview-code .token.keyword,
+.dark .file-preview-code .token.builtin {
+  color: #93c5fd;
+}
+.dark .file-preview-code .token.string,
+.dark .file-preview-code .token.char,
+.dark .file-preview-code .token.attr-value {
+  color: #fcd34d;
+}
+.dark .file-preview-code .token.number,
+.dark .file-preview-code .token.boolean,
+.dark .file-preview-code .token.function {
+  color: #fdba74;
+}
+.dark .file-preview-code .token.property,
+.dark .file-preview-code .token.class-name,
+.dark .file-preview-code .token.constant,
+.dark .file-preview-code .token.symbol {
+  color: #fde047;
+}
+.dark .file-preview-code .token.tag,
+.dark .file-preview-code .token.attr-name,
+.dark .file-preview-code .token.selector,
+.dark .file-preview-code .token.atrule {
+  color: #c4b5fd;
+}
+.dark .file-preview-code .token.operator,
+.dark .file-preview-code .token.entity,
+.dark .file-preview-code .token.url {
+  color: #5eead4;
+}
+.dark .file-preview-code .token.function-name {
+  color: #7dd3fc;
+}
+.dark .file-preview-code .file-preview-line-num {
+  color: var(--color-foreground-tertiary);
+}
+
+/*
+ * DOCX 分页预览
+ *
+ * docx-preview 原生分页（breakPages:true + ignoreLastRenderedPageBreak:false）
+ * 每页生成一个 <section class="docx">，库自动排版不会切割文字。
+ * 覆盖库的默认样式，适配我们的主题色和暗色模式。
+ */
+
+/* 滚动容器 */
+.docx-render-area {
+  background: var(--color-background-tertiary, #f3f4f6);
+}
+.dark .docx-render-area {
+  background: var(--color-background-secondary, #0f0f12);
+}
+
+/* 覆盖库注入的 .docx-wrapper 灰色背景 */
+.docx-render-area .docx-wrapper {
+  background: var(--color-background-tertiary, #f3f4f6) !important;
+  padding: 24px 30px !important;
+}
+.dark .docx-render-area .docx-wrapper {
+  background: var(--color-background-secondary, #0f0f12) !important;
+}
+
+/* 每页白卡片 */
+.docx-render-area .docx-wrapper > section.docx {
+  background: var(--color-background, #fff) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08), 0 0 1px rgba(0, 0, 0, 0.1) !important;
+  border-radius: 4px;
+  margin-bottom: 24px !important;
+}
+.dark .docx-render-area .docx-wrapper > section.docx {
+  background: var(--color-background, #09090b) !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3), 0 0 1px rgba(255, 255, 255, 0.05) !important;
+}
+
+/* 页码角标 */
+.docx-page-number {
+  position: absolute;
+  bottom: 16px;
+  right: 20px;
+  font-size: 12px;
+  color: var(--color-foreground-tertiary, #9ca3af);
+  background: var(--color-background-tertiary, #f3f4f6);
+  border-radius: 6px;
+  padding: 2px 10px;
+  line-height: 1.6;
+  pointer-events: none;
+  user-select: none;
+  z-index: 2;
+}
+.dark .docx-page-number {
+  background: var(--color-background-secondary, #18181b);
 }

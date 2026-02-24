@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import { Box, FolderOpen, Plus, Trash2, Check } from "lucide-react";
 import {
   Popover,
@@ -27,6 +28,7 @@ export function WorkspacePopover({
 }: {
   trigger?: React.ReactElement;
 }) {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Workspace | null>(null);
 
@@ -63,7 +65,7 @@ export function WorkspacePopover({
     <button
       type="button"
       className="shrink-0 cursor-pointer rounded p-0.5 text-muted-foreground/70 hover:bg-background-tertiary hover:text-foreground"
-      title="Workspace"
+      title={t("chat.workspace")}
     >
       <Box className="size-4" strokeWidth={1.5} />
     </button>
@@ -82,11 +84,11 @@ export function WorkspacePopover({
         >
           {/* Header */}
           <div className="flex items-center justify-between px-2 py-3">
-            <h3 className="text-sm font-semibold">WORKSPACE</h3>
+            <h3 className="text-sm font-semibold">{t("workspace.title")}</h3>
           </div>
 
           <p className="px-4 pb-3 text-[13px] text-muted-foreground">
-            All tool operations will use this directory as working directory.
+            {t("workspace.description")}
           </p>
 
           {/* Workspace list */}
@@ -104,23 +106,23 @@ export function WorkspacePopover({
                     className={cn(
                       "group flex w-full cursor-pointer items-center gap-3 rounded-lg px-3 py-2 transition-colors",
                       isActive
-                        ? "bg-accent/10"
+                        ? "bg-brand/10"
                         : "hover:bg-accent/30",
                     )}
                   >
                     <FolderOpen
                       className={cn(
                         "size-5 shrink-0",
-                        isActive ? "text-accent" : "text-muted-foreground",
+                        isActive ? "text-brand" : "text-muted-foreground",
                       )}
                       strokeWidth={2.2}
                     />
                     <div className="min-w-0 flex-1 overflow-hidden">
                       <div className={cn(
                         "truncate text-[13px]",
-                        isActive && "font-medium text-accent",
+                        isActive && "font-medium text-foreground",
                       )}>
-                        {ws.name}
+                        {ws.is_default ? t("workspace.default") : ws.name}
                       </div>
                       <div className="truncate text-[11px] text-muted-foreground">
                         {ws.path}
@@ -131,7 +133,7 @@ export function WorkspacePopover({
                     <div className="flex shrink-0 items-center gap-0.5">
                       {isActive && (
                         <div className="rounded p-1">
-                          <Check className="size-3.5 text-accent" strokeWidth={2} />
+                          <Check className="size-3.5 text-brand" strokeWidth={2} />
                         </div>
                       )}
                       {!ws.is_default && (
@@ -142,7 +144,7 @@ export function WorkspacePopover({
                             setDeleteTarget(ws);
                           }}
                           className="rounded p-1 text-muted-foreground opacity-0 transition-opacity hover:bg-destructive/10 hover:text-destructive group-hover:opacity-100"
-                          title="Remove workspace"
+                          title={t("workspace.removeButtonTitle")}
                         >
                           <Trash2 className="size-3.5" strokeWidth={1.5} />
                         </button>
@@ -162,7 +164,7 @@ export function WorkspacePopover({
               className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-[13px] text-muted-foreground transition-colors hover:bg-accent/30 hover:text-foreground"
             >
               <Plus className="size-5 shrink-0" strokeWidth={1.5} />
-              <span>Select Directory...</span>
+              <span>{t("workspace.selectDirectory")}</span>
             </button>
           </div>
         </PopoverContent>
@@ -172,15 +174,15 @@ export function WorkspacePopover({
       <AlertDialog open={!!deleteTarget} onOpenChange={(v) => { if (!v) setDeleteTarget(null); }}>
         <AlertDialogContent size="sm">
           <AlertDialogHeader>
-            <AlertDialogTitle>Remove workspace</AlertDialogTitle>
+            <AlertDialogTitle>{t("workspace.removeTitle")}</AlertDialogTitle>
             <AlertDialogDescription>
-              Remove <span className="font-medium text-foreground">{deleteTarget?.name}</span> from the workspace list? This won't delete any files on disk.
+              {t("workspace.removeDescription", { name: deleteTarget?.name ?? "" })}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t("workspace.cancel")}</AlertDialogCancel>
             <AlertDialogAction variant="destructive" onClick={handleConfirmDelete}>
-              Remove
+              {t("workspace.remove")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

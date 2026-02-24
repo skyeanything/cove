@@ -43,6 +43,42 @@ interface StreamDebugOptions {
   previewChars?: number;
 }
 
+function parseErrorLike(value: unknown): string | undefined {
+  if (!value) return undefined;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return undefined;
+    try {
+      const parsed = JSON.parse(trimmed) as unknown;
+      const nested = parseErrorLike(parsed);
+      return nested ?? trimmed;
+    } catch {
+      return trimmed;
+    }
+  }
+  if (value instanceof Error) return value.message || String(value);
+  if (typeof value === "object") {
+    const obj = value as Record<string, unknown>;
+    const candidates = [
+      obj.message,
+      (obj.error as Record<string, unknown> | undefined)?.message,
+      (obj.cause as Record<string, unknown> | undefined)?.message,
+      (obj.data as Record<string, unknown> | undefined)?.message,
+      (obj.responseBody as Record<string, unknown> | undefined)?.message,
+    ];
+    for (const candidate of candidates) {
+      const text = parseErrorLike(candidate);
+      if (text) return text;
+    }
+    try {
+      return JSON.stringify(obj);
+    } catch {
+      return String(value);
+    }
+  }
+  return String(value);
+}
+
 function isStreamDebugEnabled(explicitEnabled?: boolean): boolean {
   if (typeof explicitEnabled === "boolean") return explicitEnabled;
   try {
@@ -333,7 +369,7 @@ export async function handleAgentStream(
     }
 
     if (part.type === "error") {
-      streamError = String(part.error);
+      streamError = parseErrorLike(part.error) ?? "Unknown stream error";
     }
   }
   } catch (err) {
@@ -341,7 +377,7 @@ export async function handleAgentStream(
     // from providers whose tool-call IDs don't match up across steps).
     // Without this, the for-await loop hangs or crashes and the UI gets stuck.
     if (!streamError) {
-      streamError = err instanceof Error ? err.message : String(err);
+      streamError = parseErrorLike(err) ?? "Unknown stream error";
     }
   }
 

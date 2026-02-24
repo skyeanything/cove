@@ -28,6 +28,14 @@ export function getModel(provider: Provider, modelId: string): LanguageModel {
       return openai(modelId);
     }
 
+    case "aliyun": {
+      const aliyun = createOpenAI({
+        apiKey: provider.api_key,
+        baseURL: provider.base_url || "https://dashscope.aliyuncs.com/compatible-mode/v1",
+      });
+      return aliyun.chat(modelId);
+    }
+
     case "anthropic": {
       const anthropic = createAnthropic({
         apiKey: provider.api_key,
@@ -69,6 +77,22 @@ export function getModel(provider: Provider, modelId: string): LanguageModel {
       return ollama(modelId);
     }
 
+    case "tencent-cloud": {
+      const tencentCloud = createOpenAI({
+        apiKey: provider.api_key,
+        baseURL: provider.base_url || "https://api.hunyuan.cloud.tencent.com/v1",
+      });
+      return tencentCloud.chat(modelId);
+    }
+
+    case "volcengine-ark": {
+      const volcengineArk = createOpenAI({
+        apiKey: provider.api_key,
+        baseURL: provider.base_url || "https://ark.ap-southeast.bytepluses.com/api/v3",
+      });
+      return volcengineArk.chat(modelId);
+    }
+
     case "deepseek": {
       const deepseek = createDeepSeek({
         apiKey: provider.api_key ?? "",
@@ -91,6 +115,16 @@ export function getModel(provider: Provider, modelId: string): LanguageModel {
         baseURL: provider.base_url || "https://api.mistral.ai/v1",
       });
       return mistral(modelId);
+    }
+
+    case "minimax": {
+      const base = (provider.base_url || "https://api.minimaxi.com").replace(/\/+$/, "");
+      const minimax = createOpenAI({
+        apiKey: provider.api_key,
+        baseURL: base.endsWith("/v1") ? base : `${base}/v1`,
+      });
+      // MiniMax OpenAI 兼容端当前不保证支持 /responses，显式走 /chat/completions
+      return minimax.chat(modelId);
     }
 
     case "moonshot": {

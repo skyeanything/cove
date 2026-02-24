@@ -1,7 +1,12 @@
+mod attachment_commands;
+mod docx_commands;
+mod fetch_commands;
 mod fs_commands;
 mod shell_commands;
 mod skill_discovery;
+mod workspace_watcher;
 
+use std::sync::Arc;
 use tauri::menu::{IconMenuItem, MenuItemKind};
 use tauri::Emitter;
 use tauri_plugin_sql::{Migration, MigrationKind};
@@ -39,6 +44,7 @@ pub fn run() {
   ];
 
   tauri::Builder::default()
+    .manage(Arc::new(workspace_watcher::WatcherState::new()))
     .plugin(
       tauri_plugin_sql::Builder::default()
         .add_migrations("sqlite:office-chat.db", migrations)
@@ -76,11 +82,28 @@ pub fn run() {
       Ok(())
     })
     .invoke_handler(tauri::generate_handler![
+      attachment_commands::save_attachment_file,
+      attachment_commands::save_attachment_from_base64,
+      attachment_commands::read_attachment_as_data_url,
+      attachment_commands::parse_document_text,
+      fetch_commands::fetch_url,
       fs_commands::read_file,
+      fs_commands::read_file_raw,
       fs_commands::write_file,
       fs_commands::stat_file,
+      fs_commands::list_dir,
+      fs_commands::read_file_as_data_url,
+      fs_commands::open_with_app,
+      fs_commands::detect_office_apps,
+      fs_commands::create_dir,
+      fs_commands::move_file,
+      fs_commands::remove_entry,
+      fs_commands::reveal_in_finder,
+      workspace_watcher::watch_workspace_command,
       shell_commands::run_command,
       skill_discovery::discover_external_skills,
+      docx_commands::docx_to_pdf_via_pages,
+      docx_commands::pptx_to_pdf,
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

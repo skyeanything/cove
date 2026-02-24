@@ -10,17 +10,26 @@ import {
 } from "lucide-react";
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { useChatStore } from "@/stores/chatStore";
+import { useChatStore, type DraftAttachment } from "@/stores/chatStore";
 import { useDataStore } from "@/stores/dataStore";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useSkillsStore } from "@/stores/skillsStore";
 import { getModelOption } from "@/lib/ai/model-service";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { invoke } from "@tauri-apps/api/core";
 import { listSkills } from "@/lib/ai/skills/loader";
 import { WorkspacePopover } from "./WorkspacePopover";
 import { SkillsPopover } from "./SkillsPopover";
 import { ModelSelector } from "./ModelSelector";
+import { AttachmentBar } from "./AttachmentBar";
+import {
+  detectAttachmentType,
+  detectMimeType,
+  isSupportedUploadFile,
+  isImageAttachment,
+} from "@/lib/attachment-utils";
 import {
   Tooltip,
   TooltipContent,
@@ -30,6 +39,93 @@ import {
 
 /** IME 刚结束组合后的一小段时间内不把 Enter 当作发送（避免确认拼音/英文时误发） */
 const IME_COMMIT_GRACE_MS = 150;
+
+const IMAGE_MIME = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
+
+function isImageFile(file: File): boolean {
+  return IMAGE_MIME.has(file.type);
+}
+
+function fileToDataUrl(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+async function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result;
+      const str = typeof dataUrl === "string" ? dataUrl : "";
+      const base64 = str.includes(",") ? str.split(",")[1] ?? "" : "";
+      resolve(base64);
+    };
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+
+async function imageFilesToDraftAttachments(files: File[]): Promise<DraftAttachment[]> {
+  const imageFiles = Array.from(files).filter(isImageFile);
+  if (imageFiles.length === 0) return [];
+  const attachments: DraftAttachment[] = [];
+  for (const file of imageFiles) {
+    try {
+      const content = await fileToDataUrl(file);
+      attachments.push({
+        id: crypto.randomUUID(),
+        type: "image",
+        name: file.name || "image.png",
+        mime_type: file.type,
+        size: file.size,
+        content,
+      });
+    } catch {
+      // 单文件失败时跳过
+    }
+  }
+  return attachments;
+}
+
+/** 拖放的非图片支持文件（PDF/文档等）通过 Tauri 保存到 AppData 并转为草稿附件 */
+async function nonImageFilesToDraftAttachments(files: File[]): Promise<DraftAttachment[]> {
+  const supported = Array.from(files).filter(
+    (f) => !isImageFile(f) && isSupportedUploadFile(f.name || ""),
+  );
+  if (supported.length === 0) return [];
+  const attachments: DraftAttachment[] = [];
+  for (const file of supported) {
+    try {
+      const contentBase64 = await fileToBase64(file);
+      const saved = await invoke<{ path: string; name: string; size: number; previewDataUrl?: string }>(
+        "save_attachment_from_base64",
+        {
+          args: {
+            name: file.name || "file",
+            contentBase64,
+            mimeType: file.type || undefined,
+          },
+        },
+      );
+      attachments.push({
+        id: crypto.randomUUID(),
+        type: detectAttachmentType(saved.name),
+        name: saved.name,
+        path: saved.path,
+        mime_type: detectMimeType(saved.name),
+        size: saved.size,
+        content: saved.previewDataUrl,
+      });
+    } catch {
+      // 单文件失败时跳过
+    }
+  }
+  return attachments;
+}
 
 /** 上下文用量环形指示器，0–100% */
 function ContextRing({ percent }: { percent: number }) {
@@ -76,11 +172,15 @@ export function ChatInput({
 } = {}) {
   const { t } = useTranslation();
   const [message, setMessage] = useState("");
+  const [attachError, setAttachError] = useState<string | null>(null);
   const [modelSelectorOpenLocal, setModelSelectorOpenLocal] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const lastCompositionEndRef = useRef<number>(0);
   const sendMessage = useChatStore((s) => s.sendMessage);
   const stopGeneration = useChatStore((s) => s.stopGeneration);
+  const addDraftAttachments = useChatStore((s) => s.addDraftAttachments);
+  const removeDraftAttachment = useChatStore((s) => s.removeDraftAttachment);
+  const draftAttachments = useChatStore((s) => s.draftAttachments);
   const isStreaming = useChatStore((s) => s.isStreaming);
   const modelId = useChatStore((s) => s.modelId);
   const providerId = useChatStore((s) => s.providerId);
@@ -99,16 +199,16 @@ export function ChatInput({
     0,
   );
   const contextLimit = useMemo(() => {
-    if (!modelId || !providerId) return 128_000;
+    if (!modelId || !providerId) return 0;
     const provider = providers.find((p) => p.id === providerId);
-    if (!provider) return 128_000;
+    if (!provider) return 0;
     const opt = getModelOption(provider, modelId);
     return opt?.context_window ?? 128_000;
   }, [modelId, providerId, providers]);
-  const contextPercent = Math.min(
-    100,
-    Math.round((sessionTokens / contextLimit) * 100),
-  );
+  const contextPercent =
+    contextLimit === 0
+      ? 0
+      : Math.min(100, Math.round((sessionTokens / contextLimit) * 100));
   const formatContextNum = (n: number) =>
     n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : String(n);
   const contextTooltip = t("chat.contextUsedFormula", {
@@ -149,7 +249,17 @@ export function ChatInput({
     [skillNames, slashFilter],
   );
 
-  const canSend = message.trim() && modelId && !isStreaming;
+  const provider = useMemo(
+    () => (providerId ? providers.find((p) => p.id === providerId) : undefined),
+    [providerId, providers],
+  );
+  const modelSupportsVision = useMemo(() => {
+    if (!provider || !modelId) return false;
+    const opt = getModelOption(provider, modelId);
+    return opt?.vision === true || opt?.image_in === true;
+  }, [provider, modelId]);
+
+  const canSend = Boolean((message.trim() || draftAttachments.length > 0) && modelId && !isStreaming);
 
   // Auto-resize textarea
   useEffect(() => {
@@ -159,11 +269,106 @@ export function ChatInput({
     el.style.height = Math.min(el.scrollHeight, 200) + "px";
   }, [message]);
 
+  const handleAttachFiles = async () => {
+    const selected = await openDialog({ directory: false, multiple: true });
+    if (!selected) return;
+    const paths = Array.isArray(selected) ? selected : [selected];
+    const supportedPaths = paths.filter((path) => isSupportedUploadFile(path));
+    const rejectedCount = paths.length - supportedPaths.length;
+    if (supportedPaths.length === 0) {
+      setAttachError("仅支持图片与文档文件（pdf/txt/md/docx/xlsx/pptx/代码文件等）。");
+      return;
+    }
+    type SaveAttachmentFileResult = {
+      path: string;
+      name: string;
+      size: number;
+      previewDataUrl?: string;
+    };
+    const attachments = (
+      await Promise.all(
+        supportedPaths.map(async (sourcePath): Promise<DraftAttachment | null> => {
+          try {
+            const saved = await invoke<SaveAttachmentFileResult>("save_attachment_file", {
+              args: { sourcePath },
+            });
+            return {
+              id: crypto.randomUUID(),
+              type: detectAttachmentType(saved.name || sourcePath),
+              name: saved.name,
+              path: saved.path,
+              mime_type: detectMimeType(saved.name || sourcePath),
+              size: saved.size,
+              content: saved.previewDataUrl,
+            };
+          } catch {
+            return null;
+          }
+        }),
+      )
+    ).filter((item): item is DraftAttachment => item !== null);
+    if (attachments.length > 0) {
+      addDraftAttachments(attachments);
+      setAttachError(
+        rejectedCount > 0
+          ? `已添加 ${attachments.length} 个文件，忽略 ${rejectedCount} 个不支持类型。`
+          : null,
+      );
+    } else {
+      setAttachError("文件添加失败，请重试。");
+    }
+  };
+
   const handleSend = () => {
     if (!canSend) return;
+    const hasImage = draftAttachments.some((a) => isImageAttachment(a));
+    if (hasImage && !modelSupportsVision) {
+      setAttachError(t("chat.visionNotSupported"));
+      return;
+    }
+    setAttachError(null);
     const content = message.trim();
     setMessage("");
     sendMessage(content);
+  };
+
+  const handlePaste = async (e: React.ClipboardEvent) => {
+    const items = e.clipboardData?.items;
+    if (!items?.length) return;
+    const files: File[] = [];
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      if (item?.kind === "file") {
+        const file = item.getAsFile();
+        if (file && isImageFile(file)) files.push(file);
+      }
+    }
+    if (files.length === 0) return;
+    e.preventDefault();
+    const attachments = await imageFilesToDraftAttachments(files);
+    if (attachments.length > 0) {
+      addDraftAttachments(attachments);
+      setAttachError(null);
+    }
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const files = e.dataTransfer?.files;
+    if (!files?.length) return;
+    const imageList = await imageFilesToDraftAttachments(Array.from(files));
+    const docList = await nonImageFilesToDraftAttachments(Array.from(files));
+    const all = [...imageList, ...docList];
+    if (all.length > 0) {
+      addDraftAttachments(all);
+      setAttachError(null);
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -204,14 +409,19 @@ export function ChatInput({
     <div className="shrink-0 px-4 pb-3 pt-1">
       <div className="mx-auto max-w-[896px]">
         {/* Error message */}
-        {error && (
+        {(error || attachError) && (
           <div className="mb-2 rounded-lg bg-destructive/10 px-3 py-2 text-[13px] text-destructive">
-            {error}
+            {error ?? attachError}
           </div>
         )}
 
-        {/* Input container */}
-        <div className="rounded-lg border border-border transition-colors focus-within:border-ring">
+        {/* Input container：支持拖放图片到此处 */}
+        <div
+          className="rounded-lg border border-border transition-colors focus-within:border-ring"
+          onDrop={handleDrop}
+          onDragOver={handleDragOver}
+        >
+          <AttachmentBar attachments={draftAttachments} onRemove={removeDraftAttachment} />
           {/* Workspace bar */}
           {activeWorkspace && (
             <div className="flex items-center gap-1.5 border-b border-border/50 px-3 py-1">
@@ -262,6 +472,7 @@ export function ChatInput({
               lastCompositionEndRef.current = Date.now();
             }}
             onKeyDown={handleKeyDown}
+            onPaste={handlePaste}
             placeholder={
               modelId
                 ? t("chat.placeholder", {
@@ -274,7 +485,7 @@ export function ChatInput({
             }
             rows={1}
             disabled={!modelId}
-            className="block max-h-[200px] w-full resize-none bg-transparent px-4 pt-3 pb-1 text-[14px] placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+            className="block min-h-[44px] max-h-[200px] w-full resize-none bg-transparent px-4 pt-3 pb-1 text-[14px] leading-[1.5] placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
           />
 
           {/* / 命令：skill 快捷选择 */}
@@ -302,7 +513,7 @@ export function ChatInput({
           {/* Bottom toolbar */}
           <div className="flex items-center px-2 pb-2 pt-1">
             {/* Left icons */}
-            <ToolbarIcon icon={<Paperclip />} title={t("chat.attachFiles")} />
+            <ToolbarIcon icon={<Paperclip />} title={t("chat.attachFiles")} onClick={handleAttachFiles} />
             <ToolbarIcon icon={<Globe />} title={t("chat.webSearch")} />
             <SkillsPopover />
             {/* 模型选择：卡片 Popover，与 Skills 同风格 */}
@@ -328,13 +539,13 @@ export function ChatInput({
             <div className="flex-1" />
 
             {/* Microphone */}
-            <ToolbarIcon icon={<Mic />} title={t("chat.voiceInput")} />
+            {/* <ToolbarIcon icon={<Mic />} title={t("chat.voiceInput")} /> */}
 
             {/* Send / Stop button */}
             {isStreaming ? (
               <button
                 onClick={stopGeneration}
-                className="ml-1 flex size-7 items-center justify-center rounded-lg bg-destructive text-destructive-foreground transition-opacity"
+                className="ml-1 flex size-6 items-center justify-center rounded-lg bg-destructive text-destructive-foreground transition-opacity"
                 title={t("chat.stopGeneration")}
               >
                 <Square className="size-3" strokeWidth={2} fill="currentColor" />
@@ -343,7 +554,7 @@ export function ChatInput({
               <button
                 onClick={handleSend}
                 disabled={!canSend}
-                className="ml-1 flex size-7 items-center justify-center rounded-lg bg-foreground text-background transition-opacity disabled:opacity-30"
+                className="ml-1 flex size-6 items-center justify-center rounded-lg bg-foreground text-background transition-opacity disabled:opacity-30"
                 title={t("chat.sendMessage")}
               >
                 <ArrowUp className="size-4" strokeWidth={2} />
