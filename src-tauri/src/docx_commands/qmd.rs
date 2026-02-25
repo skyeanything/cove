@@ -72,12 +72,13 @@ pub(super) fn convert_qmd_via_quarto(
         "未找到 Quarto CLI，请先安装：https://quarto.org/docs/get-started/".to_string()
     })?;
 
-    let output_str = output_path.to_string_lossy().into_owned();
     let input_str = input_path.to_string_lossy().into_owned();
 
+    // quarto render 默认将输出写到与输入同目录、同名但扩展名为 .pdf 的文件
+    // --output 只接受纯文件名（不可含路径），所以这里不指定 --output
     log::info!("[office-preview] quarto render {input_str} --to pdf");
     let result = Command::new(&quarto_bin)
-        .args(["render", &input_str, "--to", "pdf", "--output", &output_str])
+        .args(["render", &input_str, "--to", "pdf"])
         .output();
 
     let _ = fs::remove_file(&input_path);
