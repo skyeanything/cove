@@ -178,3 +178,31 @@ src/
 | 输出截断 | `tool/truncation.ts` | 工具输出过长时写文件并返回路径提示；前端可做简单长度截断 |
 
 实现上述能力时，可继续参考 opencode 的 `external-directory.ts`（访问工作区外路径时的权限）、`edit.ts` 中的多种 `Replacer`（oldString 匹配策略）以及 `read.txt` / `edit.txt` 等描述文案。
+
+## Development Workflow
+
+### 文件大小限制（Hard Constraint）
+- TypeScript 代码文件（`.ts`/`.tsx`）：最多 **400 行**
+- TypeScript 测试文件（`.test.ts`/`.spec.ts`）：最多 **500 行**
+- Rust 文件（`.rs`）：最多 **300 行**
+- 超出时在文件顶部添加 `// FILE_SIZE_EXCEPTION: <原因>` 注释
+- `src/components/ui/` 下的 shadcn 原语文件豁免（CLAUDE.md 明确标注 DO NOT modify）
+
+### Git Worktree 工作流
+- 所有功能开发在独立 worktree 中进行，主目录保持 main 分支干净
+- 新建 worktree：`./scripts/start-worktree.sh <type> <issue-id> <desc>`
+- Worktree 根目录：`/Users/lizc/code/cove-worktrees/`
+- 分支规范：`feature/issue-<id>-<desc>`、`fix/issue-<id>-<desc>`
+- Code Review 必须在独立 review worktree 中进行
+
+### 构建 & 测试基准线
+```bash
+pnpm run build                       # 前端构建（含 tsc 类型检查）
+pnpm test                            # vitest 单元测试
+cd src-tauri && cargo check          # Rust 静态检查
+python3 scripts/check-file-size.py  # 文件大小校验
+```
+
+### AI 开发规则
+- 查看 `AGENTS.md` 了解必读顺序
+- 查看 `.agent/workflows/` 了解具体工作流
