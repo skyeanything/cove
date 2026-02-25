@@ -26,6 +26,21 @@ pub(super) fn path_has_binary_extension(p: &Path) -> bool {
         .unwrap_or(false)
 }
 
+/// 已知的纯文本扩展名（跳过二进制内容检测，用 lossy UTF-8 读取）
+const TEXT_EXTENSIONS: &[&str] = &[
+    "txt", "md", "qmd", "markdown", "csv", "json", "yaml", "yml", "toml", "ini", "xml",
+    "html", "htm", "css", "scss", "less", "js", "jsx", "ts", "tsx", "mjs", "cjs",
+    "py", "rs", "go", "java", "c", "cpp", "h", "sh", "bash", "zsh", "fish", "ps1",
+    "sql", "graphql", "vue", "svelte", "log", "cfg", "conf", "env",
+];
+
+pub(super) fn path_has_text_extension(p: &Path) -> bool {
+    p.extension()
+        .and_then(|e| e.to_str())
+        .map(|e| TEXT_EXTENSIONS.iter().any(|ext| ext.eq_ignore_ascii_case(e)))
+        .unwrap_or(false)
+}
+
 /// 读取前 8KB，若非 UTF-8 或可打印字节占比 < 70% 则视为二进制。
 pub(super) fn is_binary_content(mut reader: impl Read) -> Result<bool, std::io::Error> {
     let mut buf = [0u8; 8192];
