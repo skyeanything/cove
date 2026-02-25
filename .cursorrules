@@ -1,0 +1,41 @@
+# Cursor AI Rules — cove (Office Chat)
+
+## 编码前必读
+
+1. 阅读 `CLAUDE.md` 了解项目设计规范与 Hard Constraints
+2. 阅读 `AGENTS.md` 了解工作流与命令速查
+3. 阅读 `.agent/workflows/` 了解具体工作流规则
+
+## 技术栈
+
+- **Desktop**: Tauri 2 (Rust backend)
+- **Frontend**: React 19 + TypeScript + Vite
+- **AI**: Vercel AI SDK 6 (`ai@^6`)
+- **Styling**: Tailwind CSS 4 + shadcn/ui
+- **State**: Zustand
+- **Package Manager**: pnpm
+
+## 文件大小限制
+
+- TypeScript 代码文件（`.ts` / `.tsx`）：最多 **400 行**
+- TypeScript 测试文件（`.test.ts` / `.spec.ts`）：最多 **500 行**
+- Rust 文件（`.rs`）：最多 **300 行**
+- 超出时添加 `// FILE_SIZE_EXCEPTION: <原因>` 注释
+- `src/components/ui/` 内的 shadcn 文件豁免（禁止修改）
+
+## 开发规则
+
+- 所有新功能必须在独立 worktree 中开发（见 `.agent/workflows/worktree-parallel.md`）
+- 修改 `src-tauri/` 后必须运行 `cargo check` 验证
+- 提交前运行 `pnpm run build` 确认无类型错误
+- 使用 `lucide-react` 图标，stroke-width 1.5，大小 16/18/20px
+- 使用 `cn()` 工具合并 Tailwind 类名
+- 禁止 `any` 类型，严格 TypeScript
+
+## 设计规范摘要
+
+- 遵循 Linear/Raycast 风格的极简美学
+- 使用 CSS 变量色彩系统（见 `CLAUDE.md` Color Tokens）
+- 过渡动画：150-200ms ease-out
+- 圆角：按钮 `rounded-lg`，卡片 `rounded-xl`
+- 禁止给卡片添加 shadow，使用 `border` 代替

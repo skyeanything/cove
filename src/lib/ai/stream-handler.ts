@@ -1,178 +1,8 @@
-import type { MessagePart, ToolCallInfo } from "@/stores/chatStore";
+import type { ToolCallInfo, MessagePart } from "@/stores/chat-types";
+import type { StreamLike, StreamResult, StreamUpdate, StreamDebugOptions } from "./stream-types";
+import { createStreamDebugLogger, parseErrorLike } from "./stream-debug";
 
-interface StreamLike {
-  fullStream: AsyncIterable<{
-    type: string;
-    text?: string;
-    /** tool-call / tool-result 使用 */
-    toolCallId?: string;
-    toolName?: string;
-    input?: unknown;
-    output?: unknown;
-    error?: unknown;
-    /** tool-input-start / tool-input-delta 使用（SDK fullStream 用 id） */
-    id?: string;
-    delta?: string;
-  }>;
-  usage: PromiseLike<{
-    inputTokens?: number;
-    outputTokens?: number;
-  }>;
-}
-
-export interface StreamResult {
-  content: string;
-  reasoning: string;
-  parts: MessagePart[];
-  toolCalls: ToolCallInfo[];
-  inputTokens?: number;
-  outputTokens?: number;
-  error?: string;
-}
-
-export interface StreamUpdate {
-  streamingContent?: string;
-  streamingReasoning?: string;
-  streamingToolCalls?: ToolCallInfo[];
-  streamingParts?: MessagePart[];
-}
-
-interface StreamDebugOptions {
-  enabled?: boolean;
-  label?: string;
-  previewChars?: number;
-}
-
-function parseErrorLike(value: unknown): string | undefined {
-  if (!value) return undefined;
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    if (!trimmed) return undefined;
-    try {
-      const parsed = JSON.parse(trimmed) as unknown;
-      const nested = parseErrorLike(parsed);
-      return nested ?? trimmed;
-    } catch {
-      return trimmed;
-    }
-  }
-  if (value instanceof Error) return value.message || String(value);
-  if (typeof value === "object") {
-    const obj = value as Record<string, unknown>;
-    const candidates = [
-      obj.message,
-      (obj.error as Record<string, unknown> | undefined)?.message,
-      (obj.cause as Record<string, unknown> | undefined)?.message,
-      (obj.data as Record<string, unknown> | undefined)?.message,
-      (obj.responseBody as Record<string, unknown> | undefined)?.message,
-    ];
-    for (const candidate of candidates) {
-      const text = parseErrorLike(candidate);
-      if (text) return text;
-    }
-    try {
-      return JSON.stringify(obj);
-    } catch {
-      return String(value);
-    }
-  }
-  return String(value);
-}
-
-function isStreamDebugEnabled(explicitEnabled?: boolean): boolean {
-  if (typeof explicitEnabled === "boolean") return explicitEnabled;
-  try {
-    return globalThis.localStorage?.getItem("cove.streamDebug") === "1";
-  } catch {
-    return false;
-  }
-}
-
-function createStreamDebugLogger(options?: StreamDebugOptions) {
-  const enabled = isStreamDebugEnabled(options?.enabled);
-  const label = options?.label ?? "stream";
-  const previewChars = options?.previewChars ?? 24;
-
-  let startedAt = 0;
-  let lastAt = 0;
-  let totalEvents = 0;
-  let textDeltaEvents = 0;
-  let reasoningDeltaEvents = 0;
-  let textChars = 0;
-  let reasoningChars = 0;
-
-  const now = () => (typeof performance !== "undefined" ? performance.now() : Date.now());
-  const safePreview = (s: string) => s.replace(/\n/g, "\\n").slice(0, previewChars);
-
-  const log = (message: string, payload?: Record<string, unknown>) => {
-    if (!enabled) return;
-    if (payload) console.debug(`[stream-debug][${label}] ${message}`, payload);
-    else console.debug(`[stream-debug][${label}] ${message}`);
-  };
-
-  return {
-    start() {
-      if (!enabled) return;
-      startedAt = now();
-      lastAt = startedAt;
-      log("start");
-    },
-    event(part: { type: string; text?: string; delta?: string }) {
-      if (!enabled) return;
-      const t = now();
-      const dt = Math.round(t - lastAt);
-      lastAt = t;
-      totalEvents += 1;
-
-      if (part.type === "text-delta") {
-        const text = part.text ?? "";
-        textDeltaEvents += 1;
-        textChars += text.length;
-        log("text-delta", {
-          event: totalEvents,
-          dt_ms: dt,
-          chunk_chars: text.length,
-          chunk_preview: safePreview(text),
-          text_delta_events: textDeltaEvents,
-          text_chars_total: textChars,
-        });
-        return;
-      }
-
-      if (part.type === "reasoning-delta" || part.type === "reasoning") {
-        const text = part.text ?? part.delta ?? "";
-        reasoningDeltaEvents += 1;
-        reasoningChars += text.length;
-        log("reasoning-delta", {
-          event: totalEvents,
-          dt_ms: dt,
-          chunk_chars: text.length,
-          chunk_preview: safePreview(text),
-          reasoning_delta_events: reasoningDeltaEvents,
-          reasoning_chars_total: reasoningChars,
-        });
-        return;
-      }
-
-      log(part.type, { event: totalEvents, dt_ms: dt });
-    },
-    finish(extra?: { contentChars?: number; reasoningChars?: number; error?: string }) {
-      if (!enabled) return;
-      const elapsed = Math.round(now() - startedAt);
-      log("finish", {
-        elapsed_ms: elapsed,
-        total_events: totalEvents,
-        text_delta_events: textDeltaEvents,
-        reasoning_delta_events: reasoningDeltaEvents,
-        text_chars_total: textChars,
-        reasoning_chars_total: reasoningChars,
-        content_chars_final: extra?.contentChars,
-        reasoning_chars_final: extra?.reasoningChars,
-        error: extra?.error,
-      });
-    },
-  };
-}
+export type { StreamResult, StreamUpdate };
 
 export async function handleAgentStream(
   stream: StreamLike,
@@ -201,11 +31,7 @@ export async function handleAgentStream(
       } else {
         parts.push({ type: "text", text });
       }
-      onUpdate({
-        streamingContent: fullContent,
-        streamingParts: [...parts],
-        streamingToolCalls: [...toolCalls],
-      });
+      onUpdate({ streamingContent: fullContent, streamingParts: [...parts], streamingToolCalls: [...toolCalls] });
       continue;
     }
 
@@ -214,17 +40,8 @@ export async function handleAgentStream(
       const text = part.text ?? (part as { delta?: string }).delta ?? "";
       fullReasoning += text;
       const last = parts[parts.length - 1];
-      if (last?.type === "reasoning") {
-        last.text += text;
-      } else {
-        parts.push({ type: "reasoning", text });
-      }
-      onUpdate({
-        streamingContent: fullContent,
-        streamingReasoning: fullReasoning,
-        streamingToolCalls: [...toolCalls],
-        streamingParts: [...parts],
-      });
+      if (last?.type === "reasoning") { last.text += text; } else { parts.push({ type: "reasoning", text }); }
+      onUpdate({ streamingContent: fullContent, streamingReasoning: fullReasoning, streamingToolCalls: [...toolCalls], streamingParts: [...parts] });
       continue;
     }
 
@@ -234,17 +51,8 @@ export async function handleAgentStream(
       const text = (part as { text?: string }).text ?? "";
       fullReasoning += text;
       const last = parts[parts.length - 1];
-      if (last?.type === "reasoning") {
-        last.text += text;
-      } else {
-        parts.push({ type: "reasoning", text });
-      }
-      onUpdate({
-        streamingContent: fullContent,
-        streamingReasoning: fullReasoning,
-        streamingToolCalls: [...toolCalls],
-        streamingParts: [...parts],
-      });
+      if (last?.type === "reasoning") { last.text += text; } else { parts.push({ type: "reasoning", text }); }
+      onUpdate({ streamingContent: fullContent, streamingReasoning: fullReasoning, streamingToolCalls: [...toolCalls], streamingParts: [...parts] });
       continue;
     }
 
@@ -253,20 +61,10 @@ export async function handleAgentStream(
       onPartType?.("tool-call");
       const id = (part as { id?: string }).id ?? crypto.randomUUID();
       const toolName = (part as { toolName?: string }).toolName ?? "unknown";
-      const tc: ToolCallInfo = {
-        id,
-        toolName,
-        args: {},
-        isLoading: true,
-        startTime: Date.now(),
-        argsJsonStream: "",
-      };
+      const tc: ToolCallInfo = { id, toolName, args: {}, isLoading: true, startTime: Date.now(), argsJsonStream: "" };
       toolCalls.push(tc);
       parts.push({ type: "tool", ...tc });
-      onUpdate({
-        streamingToolCalls: [...toolCalls],
-        streamingParts: [...parts],
-      });
+      onUpdate({ streamingToolCalls: [...toolCalls], streamingParts: [...parts] });
       continue;
     }
 
@@ -279,10 +77,7 @@ export async function handleAgentStream(
           tc.argsJsonStream = (tc.argsJsonStream ?? "") + delta;
           const partInParts = parts.find((p) => p.type === "tool" && p.id === id);
           if (partInParts && partInParts.type === "tool") partInParts.argsJsonStream = tc.argsJsonStream;
-          onUpdate({
-            streamingToolCalls: [...toolCalls],
-            streamingParts: [...parts],
-          });
+          onUpdate({ streamingToolCalls: [...toolCalls], streamingParts: [...parts] });
         }
       }
       continue;
@@ -293,29 +88,20 @@ export async function handleAgentStream(
       if (id) {
         const tc = toolCalls.find((t) => t.id === id);
         if (tc && tc.argsJsonStream !== undefined) {
-          try {
-            tc.args = (JSON.parse(tc.argsJsonStream) as Record<string, unknown>) ?? {};
-          } catch {
-            tc.args = {};
-          }
+          try { tc.args = (JSON.parse(tc.argsJsonStream) as Record<string, unknown>) ?? {}; } catch { tc.args = {}; }
           delete tc.argsJsonStream;
           const partInParts = parts.find((p) => p.type === "tool" && p.id === id);
           if (partInParts && partInParts.type === "tool") {
             partInParts.args = tc.args;
             delete (partInParts as ToolCallInfo).argsJsonStream;
           }
-          onUpdate({
-            streamingToolCalls: [...toolCalls],
-            streamingParts: [...parts],
-          });
+          onUpdate({ streamingToolCalls: [...toolCalls], streamingParts: [...parts] });
         }
       }
       continue;
     }
 
-    // SDK 在工具调用完整到达时可能发 tool-call 或 tool-input-available，逻辑一致
-    const isToolCallComplete =
-      part.type === "tool-call" || part.type === "tool-input-available";
+    const isToolCallComplete = part.type === "tool-call" || part.type === "tool-input-available";
     if (isToolCallComplete) {
       onPartType?.("tool-call");
       const id = part.toolCallId ?? (part as { id?: string }).id ?? crypto.randomUUID();
@@ -330,19 +116,13 @@ export async function handleAgentStream(
         }
       } else {
         const tc: ToolCallInfo = {
-          id,
-          toolName: part.toolName ?? "unknown",
-          args: (part.input as Record<string, unknown>) ?? {},
-          isLoading: true,
-          startTime: Date.now(),
+          id, toolName: part.toolName ?? "unknown",
+          args: (part.input as Record<string, unknown>) ?? {}, isLoading: true, startTime: Date.now(),
         };
         toolCalls.push(tc);
         parts.push({ type: "tool", ...tc });
       }
-      onUpdate({
-        streamingToolCalls: [...toolCalls],
-        streamingParts: [...parts],
-      });
+      onUpdate({ streamingToolCalls: [...toolCalls], streamingParts: [...parts] });
       continue;
     }
 
@@ -361,10 +141,7 @@ export async function handleAgentStream(
         partInParts.isLoading = false;
         if (tc?.durationMs != null) partInParts.durationMs = tc.durationMs;
       }
-      onUpdate({
-        streamingToolCalls: [...toolCalls],
-        streamingParts: [...parts],
-      });
+      onUpdate({ streamingToolCalls: [...toolCalls], streamingParts: [...parts] });
       continue;
     }
 
@@ -373,27 +150,13 @@ export async function handleAgentStream(
     }
   }
   } catch (err) {
-    // Catch stream-level errors thrown by the SDK (e.g. AI_MissingToolResultsError
-    // from providers whose tool-call IDs don't match up across steps).
-    // Without this, the for-await loop hangs or crashes and the UI gets stuck.
-    if (!streamError) {
-      streamError = parseErrorLike(err) ?? "Unknown stream error";
-    }
+    // Catch stream-level errors thrown by the SDK (e.g. AI_MissingToolResultsError)
+    if (!streamError) streamError = parseErrorLike(err) ?? "Unknown stream error";
   }
 
   if (streamError) {
-    debug.finish({
-      contentChars: fullContent.length,
-      reasoningChars: fullReasoning.length,
-      error: streamError,
-    });
-    return {
-      content: fullContent,
-      reasoning: fullReasoning,
-      parts,
-      toolCalls,
-      error: streamError,
-    };
+    debug.finish({ contentChars: fullContent.length, reasoningChars: fullReasoning.length, error: streamError });
+    return { content: fullContent, reasoning: fullReasoning, parts, toolCalls, error: streamError };
   }
 
   let inputTokens: number | undefined;
@@ -406,17 +169,6 @@ export async function handleAgentStream(
     // usage 可能不可用
   }
 
-  debug.finish({
-    contentChars: fullContent.length,
-    reasoningChars: fullReasoning.length,
-  });
-  return {
-    content: fullContent,
-    reasoning: fullReasoning,
-    parts,
-    toolCalls,
-    inputTokens,
-    outputTokens,
-  };
+  debug.finish({ contentChars: fullContent.length, reasoningChars: fullReasoning.length });
+  return { content: fullContent, reasoning: fullReasoning, parts, toolCalls, inputTokens, outputTokens };
 }
-

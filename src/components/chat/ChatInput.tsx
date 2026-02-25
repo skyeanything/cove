@@ -9,26 +9,29 @@ import {
 } from "lucide-react";
 import { useState, useRef, useEffect, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { useChatStore, type DraftAttachment } from "@/stores/chatStore";
+import { ContextRing } from "./ContextRing";
+import { ToolbarIcon } from "./ToolbarIcon";
+import { useChatStore } from "@/stores/chatStore";
 import { useDataStore } from "@/stores/dataStore";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useSkillsStore } from "@/stores/skillsStore";
 import { getModelOption } from "@/lib/ai/model-service";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
-import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { invoke } from "@tauri-apps/api/core";
 import { listSkills } from "@/lib/ai/skills/loader";
 import { WorkspacePopover } from "./WorkspacePopover";
 import { SkillsPopover } from "./SkillsPopover";
 import { ModelSelector } from "./ModelSelector";
 import { AttachmentBar } from "./AttachmentBar";
 import {
-  detectAttachmentType,
-  detectMimeType,
-  isSupportedUploadFile,
   isImageAttachment,
 } from "@/lib/attachment-utils";
+import { pickAndSaveAttachments } from "@/hooks/useAttachFiles";
+import {
+  isImageFile,
+  imageFilesToDraftAttachments,
+  nonImageFilesToDraftAttachments,
+} from "@/lib/chat-input-utils";
 import {
   Tooltip,
   TooltipContent,
@@ -38,129 +41,6 @@ import {
 
 /** IME 刚结束组合后的一小段时间内不把 Enter 当作发送（避免确认拼音/英文时误发） */
 const IME_COMMIT_GRACE_MS = 150;
-
-const IMAGE_MIME = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
-
-function isImageFile(file: File): boolean {
-  return IMAGE_MIME.has(file.type);
-}
-
-function fileToDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
-}
-
-async function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result;
-      const str = typeof dataUrl === "string" ? dataUrl : "";
-      const base64 = str.includes(",") ? str.split(",")[1] ?? "" : "";
-      resolve(base64);
-    };
-    reader.onerror = () => reject(reader.error);
-    reader.readAsDataURL(file);
-  });
-}
-
-async function imageFilesToDraftAttachments(files: File[]): Promise<DraftAttachment[]> {
-  const imageFiles = Array.from(files).filter(isImageFile);
-  if (imageFiles.length === 0) return [];
-  const attachments: DraftAttachment[] = [];
-  for (const file of imageFiles) {
-    try {
-      const content = await fileToDataUrl(file);
-      attachments.push({
-        id: crypto.randomUUID(),
-        type: "image",
-        name: file.name || "image.png",
-        mime_type: file.type,
-        size: file.size,
-        content,
-      });
-    } catch {
-      // 单文件失败时跳过
-    }
-  }
-  return attachments;
-}
-
-/** 拖放的非图片支持文件（PDF/文档等）通过 Tauri 保存到 AppData 并转为草稿附件 */
-async function nonImageFilesToDraftAttachments(files: File[]): Promise<DraftAttachment[]> {
-  const supported = Array.from(files).filter(
-    (f) => !isImageFile(f) && isSupportedUploadFile(f.name || ""),
-  );
-  if (supported.length === 0) return [];
-  const attachments: DraftAttachment[] = [];
-  for (const file of supported) {
-    try {
-      const contentBase64 = await fileToBase64(file);
-      const saved = await invoke<{ path: string; name: string; size: number; previewDataUrl?: string }>(
-        "save_attachment_from_base64",
-        {
-          args: {
-            name: file.name || "file",
-            contentBase64,
-            mimeType: file.type || undefined,
-          },
-        },
-      );
-      attachments.push({
-        id: crypto.randomUUID(),
-        type: detectAttachmentType(saved.name),
-        name: saved.name,
-        path: saved.path,
-        mime_type: detectMimeType(saved.name),
-        size: saved.size,
-        content: saved.previewDataUrl,
-      });
-    } catch {
-      // 单文件失败时跳过
-    }
-  }
-  return attachments;
-}
-
-/** 上下文用量环形指示器，0–100% */
-function ContextRing({ percent }: { percent: number }) {
-  const size = 16;
-  const r = 7;
-  const stroke = 1.5;
-  const circumference = 2 * Math.PI * (r - stroke / 2);
-  const dashOffset = circumference - (percent / 100) * circumference;
-  const c = size / 2;
-  return (
-    <svg width={size} height={size} className="shrink-0" aria-hidden>
-      <circle
-        cx={c}
-        cy={c}
-        r={r - stroke / 2}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={stroke}
-        className="opacity-20"
-      />
-      <circle
-        cx={c}
-        cy={c}
-        r={r - stroke / 2}
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={stroke}
-        strokeDasharray={circumference}
-        strokeDashoffset={dashOffset}
-        strokeLinecap="round"
-        className="transition-[stroke-dashoffset] duration-300"
-        style={{ transform: "rotate(-90deg)", transformOrigin: "center" }}
-      />
-    </svg>
-  );
-}
 
 export function ChatInput({
   modelSelectorOpen: modelSelectorOpenProp,
@@ -269,53 +149,7 @@ export function ChatInput({
   }, [message]);
 
   const handleAttachFiles = async () => {
-    const selected = await openDialog({ directory: false, multiple: true });
-    if (!selected) return;
-    const paths = Array.isArray(selected) ? selected : [selected];
-    const supportedPaths = paths.filter((path) => isSupportedUploadFile(path));
-    const rejectedCount = paths.length - supportedPaths.length;
-    if (supportedPaths.length === 0) {
-      setAttachError("仅支持图片与文档文件（pdf/txt/md/docx/xlsx/pptx/代码文件等）。");
-      return;
-    }
-    type SaveAttachmentFileResult = {
-      path: string;
-      name: string;
-      size: number;
-      previewDataUrl?: string;
-    };
-    const attachments = (
-      await Promise.all(
-        supportedPaths.map(async (sourcePath): Promise<DraftAttachment | null> => {
-          try {
-            const saved = await invoke<SaveAttachmentFileResult>("save_attachment_file", {
-              args: { sourcePath },
-            });
-            return {
-              id: crypto.randomUUID(),
-              type: detectAttachmentType(saved.name || sourcePath),
-              name: saved.name,
-              path: saved.path,
-              mime_type: detectMimeType(saved.name || sourcePath),
-              size: saved.size,
-              content: saved.previewDataUrl,
-            };
-          } catch {
-            return null;
-          }
-        }),
-      )
-    ).filter((item): item is DraftAttachment => item !== null);
-    if (attachments.length > 0) {
-      addDraftAttachments(attachments);
-      setAttachError(
-        rejectedCount > 0
-          ? `已添加 ${attachments.length} 个文件，忽略 ${rejectedCount} 个不支持类型。`
-          : null,
-      );
-    } else {
-      setAttachError("文件添加失败，请重试。");
-    }
+    await pickAndSaveAttachments(addDraftAttachments, setAttachError);
   };
 
   const handleSend = () => {
@@ -371,9 +205,8 @@ export function ChatInput({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    // 输入法组合中：不把 Enter 当发送，让 IME 用来确认当前候选
+    // 输入法组合中不把 Enter 当发送；部分 IME 在 compositionend 后短时内也不发送
     if (e.nativeEvent.isComposing) return;
-    // 部分 IME 在 Enter 确认时先触发 compositionend 再 keydown，此时 isComposing 已为 false，短时内仍不发送
     if (e.key === "Enter" && Date.now() - lastCompositionEndRef.current < IME_COMMIT_GRACE_MS) {
       return;
     }
@@ -563,27 +396,5 @@ export function ChatInput({
         </div>
       </div>
     </div>
-  );
-}
-
-function ToolbarIcon({
-  icon,
-  title,
-  onClick,
-}: {
-  icon: React.ReactElement;
-  title: string;
-  onClick?: () => void;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className="flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-      title={title}
-    >
-      <span className="size-4 [&>svg]:size-4 [&>svg]:stroke-[1.5]">
-        {icon}
-      </span>
-    </button>
   );
 }

@@ -6,7 +6,7 @@ interface AgentRunMetricsInit {
   modelId: string;
 }
 
-interface AgentRunMetrics {
+export interface AgentRunMetrics {
   action: AgentRunAction;
   conversationId: string;
   modelId: string;
