@@ -108,6 +108,7 @@ pub fn run() {
       skill_commands::delete_skill,
       skill_commands::read_skill,
       docx_commands::docx_to_pdf,
+      docx_commands::qmd_to_pdf,
       docx_commands::pptx_to_pdf,
       officellm::officellm_detect,
       officellm::officellm_call,

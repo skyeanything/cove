@@ -8,7 +8,7 @@ const CODE_EXTS = new Set([
   "sql", "graphql", "vue", "svelte",
 ]);
 const IMAGE_EXTS = new Set(["png", "jpg", "jpeg", "gif", "webp", "svg", "ico", "bmp"]);
-const OFFICE_EXTS = new Set(["docx", "xlsx", "pptx"]);
+const OFFICE_EXTS = new Set(["docx", "xlsx", "pptx", "qmd"]);
 
 export function getPreviewKind(path: string): PreviewKind {
   const basename = path.split("/").pop() ?? path;
@@ -42,6 +42,7 @@ export const EXT_TO_PRISM_LANG: Record<string, string> = {
   yaml: "yaml",
   yml: "yaml",
   md: "markdown",
+  qmd: "markdown",
   sh: "bash",
   bash: "bash",
   zsh: "bash",

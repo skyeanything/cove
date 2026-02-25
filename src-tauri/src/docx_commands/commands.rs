@@ -1,5 +1,6 @@
 use super::conversion::{convert_to_pdf, find_office_app};
 use super::officellm::convert_docx_via_officellm;
+use super::qmd::convert_qmd_via_quarto;
 
 // ── Tauri 命令（async：在线程池执行，不阻塞主线程）──────────────────────────
 
@@ -12,6 +13,19 @@ pub async fn docx_to_pdf(
 ) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
         convert_docx_via_officellm(app, data_url)
+    })
+    .await
+    .map_err(|e| format!("后台线程错误: {e}"))?
+}
+
+/// 将 QMD data-URL 通过 Quarto CLI 转换为 PDF data-URL。
+#[tauri::command]
+pub async fn qmd_to_pdf(
+    app: tauri::AppHandle,
+    data_url: String,
+) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        convert_qmd_via_quarto(app, data_url)
     })
     .await
     .map_err(|e| format!("后台线程错误: {e}"))?
