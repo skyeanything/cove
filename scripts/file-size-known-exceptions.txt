@@ -1,0 +1,12 @@
+# file-size-known-exceptions.txt
+#
+# 列出超出文件大小限制的历史文件（baseline 豁免）。
+# 新文件严格执行限制，不允许随意添加到此列表。
+#
+# 格式：每行一个相对路径（相对于项目根目录），# 开头为注释。
+# 例如：src/lib/ai/stream.ts
+#
+# 若文件已重构至限制以内，或已添加 FILE_SIZE_EXCEPTION 注释，
+# 请及时从此列表中删除（check-file-size.py 会检测并报告 stale 条目）。
+#
+
