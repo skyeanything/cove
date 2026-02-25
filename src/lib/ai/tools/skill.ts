@@ -7,6 +7,7 @@ import {
   getSkillToolDescription,
   getSkillToolDescriptionForSkills,
   listSkills,
+  getAllBundledSkills,
 } from "@/lib/ai/skills/loader";
 import { useSkillsStore } from "@/stores/skillsStore";
 
@@ -75,3 +76,60 @@ export const skillTool = tool({
     return `Skill "${name}" not found. Available skills: ${available || "none"}`;
   },
 });
+
+/**
+ * 创建 skill_resource 工具：按需加载 skill 中的 resource 文件（如 TABLE_OPERATIONS_GUIDE.md）。
+ * 避免将整个 96KB SKILL.md + 所有 resource 一次性注入上下文。
+ */
+export function createSkillResourceTool(enabledNames: string[]) {
+  const enabledSet = new Set(enabledNames);
+  const allSkills = getAllBundledSkills();
+  const skillsWithResources = allSkills.filter(
+    (s) => enabledSet.has(s.meta.name) && s.resources && s.resources.length > 0,
+  );
+
+  // Build resource listing for description
+  const resourceLines = skillsWithResources.flatMap((s) =>
+    (s.resources ?? []).map((r) => `  - ${s.meta.name}: ${r.path}`),
+  );
+
+  const description =
+    resourceLines.length > 0
+      ? [
+          "Load a specific resource guide from an enabled skill. Use this to retrieve detailed guides without loading the entire skill.",
+          "",
+          "Available resources:",
+          ...resourceLines,
+        ].join("\n")
+      : "Load a specific resource guide from an enabled skill. No resources are currently available.";
+
+  return tool({
+    description,
+    inputSchema: z.object({
+      skillName: z.string().describe("The skill name that owns the resource"),
+      resourcePath: z
+        .string()
+        .describe("The resource path, e.g. 'resources/TABLE_OPERATIONS_GUIDE.md'"),
+    }),
+    execute: async ({ skillName, resourcePath }) => {
+      if (!enabledSet.has(skillName)) {
+        return `Skill "${skillName}" is not enabled. Enable it in the Skills panel first.`;
+      }
+      const skill = allSkills.find((s) => s.meta.name === skillName);
+      if (!skill) return `Skill "${skillName}" not found.`;
+      if (!skill.resources || skill.resources.length === 0) {
+        return `Skill "${skillName}" has no bundled resources.`;
+      }
+      const resource = skill.resources.find((r) => r.path === resourcePath);
+      if (!resource) {
+        const available = skill.resources.map((r) => r.path).join(", ");
+        return `Resource "${resourcePath}" not found in skill "${skillName}". Available: ${available}`;
+      }
+      return [
+        `<skill_resource skill="${skillName}" path="${resourcePath}">`,
+        resource.content.trim(),
+        "</skill_resource>",
+      ].join("\n");
+    },
+  });
+}

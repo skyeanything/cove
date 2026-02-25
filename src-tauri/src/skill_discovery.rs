@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 
 /// 内置默认目录（与 Claude / OpenCode / Cursor 等约定一致）
 const DEFAULT_SKILL_ROOTS: &[(&str, &str)] = &[
+    (".cove/skills", "cove"),
     (".claude/skills", "claude"),
     (".agents/skills", "agents"),
     (".cursor/skills-cursor", "cursor"),

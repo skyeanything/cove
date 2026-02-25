@@ -204,7 +204,7 @@ export function AssistantMessage({
         <img src="/logo.png" alt="" className="size-full object-cover" />
       </div>
 
-      <div className="min-w-0 flex-1 max-w-2xl w-full">
+      <div className="min-w-0 flex-1 w-full">
         {!hasOrderedParts && reasoning && (
           <div className="mb-2">
             <button

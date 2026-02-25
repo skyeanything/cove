@@ -33,6 +33,8 @@ interface ExternalSkillEntry {
 export interface ExternalSkillWithSource {
   skill: Skill;
   source: string;
+  /** File path of the skill on disk */
+  path: string;
 }
 
 /** 从 settings 读取已勾选 skill 名称；若为空则用内置 skill 名单填充并保存 */
@@ -64,6 +66,10 @@ interface SkillsState {
   loadExternalSkills: (workspacePath?: string | null) => Promise<void>;
   loadEnabledSkillNames: () => Promise<void>;
   toggleSkillEnabled: (name: string) => Promise<void>;
+  /** Create or update a skill in ~/.cove/skills/{name}/SKILL.md */
+  saveSkill: (name: string, content: string, workspacePath?: string | null) => Promise<void>;
+  /** Delete a skill from ~/.cove/skills/{name}/ */
+  deleteSkill: (name: string, workspacePath?: string | null) => Promise<void>;
 }
 
 export const useSkillsStore = create<SkillsState>()((set, get) => ({
@@ -84,6 +90,7 @@ export const useSkillsStore = create<SkillsState>()((set, get) => ({
       const withSource: ExternalSkillWithSource[] = entries.map((e) => ({
         skill: parseSkillFromRaw(e.content, e.name),
         source: e.source,
+        path: e.path,
       }));
       set({ externalSkills: withSource, loaded: true });
     } catch {
@@ -103,5 +110,31 @@ export const useSkillsStore = create<SkillsState>()((set, get) => ({
     const next = prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name];
     await setEnabledSkillNames(next);
     set({ enabledSkillNames: next });
+  },
+
+  saveSkill: async (name, content, workspacePath) => {
+    await invoke<string>("write_skill", { name, content });
+    // Auto-enable new skill
+    const prev = get().enabledSkillNames;
+    if (!prev.includes(name)) {
+      const next = [...prev, name];
+      await setEnabledSkillNames(next);
+      set({ enabledSkillNames: next });
+    }
+    // Refresh external skills list
+    await get().loadExternalSkills(workspacePath);
+  },
+
+  deleteSkill: async (name, workspacePath) => {
+    await invoke<void>("delete_skill", { name });
+    // Remove from enabled list
+    const prev = get().enabledSkillNames;
+    if (prev.includes(name)) {
+      const next = prev.filter((n) => n !== name);
+      await setEnabledSkillNames(next);
+      set({ enabledSkillNames: next });
+    }
+    // Refresh external skills list
+    await get().loadExternalSkills(workspacePath);
   },
 }));

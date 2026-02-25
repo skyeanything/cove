@@ -18,7 +18,7 @@ import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react
 
 const SIDEBAR_MIN = 200;
 const SIDEBAR_MAX = 400;
-const CHAT_MIN = 360;
+const CHAT_MIN = 480;
 const CHAT_MAX = 1200;
 const FILE_TREE_MIN = 200;
 const FILE_TREE_MAX = 480;
@@ -200,7 +200,7 @@ export function AppLayout() {
 
       {leftOpen ? (
         <div
-          className="relative flex shrink-0 flex-col overflow-hidden"
+          className="relative flex shrink-0 flex-col overflow-hidden border-r border-sidebar-border"
           style={{ width: leftSidebarWidth, minWidth: SIDEBAR_MIN }}
         >
           <LeftSidebar open />

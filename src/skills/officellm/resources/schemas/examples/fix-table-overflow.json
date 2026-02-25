@@ -1,0 +1,31 @@
+{
+  "schema_version": "1.0",
+  "stages_completed": ["inspect", "edit", "structural_verify", "visual_verify", "decide"],
+  "decision": "fix",
+  "layout_risk": true,
+  "risk_reason": "table_overflow_page_3",
+  "visual_checks_executed": true,
+  "pages_checked": 5,
+  "missing_dependencies": [],
+  "issues": [
+    {
+      "severity": "error",
+      "page": 3,
+      "type": "table_overflow",
+      "evidence": "Table extends beyond right margin by approximately 2cm; last column is clipped."
+    },
+    {
+      "severity": "warning",
+      "page": 4,
+      "type": "pagination_drift",
+      "evidence": "Page count increased from 5 to 6 after inserting the table. Content that was on page 4 shifted to page 5."
+    }
+  ],
+  "structural_checks": {
+    "element_count_before": 38,
+    "element_count_after": 45,
+    "validation_passed": true
+  },
+  "input_file": "quarterly_report.docx",
+  "output_file": "quarterly_report_edited.docx"
+}

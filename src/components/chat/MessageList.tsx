@@ -1,4 +1,3 @@
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Pencil,
   Check,
@@ -88,15 +87,14 @@ export function MessageList() {
   }, []);
 
   useEffect(() => {
-    const root = scrollRef.current;
-    const viewport = root?.querySelector("[data-slot=scroll-area-viewport]") as HTMLElement | null;
-    if (!root || !viewport) return;
+    const el = scrollRef.current;
+    if (!el) return;
 
     const updateFollowState = () => {
       const prevTop = lastScrollTopRef.current;
-      const currTop = viewport.scrollTop;
+      const currTop = el.scrollTop;
       const scrolledUp = currTop < prevTop - 0.5;
-      const distanceFromBottom = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
+      const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
       if (scrolledUp) {
         shouldAutoFollowRef.current = false;
       }
@@ -114,13 +112,13 @@ export function MessageList() {
       }
     };
 
-    lastScrollTopRef.current = viewport.scrollTop;
+    lastScrollTopRef.current = el.scrollTop;
     updateFollowState();
-    viewport.addEventListener("scroll", updateFollowState, { passive: true });
-    root.addEventListener("wheel", onWheel, { passive: true, capture: true });
+    el.addEventListener("scroll", updateFollowState, { passive: true });
+    el.addEventListener("wheel", onWheel, { passive: true, capture: true });
     return () => {
-      viewport.removeEventListener("scroll", updateFollowState);
-      root.removeEventListener("wheel", onWheel, { capture: true });
+      el.removeEventListener("scroll", updateFollowState);
+      el.removeEventListener("wheel", onWheel, { capture: true });
       stopAutoScroll();
     };
   }, [stopAutoScroll]);
@@ -128,15 +126,14 @@ export function MessageList() {
   // 仅在流式输出且「用户当前在底部附近」时自动滚动；用户一旦上滑则停止跟随，直到再次滑到底部
   useEffect(() => {
     if (!isStreaming) return;
-    const root = scrollRef.current;
-    const viewport = root?.querySelector("[data-slot=scroll-area-viewport]") as HTMLElement | null;
-    if (!viewport) return;
-    const distanceFromBottom = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
+    const el = scrollRef.current;
+    if (!el) return;
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
     if (distanceFromBottom <= STREAMING_FOLLOW_THRESHOLD_PX) {
       shouldAutoFollowRef.current = true;
     }
     if (!shouldAutoFollowRef.current) return;
-    startAutoScroll(viewport);
+    startAutoScroll(el);
   }, [isStreaming, messages, renderedContent, renderedReasoning, streamingToolCalls, renderedParts, startAutoScroll]);
 
   if (messages.length === 0 && !isStreaming) {
@@ -144,23 +141,21 @@ export function MessageList() {
   }
 
   return (
-    <div ref={scrollRef} className="min-h-0 flex-1 overflow-hidden">
-      <ScrollArea className="h-full">
-        <div className="mx-auto max-w-[896px] px-4 py-6">
-          {messages.map((msg) => (
-            <MessageBubble key={msg.id} message={msg} />
-          ))}
-          {isStreaming && (
-            <AssistantMessage
-              content={renderedContent}
-              reasoning={renderedReasoning}
-              toolCalls={streamingToolCalls}
-              parts={renderedParts}
-              isStreaming
-            />
-          )}
-        </div>
-      </ScrollArea>
+    <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
+      <div className="mx-auto w-full max-w-[896px] px-4 py-6">
+        {messages.map((msg) => (
+          <MessageBubble key={msg.id} message={msg} />
+        ))}
+        {isStreaming && (
+          <AssistantMessage
+            content={renderedContent}
+            reasoning={renderedReasoning}
+            toolCalls={streamingToolCalls}
+            parts={renderedParts}
+            isStreaming
+          />
+        )}
+      </div>
     </div>
   );
 }

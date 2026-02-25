@@ -3,6 +3,7 @@ mod docx_commands;
 mod fetch_commands;
 mod fs_commands;
 mod shell_commands;
+mod skill_commands;
 mod skill_discovery;
 mod workspace_watcher;
 
@@ -102,6 +103,9 @@ pub fn run() {
       workspace_watcher::watch_workspace_command,
       shell_commands::run_command,
       skill_discovery::discover_external_skills,
+      skill_commands::write_skill,
+      skill_commands::delete_skill,
+      skill_commands::read_skill,
       docx_commands::docx_to_pdf,
       docx_commands::pptx_to_pdf,
     ])
