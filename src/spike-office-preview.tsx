@@ -192,14 +192,6 @@ async function parseXlsx(buffer: ArrayBuffer): Promise<SheetData[]> {
   return sheets;
 }
 
-function letterToCol(s: string): number {
-  let col = 0;
-  for (let i = 0; i < s.length; i++) {
-    col = col * 26 + (s.charCodeAt(i) - 64);
-  }
-  return col;
-}
-
 // ============================================================
 // XLSX Viewer Component
 // ============================================================
@@ -379,7 +371,8 @@ export default function SpikeOfficPreview() {
 
   const onDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
-    if (e.dataTransfer.files.length > 0) handleFile(e.dataTransfer.files[0]);
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
   }, [handleFile]);
 
   return (

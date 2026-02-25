@@ -1,7 +1,6 @@
 import {
   Paperclip,
   Globe,
-  Mic,
   ArrowUp,
   Square,
   CornerDownRight,

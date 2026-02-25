@@ -1,7 +1,7 @@
 import { tool } from "ai";
 import { z } from "zod/v4";
 import { invoke } from "@tauri-apps/api/core";
-import { buildFetchBlockFromResults, type FetchUrlResult } from "@/lib/url-utils";
+import { type FetchUrlResult } from "@/lib/url-utils";
 
 /**
  * 供模型主动调用的抓取工具：当用户消息包含 URL 且未自动注入内容时，可用本工具抓取页面。
