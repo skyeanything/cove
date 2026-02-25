@@ -4,7 +4,6 @@ import { Code, Eye } from "lucide-react";
 import { MarkdownContent } from "@/components/chat/MarkdownContent";
 import { CodeViewer } from "@/components/preview/CodeViewer";
 import { DocxViewer } from "@/components/preview/DocxViewer";
-import { QmdViewer } from "@/components/preview/QmdViewer";
 import { XlsxViewer } from "@/components/preview/XlsxViewer";
 import { PptxViewer } from "@/components/preview/PptxViewer";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -194,15 +193,6 @@ export function FilePreviewPanel() {
   // XLSX / PPTX / DOCX 等 Office
   if (kind === "office" && cached?.type === "dataUrl" && cached.dataUrl) {
     const officeExt = selectedPath.replace(/^.*\./, "").toLowerCase();
-
-    if (officeExt === "qmd") {
-      return (
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
-          <PreviewFileHeader path={selectedPath} {...headerProps} />
-          <QmdViewer dataUrl={cached.dataUrl} className="flex-1" />
-        </div>
-      );
-    }
 
     if (officeExt === "docx") {
       return (
