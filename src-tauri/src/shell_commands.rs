@@ -59,10 +59,9 @@ pub fn run_command(args: RunCommandArgs) -> Result<RunCommandResult, String> {
     // 尝试沙箱化执行
     let policy = sandbox::load_policy();
     let sandbox_cmd = sandbox::build_sandbox_command(&args.command, &args.workspace_root, &policy);
-    let sandboxed = sandbox_cmd.is_some();
 
-    let mut child = if let Some((program, sb_args)) = sandbox_cmd {
-        Command::new(&program)
+    let (mut child, sandboxed) = if let Some((program, sb_args)) = sandbox_cmd {
+        match Command::new(&program)
             .args(&sb_args)
             .current_dir(&workdir_path)
             .env("PATH", &path_env)
@@ -70,18 +69,20 @@ pub fn run_command(args: RunCommandArgs) -> Result<RunCommandResult, String> {
             .stderr(Stdio::piped())
             .stdin(Stdio::null())
             .spawn()
-            .or_else(|_| {
-                // 沙箱命令执行失败（如 sandbox-exec 不可用），fallback
-                spawn_plain_command(&args.command, &workdir_path, &path_env)
-            })
-            .map_err(|e| e.to_string())?
+        {
+            Ok(c) => (c, true),
+            Err(_) => {
+                // 沙箱命令执行失败（如 sandbox-exec 不可用），fallback 到非沙箱
+                let c = spawn_plain_command(&args.command, &workdir_path, &path_env)
+                    .map_err(|e| e.to_string())?;
+                (c, false)
+            }
+        }
     } else {
-        spawn_plain_command(&args.command, &workdir_path, &path_env)
-            .map_err(|e| e.to_string())?
+        let c = spawn_plain_command(&args.command, &workdir_path, &path_env)
+            .map_err(|e| e.to_string())?;
+        (c, false)
     };
-
-    // fallback 时修正 sandboxed 标志
-    let sandboxed = sandboxed && child.id() != 0; // 始终 true 除非上面的 or_else 生效
 
     let mut stdout = child.stdout.take().ok_or("stdout pipe")?;
     let mut stderr = child.stderr.take().ok_or("stderr pipe")?;

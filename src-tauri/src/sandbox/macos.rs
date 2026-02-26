@@ -2,9 +2,9 @@
 
 use super::{expand_tilde, SandboxPolicy};
 
-/// macOS 始终支持 sandbox-exec（系统内置）
+/// 检测沙箱是否可用（sandbox-exec 是否存在）
 pub fn is_supported() -> bool {
-    true
+    std::path::Path::new("/usr/bin/sandbox-exec").exists()
 }
 
 /// 构建 sandbox-exec 命令。

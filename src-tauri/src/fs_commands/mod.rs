@@ -16,6 +16,7 @@ pub use read::*;
 pub use write::*;
 
 pub(crate) use validation::ensure_inside_workspace_exists;
+pub(crate) use validation::ensure_inside_workspace_may_not_exist;
 
 use serde::{Deserialize, Serialize};
 

@@ -11,7 +11,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use crate::fs_commands::ensure_inside_workspace_exists;
+use crate::fs_commands::{ensure_inside_workspace_exists, ensure_inside_workspace_may_not_exist};
 
 const DEFAULT_MEMORY_LIMIT: usize = 64 * 1024 * 1024; // 64 MB
 const DEFAULT_MAX_STACK: usize = 512 * 1024; // 512 KB
@@ -166,7 +166,7 @@ fn register_workspace_fns<'js>(
     let write_fn = Function::new(
         ctx.clone(),
         move |path: String, content: String| -> rquickjs::Result<()> {
-            let abs = ensure_inside_workspace_exists(&wr2, &path)
+            let abs = ensure_inside_workspace_may_not_exist(&wr2, &path)
                 .map_err(|_| js_err("path outside workspace"))?;
             if let Some(parent) = abs.parent() {
                 std::fs::create_dir_all(parent).map_err(|e| {

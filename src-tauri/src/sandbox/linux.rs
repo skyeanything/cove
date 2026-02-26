@@ -5,10 +5,12 @@
 
 use super::{expand_tilde, SandboxPolicy};
 
-/// 检测 Landlock 是否可用（内核是否支持）
+/// 检测沙箱是否可用（bwrap 是否安装）
 pub fn is_supported() -> bool {
-    // 检查 /sys/kernel/security/landlock 是否存在
-    std::path::Path::new("/sys/kernel/security/landlock").exists()
+    std::process::Command::new("bwrap")
+        .arg("--version")
+        .output()
+        .is_ok()
 }
 
 /// 构建沙箱化命令。
