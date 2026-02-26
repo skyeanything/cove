@@ -22,16 +22,18 @@ export function createMockDb(
 
 /**
  * Mocks the `getDb()` function from `@/db` to return the given MockDatabase.
- * Returns the mock so callers can configure per-test return values.
+ * Uses `vi.doMock` (non-hoisted) so the runtime `mockDb` reference is available.
+ * Must be called **before** dynamically importing modules that depend on `@/db`.
  *
  * Usage:
  * ```ts
  * const db = createMockDb();
  * mockGetDb(db);
+ * const { someRepo } = await import("@/db/repos/someRepo");
  * ```
  */
 export function mockGetDb(mockDb: MockDatabase): void {
-  vi.mock("@/db", () => ({
+  vi.doMock("@/db", () => ({
     getDb: vi.fn().mockResolvedValue(mockDb),
   }));
 }

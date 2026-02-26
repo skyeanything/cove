@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { createMockDb } from "../mock-db";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import { createMockDb, mockGetDb } from "../mock-db";
 
 describe("createMockDb", () => {
   it("returns mock with default empty select", async () => {
@@ -39,5 +39,25 @@ describe("createMockDb", () => {
       execute: expect.any(Function) as never,
     });
     expect(db.select).toBeDefined();
+  });
+});
+
+describe("mockGetDb", () => {
+  beforeEach(() => {
+    vi.resetModules();
+  });
+
+  it("mocks @/db so dynamic import returns the mock database", async () => {
+    const db = createMockDb();
+    db.select.mockResolvedValueOnce([{ id: "p-1", name: "Test" }]);
+
+    mockGetDb(db);
+
+    const { getDb } = await import("@/db");
+    const resolved = await getDb();
+    const rows = await resolved.select("SELECT * FROM providers");
+
+    expect(rows).toEqual([{ id: "p-1", name: "Test" }]);
+    expect(db.select).toHaveBeenCalledWith("SELECT * FROM providers");
   });
 });
