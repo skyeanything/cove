@@ -543,11 +543,11 @@ export function SkillsPage() {
 
   const handleSaveEdit = async (fields: SkillFields) => {
     const content = buildSkillMd(fields);
-    await saveSkill(editFolderName, content, workspacePath ?? null);
+    await saveSkill(editFolderName, content, workspacePath ?? null, fields.name);
   };
 
   const handleConfirmDelete = async () => {
-    await deleteSkillAction(deleteFolderName, workspacePath ?? null);
+    await deleteSkillAction(deleteFolderName, workspacePath ?? null, deleteName);
   };
 
   return (

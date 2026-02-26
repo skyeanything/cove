@@ -68,10 +68,10 @@ interface SkillsState {
   loadExternalSkills: (workspacePath?: string | null) => Promise<void>;
   loadEnabledSkillNames: () => Promise<void>;
   toggleSkillEnabled: (name: string) => Promise<void>;
-  /** Create or update a skill in ~/.cove/skills/{name}/SKILL.md */
-  saveSkill: (name: string, content: string, workspacePath?: string | null) => Promise<void>;
-  /** Delete a skill from ~/.cove/skills/{name}/ */
-  deleteSkill: (name: string, workspacePath?: string | null) => Promise<void>;
+  /** Create or update a skill: folderName for disk CRUD, skillName for enabledSkillNames */
+  saveSkill: (folderName: string, content: string, workspacePath?: string | null, skillName?: string) => Promise<void>;
+  /** Delete a skill: folderName for disk CRUD, skillName for enabledSkillNames */
+  deleteSkill: (folderName: string, workspacePath?: string | null, skillName?: string) => Promise<void>;
 }
 
 export const useSkillsStore = create<SkillsState>()((set, get) => ({
@@ -115,12 +115,13 @@ export const useSkillsStore = create<SkillsState>()((set, get) => ({
     set({ enabledSkillNames: next });
   },
 
-  saveSkill: async (name, content, workspacePath) => {
-    await invoke<string>("write_skill", { name, content });
-    // Auto-enable new skill
+  saveSkill: async (folderName, content, workspacePath, skillName) => {
+    await invoke<string>("write_skill", { name: folderName, content });
+    // Auto-enable by logical skill name (frontmatter name), fall back to folder name
+    const enableKey = skillName ?? folderName;
     const prev = get().enabledSkillNames;
-    if (!prev.includes(name)) {
-      const next = [...prev, name];
+    if (!prev.includes(enableKey)) {
+      const next = [...prev, enableKey];
       await setEnabledSkillNames(next);
       set({ enabledSkillNames: next });
     }
@@ -128,12 +129,13 @@ export const useSkillsStore = create<SkillsState>()((set, get) => ({
     await get().loadExternalSkills(workspacePath);
   },
 
-  deleteSkill: async (name, workspacePath) => {
-    await invoke<void>("delete_skill", { name });
-    // Remove from enabled list
+  deleteSkill: async (folderName, workspacePath, skillName) => {
+    await invoke<void>("delete_skill", { name: folderName });
+    // Remove by logical skill name (frontmatter name), fall back to folder name
+    const enableKey = skillName ?? folderName;
     const prev = get().enabledSkillNames;
-    if (prev.includes(name)) {
-      const next = prev.filter((n) => n !== name);
+    if (prev.includes(enableKey)) {
+      const next = prev.filter((n) => n !== enableKey);
       await setEnabledSkillNames(next);
       set({ enabledSkillNames: next });
     }
