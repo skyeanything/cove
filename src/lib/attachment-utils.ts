@@ -2,7 +2,7 @@ import type { Attachment } from "@/db/types";
 
 const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp"]);
 const PDF_EXTENSIONS = new Set(["pdf"]);
-const TEXT_EXTENSIONS = new Set(["txt", "md", "json", "csv"]);
+const TEXT_EXTENSIONS = new Set(["txt", "md", "qmd", "json", "csv"]);
 const WORD_EXTENSIONS = new Set(["doc", "docx", "rtf", "odt", "pages"]);
 const EXCEL_EXTENSIONS = new Set(["xls", "xlsx", "ods", "numbers"]);
 const PPT_EXTENSIONS = new Set(["ppt", "pptx", "odp", "key"]);
@@ -44,7 +44,7 @@ export function detectMimeType(pathOrName: string): string | undefined {
   const ext = getFileExtension(pathOrName);
   if (IMAGE_EXTENSIONS.has(ext)) return `image/${ext === "jpg" ? "jpeg" : ext}`;
   if (PDF_EXTENSIONS.has(ext)) return "application/pdf";
-  if (ext === "md") return "text/markdown";
+  if (ext === "md" || ext === "qmd") return "text/markdown";
   if (TEXT_EXTENSIONS.has(ext) || WEB_TEXT_EXTENSIONS.has(ext) || SHELL_TEXT_EXTENSIONS.has(ext) || CODE_EXTENSIONS.has(ext)) {
     return "text/plain";
   }

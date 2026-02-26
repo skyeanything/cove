@@ -15,7 +15,7 @@ export function getPreviewKind(path: string): PreviewKind {
   if (basename.startsWith(".")) return "txt";
   const ext = path.replace(/^.*\./, "").toLowerCase();
   if (!ext) return "txt";
-  if (ext === "md" || ext === "markdown") return "md";
+  if (ext === "md" || ext === "markdown" || ext === "qmd") return "md";
   if (ext === "pdf") return "pdf";
   if (OFFICE_EXTS.has(ext)) return "office";
   if (IMAGE_EXTS.has(ext)) return "image";
@@ -42,6 +42,7 @@ export const EXT_TO_PRISM_LANG: Record<string, string> = {
   yaml: "yaml",
   yml: "yaml",
   md: "markdown",
+  qmd: "markdown",
   sh: "bash",
   bash: "bash",
   zsh: "bash",

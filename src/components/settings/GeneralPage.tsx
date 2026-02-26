@@ -1,7 +1,10 @@
+import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { emit } from "@tauri-apps/api/event";
 import { useSettingsStore } from "@/stores/settingsStore";
+import { useSandboxStore } from "@/stores/sandboxStore";
 import { settingsRepo } from "@/db/repos/settingsRepo";
+import { getSkillDirPaths, setSkillDirPaths } from "@/stores/skillsStore";
 import { i18n } from "@/i18n";
 import type { Locale } from "@/i18n";
 import type { SendMessageShortcut } from "@/stores/settingsStore";
@@ -12,7 +15,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 
 const LOCALE_OPTIONS: { value: Locale; labelKey: string }[] = [
   { value: "zh", labelKey: "settings.general.localeOption_zh" },
@@ -96,7 +101,78 @@ export function GeneralPage() {
             </SelectContent>
           </Select>
         </SettingRow>
+        <SettingRow label={t("settings.general.skillDirs")}>
+          <SkillDirPathsEditor />
+        </SettingRow>
+        <SandboxSettingRow />
       </div>
+    </div>
+  );
+}
+
+function SandboxSettingRow() {
+  const { t } = useTranslation();
+  const { sandboxSupported, policy, initialized, init, toggleEnabled } =
+    useSandboxStore();
+
+  useEffect(() => {
+    init();
+  }, [init]);
+
+  if (!initialized || !sandboxSupported) return null;
+
+  return (
+    <SettingRow label={t("settings.general.shellSandbox")}>
+      <div className="flex items-center gap-2">
+        <Switch
+          checked={policy.enabled}
+          onCheckedChange={toggleEnabled}
+        />
+        <span className="text-[11px] text-muted-foreground">
+          {policy.enabled
+            ? t("settings.general.sandboxEnabled")
+            : t("settings.general.sandboxDisabled")}
+        </span>
+      </div>
+    </SettingRow>
+  );
+}
+
+/** 每行一个路径，支持 ~ 表示用户目录，保存到 settings */
+function SkillDirPathsEditor() {
+  const { t } = useTranslation();
+  const [value, setValue] = useState("");
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    getSkillDirPaths().then((paths) => {
+      setValue(paths.join("\n"));
+      setLoaded(true);
+    });
+  }, []);
+
+  const handleBlur = async () => {
+    if (!loaded) return;
+    const paths = value
+      .split("\n")
+      .map((s) => s.trim())
+      .filter(Boolean);
+    await setSkillDirPaths(paths);
+  };
+
+  return (
+    <div className="w-full max-w-[320px]">
+      <Textarea
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        onBlur={handleBlur}
+        placeholder={"~/.cursor/skills-cursor\n~/.claude/skills"}
+        rows={3}
+        className="resize-none font-mono text-[12px]"
+      />
+      <p className="mt-1 text-[11px] text-muted-foreground">
+        {t("settings.general.skillDirsHint")}
+      </p>
     </div>
   );
 }

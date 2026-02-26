@@ -50,7 +50,7 @@ pub(crate) fn ensure_inside_workspace_exists(workspace_root: &str, path: &str) -
 }
 
 /// 路径可以不存在（如写入新文件）：规范为绝对路径并校验在工作区内。
-pub(super) fn ensure_inside_workspace_may_not_exist(workspace_root: &str, path: &str) -> Result<PathBuf, FsError> {
+pub(crate) fn ensure_inside_workspace_may_not_exist(workspace_root: &str, path: &str) -> Result<PathBuf, FsError> {
     let root = Path::new(workspace_root).canonicalize().map_err(|_| FsError::NotFound)?;
 
     let p = Path::new(path);

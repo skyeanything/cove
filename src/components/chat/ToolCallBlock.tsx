@@ -13,6 +13,8 @@ import {
   FilePenLine,
   ChevronDown,
   ChevronRight,
+  Shield,
+  Code,
 } from "lucide-react";
 import Prism from "prismjs";
 import { Highlight } from "prism-react-renderer";
@@ -186,6 +188,7 @@ export const TOOL_ICON_MAP: Record<string, typeof Wrench> = {
   edit: FileDiff,
   read: FileSearch,
   write: FilePenLine,
+  js_interpreter: Code,
 };
 
 export function ToolCallIcon({ toolName }: { toolName: string }) {
@@ -204,7 +207,16 @@ export function getToolHeaderSummary(toolName: string, args: Record<string, unkn
     const path = args.filePath;
     return typeof path === "string" && path.trim() ? path.trim() : null;
   }
+  if (toolName === "js_interpreter") {
+    const desc = args.description;
+    return typeof desc === "string" && desc.trim() ? desc.trim() : null;
+  }
   return null;
+}
+
+/** 检查 bash 结果是否包含 sandboxed 标记 */
+export function isBashSandboxed(result: unknown): boolean {
+  return typeof result === "string" && result.startsWith("[sandboxed]");
 }
 
 /** 流式展示文本：按行逐行显示，模拟输出效果 */
@@ -302,6 +314,15 @@ export function ToolCallArgsDisplay({
     const command = (args.command as string) ?? "—";
     return <div className="mb-2">{renderBashCommand(command)}</div>;
   }
+  if (toolName === "js_interpreter") {
+    const code = (args.code as string) ?? "—";
+    return (
+      <div className="mb-2 space-y-1">
+        <div className="text-[11px] font-medium text-foreground-secondary">{t("tool.jsCode")}</div>
+        {renderPre(code)}
+      </div>
+    );
+  }
   if (toolName === "read") {
     const filePath = args.filePath as string | undefined;
     const offset = args.offset as number | undefined;
@@ -395,6 +416,9 @@ export function ToolCallBlock({ toolCall, pendingAsk }: { toolCall: ToolCallInfo
       >
         <ToolCallIcon toolName={toolCall.toolName} />
         <span className="text-[13px] leading-none font-semibold capitalize">{toolDisplayName}</span>
+        {isDone && toolCall.toolName === "bash" && isBashSandboxed(toolCall.result) && (
+          <Shield className="size-3 shrink-0 text-success" strokeWidth={1.5} />
+        )}
         {toolSummary && (
           <span className="min-w-0 max-w-[420px] truncate text-[13px] leading-none font-normal text-foreground-secondary">
             {toolSummary}

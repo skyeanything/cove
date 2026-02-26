@@ -50,6 +50,7 @@ interface RunCommandResult {
   stderr: string;
   exitCode: number;
   timedOut: boolean;
+  sandboxed: boolean;
 }
 
 export const bashTool = tool({
@@ -100,6 +101,7 @@ export const bashTool = tool({
       const out = result.stdout + (result.stderr ? `\n[stderr]\n${result.stderr}` : "");
       const truncated = truncateOutput(out);
       const header = [
+        result.sandboxed ? "[sandboxed]" : "",
         result.timedOut ? "[命令已超时终止]" : "",
         `exit code: ${result.exitCode}`,
       ]

@@ -14,7 +14,10 @@
       "shortcutEnter": "Enter",
       "shortcutModifierEnter": "⌘+Enter / Ctrl+Enter",
       "skillDirs": "Skill 目录（额外）",
-      "skillDirsHint": "每行一个路径，支持 ~ 表示用户目录。内置已包含 ~/.claude/skills、~/.cursor/skills-cursor 等。"
+      "skillDirsHint": "每行一个路径，支持 ~ 表示用户目录。内置已包含 ~/.claude/skills、~/.cursor/skills-cursor 等。",
+      "shellSandbox": "Shell 沙箱",
+      "sandboxEnabled": "已启用（内核级隔离）",
+      "sandboxDisabled": "已关闭"
     },
     "appearanceComingSoon": "外观设置即将推出"
   },
@@ -184,7 +187,9 @@
     "contentToWrite": "写入内容：",
     "arguments": "参数：",
     "oldString": "原字符串：",
-    "newString": "新字符串："
+    "newString": "新字符串：",
+    "jsCode": "JavaScript 代码：",
+    "sandboxed": "已沙箱化"
   },
   "permission": {
     "title": "需要确认",

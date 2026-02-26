@@ -8,6 +8,7 @@ import { fetchUrlTool } from "./fetch-url";
 import { skillTool, createSkillTool, createSkillResourceTool } from "./skill";
 import { writeSkillTool } from "./write-skill";
 import { officellmTool } from "./officellm";
+import { jsInterpreterTool } from "./jsInterpreter";
 
 export const AGENT_TOOLS = {
   read: readTool,
@@ -18,6 +19,7 @@ export const AGENT_TOOLS = {
   fetch_url: fetchUrlTool,
   skill: skillTool,
   officellm: officellmTool,
+  js_interpreter: jsInterpreterTool,
 } as const;
 
 export type AgentToolId = keyof typeof AGENT_TOOLS;
@@ -39,6 +41,7 @@ export function getAgentTools(
     fetch_url: fetchUrlTool,
     skill: createSkillTool(enabledSkillNames),
     skill_resource: createSkillResourceTool(enabledSkillNames),
+    js_interpreter: jsInterpreterTool,
   };
   if (enabledSkillNames.includes("skill-creator")) {
     tools.write_skill = writeSkillTool;
