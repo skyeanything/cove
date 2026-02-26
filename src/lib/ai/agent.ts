@@ -176,7 +176,7 @@ export function toModelMessages(dbMessages: Message[]): ModelMessage[] {
 /**
  * Run the agent — wraps streamText() with tool support and multi-step loop.
  */
-/** 默认最大步数：每步 = 模型一轮生成（可含多次工具调用），步数用尽会停止，易被误以为“截断” */
+/** 默认最大步数：每步 = 模型一轮生成（可含多次工具调用），步数用尽会停止，易被误以为"截断" */
 const DEFAULT_MAX_STEPS = 30;
 
 export function runAgent(options: AgentOptions) {

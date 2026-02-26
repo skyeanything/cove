@@ -1,10 +1,16 @@
-import type { Skill, SkillMeta } from "./types";
+import type { Skill, SkillMeta, SkillResource } from "./types";
 
 // Static skill registry — skills are registered at build time.
 // In a Tauri/browser environment we can't dynamically scan the filesystem,
 // so we use Vite's import.meta.glob to load SKILL.md files.
 
 const skillModules = import.meta.glob("/src/skills/*/SKILL.md", {
+  query: "?raw",
+  import: "default",
+  eager: true,
+}) as Record<string, string>;
+
+const resourceModules = import.meta.glob("/src/skills/*/resources/**/*.{md,json}", {
   query: "?raw",
   import: "default",
   eager: true,
@@ -130,6 +136,46 @@ function findParentKey(yaml: string, childLine: string): string {
   return "";
 }
 
+/** Collect resource files belonging to a skill directory */
+function collectResources(skillDirName: string): SkillResource[] {
+  const prefix = `/src/skills/${skillDirName}/`;
+  const resources: SkillResource[] = [];
+  for (const [resPath, resContent] of Object.entries(resourceModules)) {
+    if (resPath.startsWith(prefix)) {
+      resources.push({
+        path: resPath.slice(prefix.length), // e.g. "resources/TABLE_OPERATIONS_GUIDE.md"
+        content: resContent,
+      });
+    }
+  }
+  return resources;
+}
+
+/** Parse metadata JSON string from frontmatter (e.g. '{"version": "2.11", "author": "..."}') */
+function parseMetadataField(raw: unknown): Record<string, string> | undefined {
+  if (!raw) return undefined;
+  if (typeof raw === "object" && raw !== null) {
+    const out: Record<string, string> = {};
+    for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+      out[k] = String(v);
+    }
+    return Object.keys(out).length > 0 ? out : undefined;
+  }
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw) as Record<string, unknown>;
+      const out: Record<string, string> = {};
+      for (const [k, v] of Object.entries(parsed)) {
+        out[k] = String(v);
+      }
+      return Object.keys(out).length > 0 ? out : undefined;
+    } catch {
+      return undefined;
+    }
+  }
+  return undefined;
+}
+
 let cachedSkills: Skill[] | null = null;
 
 function loadAllSkills(): Skill[] {
@@ -154,19 +200,32 @@ function loadAllSkills(): Skill[] {
       }
     }
 
+    const metadata = parseMetadataField(parsed.meta.metadata);
+    const resources = collectResources(pathName);
+
     const skillMeta: SkillMeta = {
       name: name || pathName,
       description: description,
       emoji: parsed.meta.emoji as string | undefined,
       always: (parsed.meta.always as boolean) ?? false,
       requires: parsed.meta.requires as { tools?: string[] } | undefined,
+      metadata,
     };
 
-    skills.push({ meta: skillMeta, content });
+    skills.push({
+      meta: skillMeta,
+      content,
+      resources: resources.length > 0 ? resources : undefined,
+    });
   }
 
   cachedSkills = skills;
   return skills;
+}
+
+/** Get all bundled skills with their full content and resources (for settings page) */
+export function getAllBundledSkills(): Skill[] {
+  return loadAllSkills();
 }
 
 export function listSkills(): SkillMeta[] {
@@ -288,6 +347,7 @@ export function parseSkillFromRaw(rawContent: string, fallbackName: string): Ski
     emoji: parsed.meta.emoji as string | undefined,
     always: (parsed.meta.always as boolean) ?? false,
     requires: parsed.meta.requires as { tools?: string[] } | undefined,
+    metadata: parseMetadataField(parsed.meta.metadata),
   };
   return { meta: skillMeta, content };
 }

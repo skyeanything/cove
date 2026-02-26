@@ -143,10 +143,9 @@ export function LeftSidebar({ open }: LeftSidebarProps) {
   return (
     <div
       className={cn(
-        "no-select flex flex-col overflow-hidden bg-sidebar",
+        "no-select flex h-full flex-col overflow-hidden",
         "transition-[width,min-width] duration-300 ease-out",
-        open ? "w-full min-w-0" : "w-0 min-w-0 border-r-0",
-        open && "border-r border-sidebar-border",
+        open ? "w-full min-w-0" : "w-0 min-w-0",
       )}
     >
       {/* Top spacer — matches WindowControls height (traffic lights + buttons row) */}
