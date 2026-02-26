@@ -11,6 +11,12 @@ vi.mock("@/lib/url-utils", () => ({
 import { extractUrls, buildFetchBlockFromResults } from "@/lib/url-utils";
 import { getFetchBlockForText, injectFetchBlockIntoLastUserMessage } from "./chat-url-utils";
 
+/** Extract text from a ModelMessage's first content part (test helper) */
+function textOf(msg: ModelMessage): string {
+  const c = msg as { content: Array<{ type: string; text?: string }> };
+  return c.content[0]?.text ?? "";
+}
+
 const mockExtractUrls = vi.mocked(extractUrls);
 const mockBuildBlock = vi.mocked(buildFetchBlockFromResults);
 
@@ -89,7 +95,7 @@ describe("injectFetchBlockIntoLastUserMessage", () => {
       { role: "user", content: [{ type: "text", text: "hello" }] },
     ];
     injectFetchBlockIntoLastUserMessage(msgs, "");
-    expect((msgs[0] as { content: Array<{ text: string }> }).content[0].text).toBe("hello");
+    expect(textOf(msgs[0]!)).toBe("hello");
   });
 
   it("appends fetchBlock to last user message text", () => {
@@ -97,9 +103,7 @@ describe("injectFetchBlockIntoLastUserMessage", () => {
       { role: "user", content: [{ type: "text", text: "original" }] },
     ];
     injectFetchBlockIntoLastUserMessage(msgs, "\n\n[fetched]");
-    expect((msgs[0] as { content: Array<{ text: string }> }).content[0].text).toBe(
-      "original\n\n[fetched]",
-    );
+    expect(textOf(msgs[0]!)).toBe("original\n\n[fetched]");
   });
 
   it("targets the last user message when multiple exist", () => {
@@ -110,11 +114,9 @@ describe("injectFetchBlockIntoLastUserMessage", () => {
     ];
     injectFetchBlockIntoLastUserMessage(msgs, "[block]");
     // First user message unchanged
-    expect((msgs[0] as { content: Array<{ text: string }> }).content[0].text).toBe("first");
+    expect(textOf(msgs[0]!)).toBe("first");
     // Last user message modified
-    expect((msgs[2] as { content: Array<{ text: string }> }).content[0].text).toBe(
-      "second[block]",
-    );
+    expect(textOf(msgs[2]!)).toBe("second[block]");
   });
 
   it("does nothing when no user messages exist", () => {
@@ -123,7 +125,7 @@ describe("injectFetchBlockIntoLastUserMessage", () => {
     ];
     // Should not throw
     injectFetchBlockIntoLastUserMessage(msgs, "[block]");
-    expect((msgs[0] as { content: Array<{ text: string }> }).content[0].text).toBe("hi");
+    expect(textOf(msgs[0]!)).toBe("hi");
   });
 
   it("does nothing for empty messages array", () => {
