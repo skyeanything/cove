@@ -3,7 +3,6 @@
 //! 并发安全设计：session 始终留在全局 SESSION 中，仅 I/O 句柄 (SessionIO)
 //! 被临时取出执行阻塞读写。close() 可随时 kill 子进程，has_session() 始终准确。
 
-use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -48,31 +47,58 @@ pub fn open(path: &str) -> Result<(), String> {
 
     log::info!("[officellm-server] opening: {path}");
 
-    let tmp_dir = dirs::home_dir()
-        .map(|h| h.join(".officellm/tmp"))
-        .unwrap_or_else(|| std::path::PathBuf::from("/tmp"));
-    let _ = std::fs::create_dir_all(&tmp_dir);
-
     let mut child = Command::new(&bin)
-        .args(["serve", "--stdio", "--input", path])
-        .env("TMPDIR", &tmp_dir)
-        .env("TEMP", &tmp_dir)
-        .env("TMP", &tmp_dir)
+        .args(["serve", "--transport", "stdio"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::null())
+        .stderr(Stdio::piped())
         .spawn()
         .map_err(|e| format!("启动 officellm serve 失败: {e}"))?;
+
+    // 等待 300ms 后检查进程是否已提前退出（如文件不存在、权限错误等）
+    std::thread::sleep(Duration::from_millis(300));
+    match child.try_wait() {
+        Ok(Some(status)) => {
+            let mut msg = String::new();
+            if let Some(mut err) = child.stderr.take() {
+                use std::io::Read;
+                let _ = err.read_to_string(&mut msg);
+            }
+            return Err(format!(
+                "officellm serve 启动后立即退出 (code {:?}){}",
+                status.code(),
+                if msg.is_empty() { String::new() } else { format!(": {msg}") }
+            ));
+        }
+        Ok(None) => {
+            // 进程仍存活，后台 drain stderr 防止缓冲区满阻塞子进程
+            if let Some(stderr) = child.stderr.take() {
+                std::thread::spawn(move || {
+                    use std::io::Read;
+                    let _ = std::io::BufReader::new(stderr).read_to_end(&mut Vec::new());
+                });
+            }
+        }
+        Err(e) => return Err(format!("检查进程状态失败: {e}")),
+    }
 
     let stdin = child.stdin.take().ok_or("stdin pipe 不可用")?;
     let stdout = child.stdout.take().ok_or("stdout pipe 不可用")?;
 
+    // 发送 JSON-RPC open 请求，在服务进程中打开文档
+    let io = SessionIO { stdin, reader: BufReader::new(stdout) };
+    let io = send_open_request(io, path).map_err(|e| {
+        let _ = child.kill();
+        let _ = child.wait();
+        e
+    })?;
+
     *guard = Some(ServerSession {
         child,
-        io: Some(SessionIO { stdin, reader: BufReader::new(stdout) }),
+        io: Some(io),
         document_path: path.to_string(),
         started_at: Instant::now(),
-        next_id: AtomicU64::new(1),
+        next_id: AtomicU64::new(2), // id=1 已用于 open 请求
     });
 
     Ok(())
@@ -107,13 +133,13 @@ fn kill_on_io_error() {
 }
 
 /// 在活跃会话中执行命令
-pub fn call(cmd: &str, args: &HashMap<String, String>) -> Result<CommandResult, String> {
+pub fn call(cmd: &str, args: &[String]) -> Result<CommandResult, String> {
     let (io, id) = take_io()?;
     let params = serde_json::json!({ "command": cmd, "args": args });
     let request = JsonRpcRequest {
         jsonrpc: "2.0",
         id,
-        method: "execute".to_string(),
+        method: "call".to_string(),
         params: Some(params),
     };
 
@@ -192,6 +218,31 @@ pub fn status() -> Result<Option<SessionInfo>, String> {
     }))
 }
 
+/// 发送 JSON-RPC open 请求，打开文档（10s 超时）
+fn send_open_request(io: SessionIO, path: &str) -> Result<SessionIO, String> {
+    let SessionIO { mut stdin, mut reader } = io;
+    let request = JsonRpcRequest { jsonrpc: "2.0", id: 1, method: "open".to_string(),
+        params: Some(serde_json::json!({ "path": path })) };
+    let payload = serde_json::to_string(&request).map_err(|e| format!("序列化失败: {e}"))?;
+    writeln!(stdin, "{payload}").map_err(|e| format!("发送 open 请求失败: {e}"))?;
+    stdin.flush().map_err(|e| format!("flush 失败: {e}"))?;
+    let (tx, rx) = std::sync::mpsc::channel();
+    std::thread::spawn(move || {
+        let mut line = String::new();
+        let result = reader.read_line(&mut line);
+        let _ = tx.send((reader, line, result));
+    });
+    let (reader, line, read_result) = rx.recv_timeout(Duration::from_secs(10))
+        .map_err(|_| "open 响应超时 (10s)".to_string())?;
+    read_result.map_err(|e| format!("读取 open 响应失败: {e}"))?;
+    let response: JsonRpcResponse =
+        serde_json::from_str(&line).map_err(|e| format!("解析 open 响应失败: {e}"))?;
+    if let Some(err) = response.error {
+        return Err(format!("open 失败: {}", err.message));
+    }
+    Ok(SessionIO { stdin, reader })
+}
+
 /// 发送 JSON-RPC 请求并读取响应（带 60s 超时）。
 /// 拥有 IO 句柄所有权：成功时归还，超时时句柄留在读线程中（由 kill 关闭 pipe 回收）。
 fn send_request(
@@ -228,23 +279,22 @@ fn send_request(
 }
 
 /// 解析 JSON-RPC 响应为 CommandResult
+///
+/// call 响应格式：`{"exit_code": N, "output": {CLI JSON}}`
+/// save/其他响应格式：直接是数据
 fn parse_response(line: &str) -> Result<CommandResult, String> {
     let response: JsonRpcResponse = serde_json::from_str(line)
         .map_err(|e| format!("解析 JSON-RPC 响应失败: {e}"))?;
-
     if let Some(err) = response.error {
-        return Ok(CommandResult {
-            status: "error".to_string(),
-            data: serde_json::Value::Null,
-            error: Some(err.message),
-            metrics: None,
-        });
+        return Ok(CommandResult { status: "error".to_string(), data: serde_json::Value::Null,
+            error: Some(err.message), metrics: None });
     }
-
-    Ok(CommandResult {
-        status: "success".to_string(),
-        data: response.result.unwrap_or(serde_json::Value::Null),
-        error: None,
-        metrics: None,
-    })
+    let result = response.result.unwrap_or(serde_json::Value::Null);
+    // call 响应中取 output 字段（CLI JSON），其他响应直接用 result
+    let payload = result.get("output").cloned().unwrap_or(result);
+    if let Ok(mut r) = serde_json::from_value::<CommandResult>(payload.clone()) {
+        if r.status == "failure" { r.status = "error".to_string(); }
+        return Ok(r);
+    }
+    Ok(CommandResult { status: "success".to_string(), data: payload, error: None, metrics: None })
 }

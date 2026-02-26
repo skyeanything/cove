@@ -1,6 +1,7 @@
 import { tool } from "ai";
 import { z } from "zod/v4";
 import { invoke } from "@tauri-apps/api/core";
+import { useWorkspaceStore } from "@/stores/workspaceStore";
 
 interface DetectResult {
   available: boolean;
@@ -37,9 +38,9 @@ export const officellmTool = tool({
       .optional()
       .describe("Command name (required for 'call', e.g. 'addSlide', 'setText')"),
     args: z
-      .record(z.string(), z.string())
+      .array(z.string())
       .optional()
-      .describe("Command arguments as key-value pairs (for 'call')"),
+      .describe("CLI-style arguments for 'call', e.g. ['--limit', '50', '--page', '2']. For CLI mode without an open session, include '--input' and the file path."),
   }),
   execute: async ({ action, path, command, args }) => {
     try {
@@ -52,8 +53,13 @@ export const officellmTool = tool({
 
         case "open": {
           if (!path) return "Error: 'path' is required for the 'open' action.";
-          await invoke<void>("officellm_open", { path });
-          return `Session opened for: ${path}`;
+          const workspaceRoot = useWorkspaceStore.getState().activeWorkspace?.path;
+          const absPath =
+            workspaceRoot && !path.startsWith("/")
+              ? `${workspaceRoot}/${path}`
+              : path;
+          await invoke<void>("officellm_open", { path: absPath });
+          return `Session opened for: ${absPath}`;
         }
 
         case "call": {

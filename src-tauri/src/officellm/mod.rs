@@ -5,7 +5,6 @@ pub mod detect;
 pub mod server;
 pub mod types;
 
-use std::collections::HashMap;
 use types::{CommandResult, DetectResult, SessionInfo};
 
 // ── Tauri 命令 ──────────────────────────────────────────────────────────────
@@ -20,7 +19,7 @@ pub fn officellm_detect() -> DetectResult {
 #[tauri::command]
 pub async fn officellm_call(
     cmd: String,
-    args: HashMap<String, String>,
+    args: Vec<String>,
 ) -> Result<CommandResult, String> {
     tauri::async_runtime::spawn_blocking(move || {
         if server::has_session() {
