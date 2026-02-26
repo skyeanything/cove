@@ -114,14 +114,17 @@ src/
 │   ├── ui/          # shadcn/ui primitives (DO NOT modify)
 │   ├── chat/        # Chat-related components
 │   ├── sidebar/     # Sidebar components
-│   ├── settings/    # Settings panel
+│   ├── settings/    # Settings panel (incl. SkillsPage)
 │   └── layout/      # Layout shells
 ├── hooks/           # Custom React hooks
 ├── stores/          # Zustand stores (one file per domain)
 ├── lib/
-│   ├── ai/         # AI SDK wrappers
-│   ├── db/         # SQLite operations
-│   └── utils.ts    # Shared utilities
+│   ├── ai/
+│   │   ├── skills/  # Skill types, loader, discovery
+│   │   └── tools/   # AI tool definitions & registry
+│   ├── db/          # SQLite operations
+│   └── utils.ts     # Shared utilities
+├── skills/          # Built-in skills (SKILL.md + resources)
 ├── types/           # TypeScript types & interfaces
 └── i18n/            # Translations
 ```
@@ -163,7 +166,8 @@ src/
 
 ### 已对齐到本项目的部分
 - **Exa 网页搜索 / 代码搜索**: 参考 `websearch.ts`、`codesearch.ts`，调用 `https://mcp.exa.ai/mcp`，请求头 `x-api-key`，超时用 `AbortController` + `setTimeout`（opencode 用 `abortAfterAny(ms, ctx.abort)`）。
-- **工具注册表**: `src/lib/ai/tools/registry.ts` 的 `TOOL_REGISTRY` 与 `getAgentTools()` 的 key 对应，用于 UI 展示与勾选，类似 opencode 按 agent/permission 过滤工具。
+- **工具注册表**: `src/lib/ai/tools/index.ts` 的 `AGENT_TOOLS`（静态默认集）与 `getAgentTools(enabledSkillNames, options?)`（动态过滤集）对应，类似 opencode 按 agent/permission 过滤工具。
+- **Skill 系统**: `src/lib/ai/skills/` 实现了技能发现、加载与优先级解析，详见下方「Skill 系统架构」。
 
 ### 依赖后端、尚未集成的能力
 以下在 opencode 中依赖 Bun/Node 与本地文件系统，若要在 office-chat 中实现需通过 Tauri 提供能力：
@@ -178,6 +182,69 @@ src/
 | 输出截断 | `tool/truncation.ts` | 工具输出过长时写文件并返回路径提示；前端可做简单长度截断 |
 
 实现上述能力时，可继续参考 opencode 的 `external-directory.ts`（访问工作区外路径时的权限）、`edit.ts` 中的多种 `Replacer`（oldString 匹配策略）以及 `read.txt` / `edit.txt` 等描述文案。
+
+## Skill 系统架构
+
+### 概述
+
+Skill 是模块化的能力扩展包，每个 Skill 以 `SKILL.md` 为核心定义文件，可选附带 `resources/` 资源目录。
+
+### SKILL.md Frontmatter 规范
+
+```yaml
+---
+name: my-skill            # 必填，slug 格式（小写字母、数字、连字符）
+description: "..."        # 必填，简短描述（模型用于判断何时启用）
+emoji: "🔧"              # 可选，UI 展示图标
+always: true              # 可选，始终注入 system prompt（不需用户启用）
+requires:                 # 可选，声明依赖的工具
+  tools:
+    - bash
+    - write
+metadata:                 # 可选，额外元数据
+  version: "1.0"
+  author: "..."
+---
+
+（Markdown 正文 = Skill 指令，注入为 system prompt 的一部分）
+```
+
+> **重要**: 编辑保存 Skill 时必须保留所有 frontmatter 字段（包括未在 UI 中展示的 `always`、`requires`、`metadata` 等）。`SkillsPage` 的 `parseSkillFields()` / `buildSkillMd()` 通过 `extraFrontmatter` 实现未知字段的 round-trip 保留。
+
+### 三层加载机制
+
+1. **Built-in skills** — 打包在 `src/skills/` 中，通过 Vite `import.meta.glob` 静态加载
+2. **User skills (cove)** — 存放在 `~/.cove/skills/{name}/SKILL.md`，通过 Tauri 命令发现
+3. **Discovered skills (claude/cursor/etc.)** — 从已知约定目录自动扫描
+
+来源优先级：`cove > claude > 其他`（同名 Skill 仅保留最高优先级）
+
+### 关键文件
+
+| 文件 | 职责 |
+|------|------|
+| `src/skills/*/SKILL.md` | 内置 Skill 定义 |
+| `src/lib/ai/skills/types.ts` | `SkillMeta`, `Skill`, `SkillResource` 类型 |
+| `src/lib/ai/skills/loader.ts` | Frontmatter 解析、加载、摘要生成 |
+| `src/lib/ai/tools/index.ts` | `AGENT_TOOLS`（静态集）、`getAgentTools()`（动态集） |
+| `src/lib/ai/tools/skill.ts` | `skill` 工具（模型按名调用 Skill）、`skill_resource` 工具 |
+| `src/lib/ai/tools/write-skill.ts` | `write_skill` 工具（AI 创建新 Skill 并保存到磁盘） |
+| `src/stores/skillsStore.ts` | Zustand store：发现、启用/禁用、保存、删除 |
+| `src/components/settings/SkillsPage.tsx` | 设置页 UI：列表、编辑（结构化表单）、删除 |
+| `src/components/chat/SkillsPopover.tsx` | 聊天中 Skill 选择弹窗 |
+| `src-tauri/src/skill_commands.rs` | Rust 端：`read_skill`、`write_skill`、`delete_skill` |
+| `src-tauri/src/skill_discovery.rs` | Rust 端：外部 Skill 目录扫描 |
+
+### 工具门控（Tool Gating）
+
+`getAgentTools()` 根据 `enabledSkillNames` 动态构建工具集：
+- `skill` 工具始终注册，但内部仅暴露已启用的 Skill
+- `write_skill` 仅在 `skill-creator` 已启用时注册
+- `officellm` 通过 `options.officellm` 控制
+
+### React Key 规范
+
+Skill 列表中的 React key 使用 `${source}:${name}` 复合键，防止不同来源同名 Skill 导致 key 冲突。
 
 ## Development Workflow
 
