@@ -48,8 +48,16 @@ pub fn open(path: &str) -> Result<(), String> {
 
     log::info!("[officellm-server] opening: {path}");
 
+    let tmp_dir = dirs::home_dir()
+        .map(|h| h.join(".officellm/tmp"))
+        .unwrap_or_else(|| std::path::PathBuf::from("/tmp"));
+    let _ = std::fs::create_dir_all(&tmp_dir);
+
     let mut child = Command::new(&bin)
         .args(["serve", "--stdio", "--input", path])
+        .env("TMPDIR", &tmp_dir)
+        .env("TEMP", &tmp_dir)
+        .env("TMP", &tmp_dir)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
