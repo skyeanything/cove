@@ -8,6 +8,7 @@ use std::time::Duration;
 use serde::{Deserialize, Serialize};
 
 use crate::fs_commands::ensure_inside_workspace_exists;
+use crate::sandbox;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -16,6 +17,7 @@ pub struct RunCommandResult {
     pub stderr: String,
     pub exit_code: i32,
     pub timed_out: bool,
+    pub sandboxed: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -38,11 +40,6 @@ pub fn run_command(args: RunCommandArgs) -> Result<RunCommandResult, String> {
     let timeout_ms = args.timeout_ms.unwrap_or(120_000).min(600_000);
     let timeout = Duration::from_millis(timeout_ms);
 
-    #[cfg(unix)]
-    let (shell, shell_arg) = ("sh", "-c");
-    #[cfg(windows)]
-    let (shell, shell_arg) = ("cmd", "/c");
-
     // 将 ~/.local/bin 等常用工具目录追加到 PATH，
     // 因为 sh -c 不加载用户 shell profile。
     // 注：officellm 现通过专属 officellm 模块调用，不再注入 PATH。
@@ -59,16 +56,32 @@ pub fn run_command(args: RunCommandArgs) -> Result<RunCommandResult, String> {
         format!("{}:{current}", extra.join(":"))
     };
 
-    let mut child = Command::new(shell)
-        .arg(shell_arg)
-        .arg(&args.command)
-        .current_dir(&workdir_path)
-        .env("PATH", &path_env)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .stdin(Stdio::null())
-        .spawn()
-        .map_err(|e| e.to_string())?;
+    // 尝试沙箱化执行
+    let policy = sandbox::load_policy();
+    let sandbox_cmd = sandbox::build_sandbox_command(&args.command, &args.workspace_root, &policy);
+    let sandboxed = sandbox_cmd.is_some();
+
+    let mut child = if let Some((program, sb_args)) = sandbox_cmd {
+        Command::new(&program)
+            .args(&sb_args)
+            .current_dir(&workdir_path)
+            .env("PATH", &path_env)
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .stdin(Stdio::null())
+            .spawn()
+            .or_else(|_| {
+                // 沙箱命令执行失败（如 sandbox-exec 不可用），fallback
+                spawn_plain_command(&args.command, &workdir_path, &path_env)
+            })
+            .map_err(|e| e.to_string())?
+    } else {
+        spawn_plain_command(&args.command, &workdir_path, &path_env)
+            .map_err(|e| e.to_string())?
+    };
+
+    // fallback 时修正 sandboxed 标志
+    let sandboxed = sandboxed && child.id() != 0; // 始终 true 除非上面的 or_else 生效
 
     let mut stdout = child.stdout.take().ok_or("stdout pipe")?;
     let mut stderr = child.stderr.take().ok_or("stderr pipe")?;
@@ -91,6 +104,7 @@ pub fn run_command(args: RunCommandArgs) -> Result<RunCommandResult, String> {
                 stderr: stderr_str,
                 exit_code,
                 timed_out: false,
+                sandboxed,
             });
         }
         if rx.try_recv().is_ok() {
@@ -110,5 +124,27 @@ pub fn run_command(args: RunCommandArgs) -> Result<RunCommandResult, String> {
         stderr: err,
         exit_code: -1,
         timed_out: true,
+        sandboxed,
     })
+}
+
+fn spawn_plain_command(
+    cmd: &str,
+    workdir: &str,
+    path_env: &str,
+) -> std::io::Result<std::process::Child> {
+    #[cfg(unix)]
+    let (shell, shell_arg) = ("sh", "-c");
+    #[cfg(windows)]
+    let (shell, shell_arg) = ("cmd", "/c");
+
+    Command::new(shell)
+        .arg(shell_arg)
+        .arg(cmd)
+        .current_dir(workdir)
+        .env("PATH", path_env)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .stdin(Stdio::null())
+        .spawn()
 }

@@ -2,7 +2,9 @@ mod attachment_commands;
 mod docx_commands;
 mod fetch_commands;
 mod fs_commands;
+mod js_interpreter;
 mod officellm;
+mod sandbox;
 mod shell_commands;
 mod skill_commands;
 mod skill_discovery;
@@ -103,6 +105,10 @@ pub fn run() {
       fs_commands::reveal_in_finder,
       workspace_watcher::watch_workspace_command,
       shell_commands::run_command,
+      sandbox::check_sandbox_supported,
+      sandbox::get_sandbox_policy,
+      sandbox::set_sandbox_policy,
+      js_interpreter::run_js,
       skill_discovery::discover_external_skills,
       skill_commands::write_skill,
       skill_commands::delete_skill,
