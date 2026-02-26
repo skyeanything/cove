@@ -2,15 +2,14 @@ import { streamText, stepCountIs } from "ai";
 import type { LanguageModel, ModelMessage } from "ai";
 import type { Message } from "@/db/types";
 import { buildSystemPrompt } from "./context";
-import { AGENT_TOOLS } from "./tools";
+import { AGENT_TOOLS, type ToolRecord } from "./tools";
 
 export interface AgentOptions {
   model: LanguageModel;
   messages: ModelMessage[];
   system?: string;
   /** 不传则使用默认 AGENT_TOOLS；传则使用该工具集（如 getAgentTools(enabledSkillNames)） */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  tools?: Record<string, any>;
+  tools?: ToolRecord;
   abortSignal?: AbortSignal;
   maxSteps?: number;
   /** 最大输出 token 数，来自 Provider 模型选项时可传入 */

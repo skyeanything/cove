@@ -26,6 +26,9 @@ description: Agent 默认行为规则（方案与审查）
 ## 4. PR Review 输出规则
 
 - 如果任务是 review pull request，review 结果必须写在该 PR 的评论中。
+- 不能只在本地终端输出 review 结果后结束任务；必须回写到远端 PR 讨论区。
+- 优先使用 `gh pr review`（`--comment` / `--approve` / `--request-changes`）。
+- 若因权限或平台限制导致 `gh pr review` 失败（例如审查自己创建的 PR 时不能 `request-changes`），必须 fallback 使用 `gh pr comment` 发布同等信息。
 - 评论内容应包含结论与可执行项（例如 MUST/SHOULD/NIT 或等价分级）。
 - 若无问题，也要在 PR 评论中明确写出无阻塞问题的结论。
 

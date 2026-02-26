@@ -7,6 +7,7 @@ import { reportAgentRunMetrics, trackAgentPart } from "@/lib/ai/agent-metrics";
 import type { AgentRunMetrics } from "@/lib/ai/agent-metrics";
 import { handleAgentStream, type StreamResult } from "@/lib/ai/stream-handler";
 import { buildSystemPrompt } from "@/lib/ai/context";
+import { isOfficellmAvailable } from "@/lib/ai/officellm-detect";
 import { getAgentTools } from "@/lib/ai/tools";
 import { getEnabledSkillNames } from "./skillsStore";
 import type { StreamUpdate } from "@/lib/ai/stream-types";
@@ -46,14 +47,15 @@ export async function runStreamLoop(
   const model = getModel(provider, modelId);
   const modelOption = getModelOption(provider, modelId);
   const enabledSkillNames = await getEnabledSkillNames();
-  const tools = getAgentTools(enabledSkillNames);
+  const officellmAvailable = await isOfficellmAvailable();
+  const tools = getAgentTools(enabledSkillNames, { officellm: officellmAvailable });
 
   let streamResult: StreamResult | null = null;
   for (let attempt = 1; attempt <= RETRYABLE_ATTEMPTS; attempt++) {
     const attemptResult = runAgent({
       model,
       messages: modelMessages,
-      system: buildSystemPrompt({ workspacePath }),
+      system: buildSystemPrompt({ workspacePath, officellmAvailable }),
       tools,
       abortSignal,
       maxOutputTokens: modelOption?.max_output_tokens,
