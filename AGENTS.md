@@ -6,9 +6,10 @@
 
 1. **`.agent/workflows/worktree-parallel.md`** — Git Worktree 并行开发流程（新功能必须在独立 worktree 中开发）
 2. **`.agent/workflows/agent-defaults.md`** — Agent 默认行为（KISS、Review 角色、PR Review 输出规则）
-3. **`.agent/workflows/build-and-test.md`** — 构建与测试命令（提交前必须通过）
-4. **`.agent/workflows/submit-pr.md`** — PR 提交规范与流程
-5. **`CLAUDE.md`** — 项目设计规范、技术栈、代码约定（Hard Constraints）
+3. **`.agent/workflows/issue-decomposition.md`** — Issue 拆分规范（Epic 分解、子 Issue 粒度、模板）
+4. **`.agent/workflows/build-and-test.md`** — 构建与测试命令（提交前必须通过）
+5. **`.agent/workflows/submit-pr.md`** — PR 提交规范与流程
+6. **`CLAUDE.md`** — 项目设计规范、技术栈、代码约定（Hard Constraints）
 
 ## 优先级
 
