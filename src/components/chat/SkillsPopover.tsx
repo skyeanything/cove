@@ -14,20 +14,36 @@ import { useSkillsStore } from "@/stores/skillsStore";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import type { SkillMeta } from "@/lib/ai/skills/types";
 
-/** 合并内置与外部 skill，按 name 去重（内置优先）；外部保留来源 claude/cursor/opencode/agents/custom */
+/** 来源优先级：cove(0) > claude(1) > 其他含内置(2) */
+function sourcePriority(source: string): number {
+  const s = source.toLowerCase();
+  if (s === "cove") return 0;
+  if (s === "claude") return 1;
+  return 2;
+}
+
+/** 合并内置与外部 skill，按优先级去重：cove > claude > 内置/其他 */
 function useMergedSkills(): { meta: SkillMeta; source?: string }[] {
   const bundled = listSkills();
   const externalSkills = useSkillsStore((s) => s.externalSkills);
+
+  const all: { meta: SkillMeta; source: string; priority: number }[] = [
+    ...externalSkills.map(({ skill, source }) => ({
+      meta: skill.meta,
+      source,
+      priority: sourcePriority(source),
+    })),
+    ...bundled.map((m) => ({ meta: m, source: "app", priority: sourcePriority("app") })),
+  ];
+
+  all.sort((a, b) => a.priority - b.priority);
+
   const seen = new Set<string>();
   const result: { meta: SkillMeta; source?: string }[] = [];
-  for (const m of bundled) {
-    seen.add(m.name);
-    result.push({ meta: m, source: "app" });
-  }
-  for (const { skill, source } of externalSkills) {
-    if (!seen.has(skill.meta.name)) {
-      seen.add(skill.meta.name);
-      result.push({ meta: skill.meta, source });
+  for (const { meta, source } of all) {
+    if (!seen.has(meta.name)) {
+      seen.add(meta.name);
+      result.push({ meta, source });
     }
   }
   return result;

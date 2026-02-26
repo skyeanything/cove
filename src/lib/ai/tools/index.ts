@@ -5,7 +5,8 @@ import { writeTool } from "./write";
 import { editTool } from "./edit";
 import { bashTool } from "./bash";
 import { fetchUrlTool } from "./fetch-url";
-import { skillTool, createSkillTool } from "./skill";
+import { skillTool, createSkillTool, createSkillResourceTool } from "./skill";
+import { writeSkillTool } from "./write-skill";
 import { officellmTool } from "./officellm";
 
 export const AGENT_TOOLS = {
@@ -37,7 +38,11 @@ export function getAgentTools(
     bash: bashTool,
     fetch_url: fetchUrlTool,
     skill: createSkillTool(enabledSkillNames),
+    skill_resource: createSkillResourceTool(enabledSkillNames),
   };
+  if (enabledSkillNames.includes("skill-creator")) {
+    tools.write_skill = writeSkillTool;
+  }
   if (options?.officellm) {
     tools.officellm = officellmTool;
   }

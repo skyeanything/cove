@@ -32,6 +32,15 @@
 - 使用 `cn()` 工具合并 Tailwind 类名
 - 禁止 `any` 类型，严格 TypeScript
 
+## Skill 系统
+
+- 内置 Skill 在 `src/skills/*/SKILL.md`，用户 Skill 在 `~/.cove/skills/`
+- Frontmatter 字段：`name`(必填)、`description`(必填)、`emoji`、`always`、`requires`、`metadata`
+- 编辑保存 Skill 时必须保留所有 frontmatter 字段（包括 UI 未展示的 `always`、`requires` 等）
+- 工具注册表在 `src/lib/ai/tools/index.ts`：`AGENT_TOOLS`（静态）+ `getAgentTools()`（动态过滤）
+- `write_skill` 仅在 `skill-creator` 已启用时注册（Tool Gating）
+- Skill 列表 React key 使用 `${source}:${name}` 复合键
+
 ## 设计规范摘要
 
 - 遵循 Linear/Raycast 风格的极简美学

@@ -33,6 +33,10 @@ interface ExternalSkillEntry {
 export interface ExternalSkillWithSource {
   skill: Skill;
   source: string;
+  /** File path of the skill on disk */
+  path: string;
+  /** Folder name on disk (may differ from frontmatter name) — use for Tauri CRUD ops */
+  folderName: string;
 }
 
 /** 从 settings 读取已勾选 skill 名称；若为空则用内置 skill 名单填充并保存 */
@@ -64,6 +68,10 @@ interface SkillsState {
   loadExternalSkills: (workspacePath?: string | null) => Promise<void>;
   loadEnabledSkillNames: () => Promise<void>;
   toggleSkillEnabled: (name: string) => Promise<void>;
+  /** Create or update a skill: folderName for disk CRUD, skillName for enabledSkillNames */
+  saveSkill: (folderName: string, content: string, workspacePath?: string | null, skillName?: string) => Promise<void>;
+  /** Delete a skill: folderName for disk CRUD, skillName for enabledSkillNames */
+  deleteSkill: (folderName: string, workspacePath?: string | null, skillName?: string) => Promise<void>;
 }
 
 export const useSkillsStore = create<SkillsState>()((set, get) => ({
@@ -84,6 +92,8 @@ export const useSkillsStore = create<SkillsState>()((set, get) => ({
       const withSource: ExternalSkillWithSource[] = entries.map((e) => ({
         skill: parseSkillFromRaw(e.content, e.name),
         source: e.source,
+        path: e.path,
+        folderName: e.name,
       }));
       set({ externalSkills: withSource, loaded: true });
     } catch {
@@ -103,5 +113,33 @@ export const useSkillsStore = create<SkillsState>()((set, get) => ({
     const next = prev.includes(name) ? prev.filter((n) => n !== name) : [...prev, name];
     await setEnabledSkillNames(next);
     set({ enabledSkillNames: next });
+  },
+
+  saveSkill: async (folderName, content, workspacePath, skillName) => {
+    await invoke<string>("write_skill", { name: folderName, content });
+    // Auto-enable by logical skill name (frontmatter name), fall back to folder name
+    const enableKey = skillName ?? folderName;
+    const prev = get().enabledSkillNames;
+    if (!prev.includes(enableKey)) {
+      const next = [...prev, enableKey];
+      await setEnabledSkillNames(next);
+      set({ enabledSkillNames: next });
+    }
+    // Refresh external skills list
+    await get().loadExternalSkills(workspacePath);
+  },
+
+  deleteSkill: async (folderName, workspacePath, skillName) => {
+    await invoke<void>("delete_skill", { name: folderName });
+    // Remove by logical skill name (frontmatter name), fall back to folder name
+    const enableKey = skillName ?? folderName;
+    const prev = get().enabledSkillNames;
+    if (prev.includes(enableKey)) {
+      const next = prev.filter((n) => n !== enableKey);
+      await setEnabledSkillNames(next);
+      set({ enabledSkillNames: next });
+    }
+    // Refresh external skills list
+    await get().loadExternalSkills(workspacePath);
   },
 }));
