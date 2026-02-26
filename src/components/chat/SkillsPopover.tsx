@@ -9,52 +9,48 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Checkbox } from "@/components/ui/checkbox";
 import { listSkills } from "@/lib/ai/skills/loader";
+import { sourcePriority } from "@/lib/ai/tools/skill";
 import { cn } from "@/lib/utils";
 import { useSkillsStore } from "@/stores/skillsStore";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import type { SkillMeta } from "@/lib/ai/skills/types";
 
-/** 来源优先级：cove(0) > claude(1) > 其他含内置(2) */
-function sourcePriority(source: string): number {
+/** 展示排序：内置(app) 排最前(0)，cove 其次(1)，其他最后(2) */
+function displayOrder(source: string): number {
   const s = source.toLowerCase();
-  if (s === "cove") return 0;
-  if (s === "claude") return 1;
+  if (s === "app") return 0;
+  if (s === "cove") return 1;
   return 2;
 }
 
-/** 合并内置与外部 skill，按优先级去重：cove > claude > 内置/其他 */
+/** 合并内置与外部 skill：去重时 cove > claude > 内置/其他，展示时内置排最前 */
 function useMergedSkills(): { meta: SkillMeta; source?: string }[] {
   const bundled = listSkills();
   const externalSkills = useSkillsStore((s) => s.externalSkills);
 
-  const all: { meta: SkillMeta; source: string; priority: number }[] = [
+  const all: { meta: SkillMeta; source: string; dedup: number }[] = [
     ...externalSkills.map(({ skill, source }) => ({
       meta: skill.meta,
       source,
-      priority: sourcePriority(source),
+      dedup: sourcePriority(source),
     })),
-    ...bundled.map((m) => ({ meta: m, source: "app", priority: sourcePriority("app") })),
+    ...bundled.map((m) => ({ meta: m, source: "app", dedup: sourcePriority("app") })),
   ];
 
-  all.sort((a, b) => a.priority - b.priority);
-
+  // 去重：优先级高的先入 seen，同名低优先级丢弃
+  all.sort((a, b) => a.dedup - b.dedup);
   const seen = new Set<string>();
-  const result: { meta: SkillMeta; source?: string }[] = [];
+  const deduped: { meta: SkillMeta; source: string }[] = [];
   for (const { meta, source } of all) {
     if (!seen.has(meta.name)) {
       seen.add(meta.name);
-      result.push({ meta, source });
+      deduped.push({ meta, source });
     }
   }
-  return result;
-}
 
-/** 来源标签显示名：内置用 App，其余用来源名 */
-function sourceLabel(source: string): string {
-  const lower = source.toLowerCase();
-  if (lower === "app") return "App";
-  if (lower === "claude" || lower === "cursor" || lower === "opencode" || lower === "agents") return lower;
-  return source;
+  // 展示排序：内置最前
+  deduped.sort((a, b) => displayOrder(a.source) - displayOrder(b.source));
+  return deduped;
 }
 
 export function SkillsPopover({
@@ -146,7 +142,6 @@ export function SkillsPopover({
                       source={s.source}
                       enabled={enabledSkillNames.includes(s.meta.name)}
                       onToggle={() => useSkillsStore.getState().toggleSkillEnabled(s.meta.name)}
-                      sourceAppLabel={t("skills.sourceApp")}
                     />
                   ))}
                 </ul>
@@ -164,15 +159,20 @@ function SkillItem({
   source,
   enabled,
   onToggle,
-  sourceAppLabel,
 }: {
   meta: SkillMeta;
   source?: string;
   enabled: boolean;
   onToggle: () => void;
-  sourceAppLabel: string;
 }) {
-  const displaySource = source != null && source !== "" ? (source.toLowerCase() === "app" ? sourceAppLabel : sourceLabel(source)) : null;
+  const { t } = useTranslation();
+  function getSourceLabel(s: string): string {
+    const lower = s.toLowerCase();
+    if (lower === "app") return t("skills.sourceApp");
+    if (lower === "cove") return t("skills.sourceCove");
+    return s;
+  }
+  const displaySource = source != null && source !== "" ? getSourceLabel(source) : null;
   return (
     <li className="flex items-start gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-background-tertiary/80">
       <Checkbox

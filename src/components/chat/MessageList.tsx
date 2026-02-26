@@ -205,6 +205,7 @@ function MessageBubble({ message }: { message: Message }) {
 }
 
 function UserMessage({ messageId, content }: { messageId: string; content: string }) {
+  const { t } = useTranslation();
   const [isEditing, setIsEditing] = useState(false);
   const [editContent, setEditContent] = useState(content);
   const [copied, setCopied] = useState(false);
@@ -274,11 +275,11 @@ function UserMessage({ messageId, content }: { messageId: string; content: strin
           <div className="mt-1.5 flex justify-end gap-1">
             <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={handleCancel}>
               <X className="mr-1 size-3" strokeWidth={1.5} />
-              Cancel
+              {t("skills.cancel")}
             </Button>
             <Button size="sm" className="h-7 px-2 text-xs" onClick={handleConfirm} disabled={!editContent.trim()}>
               <Check className="mr-1 size-3" strokeWidth={1.5} />
-              Send
+              {t("chat.send")}
             </Button>
           </div>
         </div>

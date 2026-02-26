@@ -32,11 +32,11 @@ fn cove_skills_dir() -> Result<PathBuf, String> {
 
 fn home_dir() -> Option<PathBuf> {
     #[cfg(unix)]
-    return std::env::var_os("HOME").map(PathBuf::from);
+    { return std::env::var_os("HOME").map(PathBuf::from); }
     #[cfg(windows)]
-    return std::env::var_os("USERPROFILE").map(PathBuf::from);
-    #[allow(unreachable_code)]
-    None
+    { return std::env::var_os("USERPROFILE").map(PathBuf::from); }
+    #[cfg(not(any(unix, windows)))]
+    { None }
 }
 
 /// Create or update a skill: writes ~/.cove/skills/{name}/SKILL.md
@@ -48,7 +48,18 @@ pub fn write_skill(name: String, content: String) -> Result<String, String> {
     fs::create_dir_all(&skill_dir)
         .map_err(|e| format!("Failed to create skill directory: {e}"))?;
 
-    let skill_path = skill_dir.join("SKILL.md");
+    // Safety: ensure the resolved path is actually inside ~/.cove/skills/
+    let canonical = skill_dir
+        .canonicalize()
+        .map_err(|e| format!("Failed to resolve path: {e}"))?;
+    let canonical_base = skills_dir
+        .canonicalize()
+        .map_err(|e| format!("Failed to resolve base path: {e}"))?;
+    if !canonical.starts_with(&canonical_base) {
+        return Err("Path traversal detected".into());
+    }
+
+    let skill_path = canonical.join("SKILL.md");
     fs::write(&skill_path, &content)
         .map_err(|e| format!("Failed to write SKILL.md: {e}"))?;
 

@@ -12,7 +12,7 @@ import {
 import { useSkillsStore } from "@/stores/skillsStore";
 
 /** 来源优先级：cove(0) > claude(1) > 其他含内置(2) */
-function sourcePriority(source: string): number {
+export function sourcePriority(source: string): number {
   const s = source.toLowerCase();
   if (s === "cove") return 0;
   if (s === "claude") return 1;

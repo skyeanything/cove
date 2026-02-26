@@ -55,7 +55,8 @@
     "timeAfternoon": "afternoon",
     "timeDusk": "evening",
     "timeEvening": "evening",
-    "timeNight": "night"
+    "timeNight": "night",
+    "send": "Send"
   },
   "sidebar": {
     "pinned": "Pinned",
@@ -207,6 +208,7 @@
     "scanning": "Scanning local skill directories…",
     "noSkills": "No skills available",
     "sourceApp": "Built-in",
+    "sourceCove": "cove",
     "builtIn": "BUILT-IN",
     "external": "EXTERNAL",
     "skillDirs": "SKILL DIRECTORIES",
