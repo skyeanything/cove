@@ -40,8 +40,11 @@ export function getAgentTools(
     fetch_url: fetchUrlTool,
     skill: createSkillTool(enabledSkillNames),
     skill_resource: createSkillResourceTool(enabledSkillNames),
-    write_skill: writeSkillTool,
   };
+  // write_skill is only available when skill-creator is active
+  if (enabledSkillNames.includes("skill-creator")) {
+    tools.write_skill = writeSkillTool;
+  }
   if (options?.officellm) {
     tools.officellm = officellmTool;
   }

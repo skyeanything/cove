@@ -61,6 +61,8 @@ interface SkillsState {
   externalSkills: ExternalSkillWithSource[];
   loaded: boolean;
   loading: boolean;
+  /** discover_external_skills 失败时的错误信息；null 表示正常 */
+  scanError: string | null;
   /** 勾选后才会发给模型的 skill 名称（与 UI 同步，由 loadEnabledSkillNames 加载） */
   enabledSkillNames: string[];
   loadExternalSkills: (workspacePath?: string | null) => Promise<void>;
@@ -76,6 +78,7 @@ export const useSkillsStore = create<SkillsState>()((set, get) => ({
   externalSkills: [],
   loaded: false,
   loading: false,
+  scanError: null,
   enabledSkillNames: [],
 
   loadExternalSkills: async (workspacePath) => {
@@ -92,9 +95,9 @@ export const useSkillsStore = create<SkillsState>()((set, get) => ({
         source: e.source,
         path: e.path,
       }));
-      set({ externalSkills: withSource, loaded: true });
-    } catch {
-      set({ externalSkills: [], loaded: true });
+      set({ externalSkills: withSource, loaded: true, scanError: null });
+    } catch (e) {
+      set({ externalSkills: [], loaded: true, scanError: String(e) });
     } finally {
       set({ loading: false });
     }
@@ -114,12 +117,15 @@ export const useSkillsStore = create<SkillsState>()((set, get) => ({
 
   saveSkill: async (name, content, workspacePath) => {
     await invoke<string>("write_skill", { name, content });
-    // Auto-enable new skill
-    const prev = get().enabledSkillNames;
-    if (!prev.includes(name)) {
-      const next = [...prev, name];
-      await setEnabledSkillNames(next);
-      set({ enabledSkillNames: next });
+    // Auto-enable only if this is a genuinely new skill (not already tracked)
+    const isNew = !get().externalSkills.some((e) => e.skill.meta.name === name);
+    if (isNew) {
+      const prev = get().enabledSkillNames;
+      if (!prev.includes(name)) {
+        const next = [...prev, name];
+        await setEnabledSkillNames(next);
+        set({ enabledSkillNames: next });
+      }
     }
     // Refresh external skills list
     await get().loadExternalSkills(workspacePath);

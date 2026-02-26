@@ -1,3 +1,4 @@
+// FILE_SIZE_EXCEPTION: single-file settings page with inline dialog components
 import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { RefreshCw, ChevronRight, Pencil, Trash2, MessageSquarePlus } from "lucide-react";
@@ -42,24 +43,80 @@ interface SkillFields {
   emoji: string;
   description: string;
   instructions: string;
+  /** Frontmatter lines for fields unknown to the editor; preserved verbatim on save */
+  _extraFrontmatter: string[];
 }
+
+/** Unescape a YAML inline scalar value (double-quoted or single-quoted or bare). */
+function unquoteYaml(raw: string): string {
+  if (raw.startsWith('"') && raw.endsWith('"')) {
+    return raw.slice(1, -1)
+      .replace(/\\n/g, '\n')
+      .replace(/\\t/g, '\t')
+      .replace(/\\"/g, '"')
+      .replace(/\\\\/g, '\\');
+  }
+  if (raw.startsWith("'") && raw.endsWith("'")) {
+    return raw.slice(1, -1).replace(/''/g, "'");
+  }
+  return raw;
+}
+
+/** Serialize a string as a YAML inline scalar, quoting when needed. */
+function yamlInlineString(str: string): string {
+  const needsQuote =
+    str === "" ||
+    /[:#\[\]{}&*!,|>'"`?\n\r]/.test(str) ||
+    /^\s/.test(str);
+  if (!needsQuote) return str;
+  const escaped = str
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/\n/g, '\\n')
+    .replace(/\r/g, '');
+  return `"${escaped}"`;
+}
+
+const KNOWN_FM_KEYS = new Set(["name", "emoji", "description"]);
 
 function parseSkillFields(content: string): SkillFields {
   const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
-  if (!match) return { name: "", emoji: "", description: "", instructions: content };
+  if (!match) {
+    return { name: "", emoji: "", description: "", instructions: content, _extraFrontmatter: [] };
+  }
   const block = match[1]!;
   const body = match[2]!.trim();
-  const get = (key: string) => {
+
+  const get = (key: string): string => {
     const m = block.match(new RegExp(`^${key}\\s*:\\s*(.+)$`, "m"));
-    return m ? m[1]!.trim().replace(/^["']|["']$/g, "") : "";
+    return m ? unquoteYaml(m[1]!.trim()) : "";
   };
-  return { name: get("name"), emoji: get("emoji"), description: get("description"), instructions: body };
+
+  // Collect lines not belonging to known top-level keys (preserves ordering and block values)
+  const extraLines: string[] = [];
+  for (const line of block.split(/\r?\n/)) {
+    const keyMatch = line.match(/^([\w-]+)\s*:/);
+    if (!keyMatch || !KNOWN_FM_KEYS.has(keyMatch[1]!)) {
+      extraLines.push(line);
+    }
+  }
+
+  return {
+    name: get("name"),
+    emoji: get("emoji"),
+    description: get("description"),
+    instructions: body,
+    _extraFrontmatter: extraLines,
+  };
 }
 
-function buildSkillMd({ name, emoji, description, instructions }: SkillFields): string {
+function buildSkillMd({ name, emoji, description, instructions, _extraFrontmatter }: SkillFields): string {
   const lines = ["---", `name: ${name}`];
   if (emoji.trim()) lines.push(`emoji: ${emoji.trim()}`);
-  lines.push(`description: ${description}`, "---", "", instructions);
+  lines.push(`description: ${yamlInlineString(description)}`);
+  // Preserve any extra frontmatter fields verbatim
+  if (_extraFrontmatter.length > 0) lines.push(..._extraFrontmatter);
+  lines.push("---", "", instructions);
   return lines.join("\n");
 }
 
@@ -102,7 +159,6 @@ function BuiltInSkillRow({
       <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            {meta.emoji && <span className="text-sm">{meta.emoji}</span>}
             <span className="text-[13px] font-medium text-foreground">
               {meta.name}
             </span>
@@ -180,7 +236,6 @@ function ExternalSkillRow({
       <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            {meta.emoji && <span className="text-sm">{meta.emoji}</span>}
             <span className="text-[13px] font-medium text-foreground">
               {meta.name}
             </span>
@@ -287,7 +342,7 @@ function SkillEditDialog({
     setSaving(true);
     setError("");
     try {
-      await onSave({ name: fields.name, emoji, description, instructions });
+      await onSave({ name: fields.name, emoji, description, instructions, _extraFrontmatter: fields._extraFrontmatter });
       onOpenChange(false);
     } catch (e) {
       setError(String(e));
@@ -378,12 +433,16 @@ function DeleteSkillDialog({
 }) {
   const { t } = useTranslation();
   const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState("");
 
   const handleDelete = async () => {
     setDeleting(true);
+    setError("");
     try {
       await onConfirm();
       onOpenChange(false);
+    } catch (e) {
+      setError(String(e));
     } finally {
       setDeleting(false);
     }
@@ -398,6 +457,9 @@ function DeleteSkillDialog({
             {t("skills.deleteConfirmDesc", { name })}
           </AlertDialogDescription>
         </AlertDialogHeader>
+        {error && (
+          <p className="px-1 text-[12px] text-destructive">{error}</p>
+        )}
         <AlertDialogFooter>
           <AlertDialogCancel>{t("skills.cancel")}</AlertDialogCancel>
           <AlertDialogAction
@@ -456,7 +518,6 @@ function SkillDirectoriesSection() {
 }
 
 // ─── Main Page ──────────────────────────────────────────────────────
-// FILE_SIZE_EXCEPTION — single-file page with dialog components
 export function SkillsPage() {
   const { t } = useTranslation();
   const loadExternalSkills = useSkillsStore((s) => s.loadExternalSkills);
@@ -464,6 +525,7 @@ export function SkillsPage() {
   const externalSkills = useSkillsStore((s) => s.externalSkills);
   const enabledSkillNames = useSkillsStore((s) => s.enabledSkillNames);
   const loading = useSkillsStore((s) => s.loading);
+  const scanError = useSkillsStore((s) => s.scanError);
   const toggleSkillEnabled = useSkillsStore((s) => s.toggleSkillEnabled);
   const saveSkill = useSkillsStore((s) => s.saveSkill);
   const deleteSkillAction = useSkillsStore((s) => s.deleteSkill);
@@ -485,6 +547,7 @@ export function SkillsPage() {
     emoji: "",
     description: "",
     instructions: "",
+    _extraFrontmatter: [],
   });
 
   // Delete state
@@ -501,14 +564,8 @@ export function SkillsPage() {
   }, [loadExternalSkills, workspacePath]);
 
   const handleEdit = (ext: ExternalSkillWithSource) => {
-    const { meta, content } = ext.skill;
-    const raw = buildSkillMd({
-      name: meta.name,
-      emoji: meta.emoji ?? "",
-      description: meta.description ?? "",
-      instructions: content,
-    });
-    setEditFields(parseSkillFields(raw));
+    // Parse directly from the raw file content — no roundtrip through buildSkillMd
+    setEditFields(parseSkillFields(ext.skill.content));
     setEditOpen(true);
   };
 
@@ -593,7 +650,12 @@ export function SkillsPage() {
 
         {/* ── Discovered skills (claude, cursor, etc.) ── */}
         <SectionHeading>{t("skills.discoveredSkills")}</SectionHeading>
-        {discoveredSkills.length === 0 ? (
+        {scanError && (
+          <p className="mx-5 mb-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-[12px] text-destructive">
+            {scanError}
+          </p>
+        )}
+        {discoveredSkills.length === 0 && !scanError ? (
           <p className="mx-5 rounded-xl border border-dashed border-border px-4 py-6 text-center text-[12px] text-muted-foreground/60">
             {t("skills.noExternal")}
           </p>

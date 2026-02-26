@@ -52,7 +52,8 @@
     "timeAfternoon": "下午",
     "timeDusk": "傍晚",
     "timeEvening": "晚上",
-    "timeNight": "夜里"
+    "timeNight": "夜里",
+    "send": "发送"
   },
   "sidebar": {
     "pinned": "置顶",
@@ -202,6 +203,7 @@
     "scanning": "正在扫描本机技能目录…",
     "noSkills": "暂无可用技能",
     "sourceApp": "内置",
+    "sourceCove": "cove",
     "builtIn": "内置",
     "external": "外部",
     "skillDirs": "技能目录",

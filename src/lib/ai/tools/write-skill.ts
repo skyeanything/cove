@@ -1,6 +1,6 @@
 import { tool } from "ai";
 import { z } from "zod/v4";
-import { homeDir } from "@tauri-apps/api/path";
+import { homeDir, join } from "@tauri-apps/api/path";
 import { useSkillsStore } from "@/stores/skillsStore";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { useDataStore } from "@/stores/dataStore";
@@ -30,17 +30,21 @@ export const writeSkillTool = tool({
   execute: async ({ name, content }) => {
     await useSkillsStore.getState().saveSkill(name, content, null);
 
-    // Switch workspace to the newly created skill directory
+    // Switch workspace to the newly created skill directory (best-effort)
+    let workspaceSwitched = true;
     try {
       const home = await homeDir();
-      const skillDir = `${home}/.cove/skills/${name}`;
+      const skillDir = await join(home, ".cove", "skills", name);
       const ws = await useWorkspaceStore.getState().add(skillDir);
       const conversationId = useDataStore.getState().activeConversationId;
       await useWorkspaceStore.getState().select(ws.id, conversationId);
     } catch {
-      // Workspace switch is best-effort; skill was already saved successfully
+      workspaceSwitched = false;
     }
 
-    return `Skill "${name}" has been saved to ~/.cove/skills/${name}/SKILL.md and enabled. Workspace switched to the skill directory.`;
+    const wsNote = workspaceSwitched
+      ? " Workspace switched to the skill directory."
+      : " Note: workspace switch failed — you can switch manually via the workspace selector.";
+    return `Skill "${name}" has been saved to ~/.cove/skills/${name}/SKILL.md and enabled.${wsNote}`;
   },
 });
