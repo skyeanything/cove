@@ -43,11 +43,12 @@ pub fn run_command(args: RunCommandArgs) -> Result<RunCommandResult, String> {
     #[cfg(windows)]
     let (shell, shell_arg) = ("cmd", "/c");
 
-    // 将 ~/.officellm/bin 等常用工具目录追加到 PATH，
+    // 将 ~/.local/bin 等常用工具目录追加到 PATH，
     // 因为 sh -c 不加载用户 shell profile。
+    // 注：officellm 现通过专属 officellm 模块调用，不再注入 PATH。
     let extra_paths: Vec<std::path::PathBuf> = dirs::home_dir()
         .into_iter()
-        .flat_map(|home| [home.join(".officellm/bin"), home.join(".local/bin")])
+        .flat_map(|home| [home.join(".local/bin")])
         .filter(|p| p.is_dir())
         .collect();
     let path_env = if extra_paths.is_empty() {

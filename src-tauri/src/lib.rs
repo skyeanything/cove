@@ -2,6 +2,7 @@ mod attachment_commands;
 mod docx_commands;
 mod fetch_commands;
 mod fs_commands;
+mod officellm;
 mod shell_commands;
 mod skill_discovery;
 mod workspace_watcher;
@@ -104,6 +105,12 @@ pub fn run() {
       skill_discovery::discover_external_skills,
       docx_commands::docx_to_pdf,
       docx_commands::pptx_to_pdf,
+      officellm::officellm_detect,
+      officellm::officellm_call,
+      officellm::officellm_open,
+      officellm::officellm_save,
+      officellm::officellm_close,
+      officellm::officellm_status,
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
