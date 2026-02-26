@@ -48,11 +48,9 @@ describe("parseRetryAfterMs", () => {
     expect(parseRetryAfterMs("retry after: 10")).toBe(10000);
   });
 
-  it("parses retry-after with ms suffix", () => {
-    // Note: the ms regex matches after the seconds regex,
-    // but seconds regex picks up the number first — "2000 ms" → sec=2000 → 2_000_000
-    // Actually let's check the actual behavior
-    expect(parseRetryAfterMs("retry-after: 2000 ms")).toBe(2000 * 1000);
+  it("parses retry-after with ms suffix as milliseconds", () => {
+    expect(parseRetryAfterMs("retry-after: 2000 ms")).toBe(2000);
+    expect(parseRetryAfterMs("retry-after: 500ms")).toBe(500);
   });
 
   it("returns null when no retry-after found", () => {

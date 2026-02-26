@@ -16,15 +16,16 @@ export function isRateLimitErrorMessage(message: string | undefined): boolean {
 
 export function parseRetryAfterMs(message: string | undefined): number | null {
   if (!message) return null;
-  const secMatch = message.match(/retry[-\s]?after[:=\s]+(\d+)/i);
-  if (secMatch?.[1]) {
-    const sec = Number(secMatch[1]);
-    if (!Number.isNaN(sec) && sec > 0) return sec * 1000;
-  }
+  // Check ms form first so "2000 ms" is not misinterpreted as seconds
   const msMatch = message.match(/retry[-\s]?after[:=\s]+(\d+)\s*ms/i);
   if (msMatch?.[1]) {
     const ms = Number(msMatch[1]);
     if (!Number.isNaN(ms) && ms > 0) return ms;
+  }
+  const secMatch = message.match(/retry[-\s]?after[:=\s]+(\d+)/i);
+  if (secMatch?.[1]) {
+    const sec = Number(secMatch[1]);
+    if (!Number.isNaN(sec) && sec > 0) return sec * 1000;
   }
   return null;
 }
