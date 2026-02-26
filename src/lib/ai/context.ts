@@ -18,7 +18,7 @@ export function buildSystemPrompt(options: {
 
   // 四工具使用规则（极简）
   parts.push(
-    "Tools: read (files in workspace); write/edit only after reading; prefer bash+rg for search, bash+curl for web; dangerous bash requires user approval.",
+    "Tools: read (files in workspace); write/edit only after reading; js_interpreter for JavaScript/QuickJS (built-in, prefer over bash for computation); bash for system commands, grep, curl; dangerous bash requires user approval.",
   );
 
   if (options.officellmAvailable) {

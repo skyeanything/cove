@@ -6,6 +6,7 @@
 use rquickjs::{Context, Function, Runtime};
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
+use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -200,7 +201,68 @@ fn register_workspace_fns<'js>(
         },
     )
     .map_err(|e| format!("{e}"))?;
-    ws.set("listDir", list_fn).map_err(|e| format!("{e}"))
+    ws.set("listDir", list_fn).map_err(|e| format!("{e}"))?;
+
+    let wr4 = workspace_root.to_string();
+    let officellm_fn = Function::new(
+        ctx.clone(),
+        move |cmd: String, mut args: HashMap<String, String>| -> rquickjs::Result<String> {
+            // 路径边界校验：防 `..` 逃逸，拒绝 workspace 外路径（绝对/相对均检查）
+            // 输入类路径文件必须存在，输出类路径可不存在
+            for key in &["i", "input", "path"] {
+                if let Some(v) = args.get(*key) {
+                    let abs = ensure_inside_workspace_exists(&wr4, v)
+                        .map_err(|e| js_err(&format!("{e:?}")))?;
+                    args.insert(key.to_string(), abs.to_string_lossy().into_owned());
+                }
+            }
+            for key in &["o", "output"] {
+                if let Some(v) = args.get(*key) {
+                    let abs = ensure_inside_workspace_may_not_exist(&wr4, v)
+                        .map_err(|e| js_err(&format!("{e:?}")))?;
+                    args.insert(key.to_string(), abs.to_string_lossy().into_owned());
+                }
+            }
+
+            let result: Result<serde_json::Value, String> = match cmd.as_str() {
+                "open" => {
+                    let path = args.get("path").ok_or_else(|| "open 需要 path 参数".to_string()).map_err(|e| js_err(&e))?;
+                    crate::officellm::server::open(path)
+                        .map(|_| serde_json::json!({"status":"success"}))
+                }
+                "close" => {
+                    crate::officellm::server::close()
+                        .map(|_| serde_json::json!({"status":"success"}))
+                }
+                "status" => {
+                    crate::officellm::server::status()
+                        .map(|info| serde_json::json!({"status":"success","data": info}))
+                }
+                _ => {
+                    // 将 HashMap 转换为 CLI 风格参数数组，如 {"limit":"10"} → ["--limit","10"]
+                    let cli_args: Vec<String> = args.iter().flat_map(|(key, value)| {
+                        let flag = if key.len() == 1 { format!("-{key}") } else { format!("--{key}") };
+                        [flag, value.clone()]
+                    }).collect();
+                    let r = if crate::officellm::server::has_session() {
+                        crate::officellm::server::call(&cmd, &cli_args)
+                            .map(|r| serde_json::to_value(&r).unwrap_or(serde_json::Value::Null))
+                    } else {
+                        crate::officellm::cli::call(&cmd, &cli_args)
+                            .map(|r| serde_json::to_value(&r).unwrap_or(serde_json::Value::Null))
+                    };
+                    r
+                }
+            };
+
+            match result {
+                Ok(v) => serde_json::to_string(&v).map_err(|e| js_err(&e.to_string())),
+                Err(e) => Err(js_err(&e)),
+            }
+        },
+    )
+    .map_err(|e| format!("{e}"))?;
+    ws.set("officellm", officellm_fn).map_err(|e| format!("{e}"))
 }
 
 fn stringify_value(val: &rquickjs::Value) -> String {

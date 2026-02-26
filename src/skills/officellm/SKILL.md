@@ -3,10 +3,9 @@ name: officellm
 description: Guides the agent to perform document operations (DOCX/PPTX/XLSX) using the officellm JS API — CLI mode for single commands, Server mode for multi-step workflows.
 emoji: "\U0001F4C4"
 always: false
-requires:
-  tools:
-    - bash
 ---
+
+> **⚠️ IMPORTANT: Do NOT use bash to call officellm** — use the `officellm` Tauri tool. officellm is accessed through dedicated Tauri IPC commands, not shell commands.
 
 # officellm Document Operations Skill
 
@@ -73,9 +72,22 @@ Open in server mode for multiple replacements:
 2. Execute an operations file with `execute -f ops.json --atomic true`
 3. Save and close
 
+## Exact Command Names (Server mode `call` and CLI mode)
+
+⚠️ Use ONLY the command names in this table. Do NOT guess or invent command names.
+
+| Command        | Description                            | Key args                      |
+|----------------|----------------------------------------|-------------------------------|
+| `extract-text` | Extract all text from document         | (none)                        |
+| `list-styles`  | List paragraph styles in DOCX          | (none)                        |
+| `replace-text` | Find and replace text                  | `find`, `replace`             |
+| `apply-format` | Apply formatting via XPath             | `xpath`, `format`             |
+| `to-pdf`       | Convert document to PDF                | `o` (output path)             |
+| `execute`      | Run operations from a JSON file        | `f` (file path), `atomic`     |
+
 ## Error Handling
 
-- If officellm is not installed, inform the user and provide the install link: https://github.com/nicepkg/officellm
+- If officellm is not installed, inform the user and provide the install link: https://github.com/ZhenchongLi/office-llm
 - If a command fails, check stderr output for specific error messages
 - Server mode errors should trigger a `close()` to clean up the session
 

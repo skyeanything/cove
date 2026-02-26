@@ -1,6 +1,5 @@
 //! CLI 模式：spawn officellm 进程，传 --result-schema v2 --strict，解析 JSON 返回。
 
-use std::collections::HashMap;
 use std::process::Command;
 use std::time::Duration;
 
@@ -14,7 +13,7 @@ const DEFAULT_TIMEOUT_SECS: u64 = 120;
 ///
 /// 等价于：`officellm <cmd> --result-schema v2 --strict [--key value ...]`
 /// 解析 stdout JSON 并返回 `CommandResult`。
-pub fn call(cmd: &str, args: &HashMap<String, String>) -> Result<CommandResult, String> {
+pub fn call(cmd: &str, args: &[String]) -> Result<CommandResult, String> {
     let bin = default_bin_path().ok_or("无法获取用户 home 目录")?;
     if !bin.exists() {
         return Err(format!(
@@ -27,15 +26,17 @@ pub fn call(cmd: &str, args: &HashMap<String, String>) -> Result<CommandResult, 
     command.arg(cmd);
     command.args(["--result-schema", "v2", "--strict"]);
 
-    for (key, value) in args {
-        let flag = if key.len() == 1 {
-            format!("-{key}")
-        } else {
-            format!("--{key}")
-        };
-        command.arg(&flag);
-        command.arg(value);
+    for arg in args {
+        command.arg(arg);
     }
+
+    let tmp_dir = dirs::home_dir()
+        .map(|h| h.join(".officellm/tmp"))
+        .unwrap_or_else(|| std::path::PathBuf::from("/tmp"));
+    let _ = std::fs::create_dir_all(&tmp_dir);
+    command.env("TMPDIR", &tmp_dir)
+           .env("TEMP", &tmp_dir)
+           .env("TMP", &tmp_dir);
 
     command.stdout(std::process::Stdio::piped());
     command.stderr(std::process::Stdio::piped());
