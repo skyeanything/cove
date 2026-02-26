@@ -4,7 +4,7 @@
 
 ## ✨ 特性
 
-- **多供应商支持** — OpenAI、Anthropic、Google Gemini、DeepSeek、Moonshot、Amazon Bedrock 等 20+ 家 LLM 供应商
+- **多供应商支持** — OpenAI、DeepSeek、Moonshot、OpenRouter 等供应商可在设置 UI 直接配置；Anthropic、Google Gemini、Bedrock 等更多供应商已在代码层集成，后续版本陆续开放
 - **本地 SQLite 持久化** — 所有对话数据存储在本地，数据不上云
 - **流式推理** — 实时流式输出，支持 Thinking / Reasoning 内容展示
 - **内置 AI 工具** — 读写文件、执行 shell 命令、解析文档（PDF / DOCX / PPTX / XLSX）、网页获取、Office 文档操作

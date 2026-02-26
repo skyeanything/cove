@@ -115,7 +115,9 @@ Cove 内置 8 个 AI 工具，在对话过程中模型可自动调用。工具�
 
 | 参数 | 类型 | 说明 |
 |------|------|------|
-| `attachment_id` | `string` | 已上传附件的 ID |
+| `attachmentId` | `string` | 已上传附件的 ID（由会话消息中的附件清单提供） |
+| `mode` | `"full"｜"summary"｜"chunks"` | 返回模式（可选，默认 `full`） |
+| `pageRange` | `string?` | PDF 页码范围，如 `1-3,5`（可选） |
 
 **支持格式**
 
@@ -141,7 +143,6 @@ Cove 内置 8 个 AI 工具，在对话过程中模型可自动调用。工具�
 | 参数 | 类型 | 说明 |
 |------|------|------|
 | `name` | `string` | 技能名称（已启用的技能之一） |
-| `input` | `object` | 技能所需的输入参数 |
 
 **内置技能**
 
@@ -158,31 +159,32 @@ Cove 内置 8 个 AI 工具，在对话过程中模型可自动调用。工具�
 
 ## `officellm` — Office 文档操作
 
-通过集成的 officellm 进程，对本地 Office 文档（Word / Excel / PowerPoint）执行自然语言指令。
+通过集成的 officellm 进程，对本地 Office 文档（DOCX / PPTX / XLSX）执行程序化命令。
 
 **参数**
 
 | 参数 | 类型 | 说明 |
 |------|------|------|
 | `action` | `string` | 操作类型（见下表） |
-| `path` | `string?` | 文档路径（`open` 时必填） |
-| `instruction` | `string?` | 自然语言操作指令（`operate` 时必填） |
+| `path` | `string?` | 文档路径（`open` 时必填；`save` 时可选，表示另存为） |
+| `command` | `string?` | 命令名称（`call` 时必填，如 `addSlide`、`setText`） |
+| `args` | `object?` | 命令参数键值对（`call` 时可选） |
 
 **支持的 action**
 
 | action | 说明 |
 |--------|------|
-| `detect` | 检测本地已安装的 Office 应用 |
-| `open` | 打开指定路径的 Office 文档 |
-| `operate` | 对已打开的文档执行自然语言指令 |
-| `save` | 保存当前文档 |
-| `close` | 关闭当前文档 |
-| `status` | 查询 officellm 进程状态 |
+| `detect` | 检测本地是否已安装 officellm |
+| `open` | 打开指定路径的 Office 文档，建立会话 |
+| `call` | 对已打开的文档执行命令（需提供 `command`） |
+| `save` | 保存当前文档（提供 `path` 则另存为） |
+| `close` | 关闭当前会话 |
+| `status` | 查询当前会话状态（文档路径、PID、运行时长） |
 
-**使用场景**
+**示例：在 PowerPoint 添加一张幻灯片**
 
-- "帮我在 Word 文档中加一个标题"
-- "把这个 Excel 表格按销售额排序"
-- "给 PowerPoint 第三页加一张图表"
+```json
+{ "action": "call", "command": "addSlide", "args": { "title": "新章节" } }
+```
 
-> **注意**：需要本地已安装对应的 Office 应用（Microsoft 365 或 LibreOffice）。
+> **注意**：需要本地已安装 officellm 并配置好对应的 Office 环境。
