@@ -26,11 +26,11 @@ export function MessageList() {
   /** 是否跟随到底：仅在有新内容且用户未主动上滑时为 true，避免加载/切会话时强制贴底 */
   const shouldAutoFollowRef = useRef(false);
   const lastScrollTopRef = useRef(0);
+  /** 记录上一次 isStreaming 状态，用于检测「刚开始流式」时机 */
+  const prevIsStreamingRef = useRef(false);
 
   /** 距离底部小于等于此值视为「在底部」，恢复跟随（用户手动滑回底部时） */
   const FOLLOW_AT_BOTTOM_PX = 50;
-  /** 流式输出时：若距离底部在此范围内仍视为「在跟」，避免新内容刚渲染时误判为已离开底部 */
-  const STREAMING_FOLLOW_THRESHOLD_PX = 200;
   const messages = useChatStore((s) => s.messages);
   const isStreaming = useChatStore((s) => s.isStreaming);
   const streamingContent = useChatStore((s) => s.streamingContent);
@@ -95,11 +95,13 @@ export function MessageList() {
       const currTop = el.scrollTop;
       const scrolledUp = currTop < prevTop - 0.5;
       const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+      // 用 else if：用户正在上滑时，不被「仍在底部附近」条件覆盖
       if (scrolledUp) {
         shouldAutoFollowRef.current = false;
-      }
-      if (distanceFromBottom <= FOLLOW_AT_BOTTOM_PX) {
+      } else if (distanceFromBottom <= FOLLOW_AT_BOTTOM_PX) {
         shouldAutoFollowRef.current = true;
+        // 用户滑回底部时立即重启 RAF，不必等下一个 streaming token
+        startAutoScroll(el);
       }
       lastScrollTopRef.current = currTop;
       if (!shouldAutoFollowRef.current) stopAutoScroll();
@@ -121,16 +123,24 @@ export function MessageList() {
       el.removeEventListener("wheel", onWheel, { capture: true });
       stopAutoScroll();
     };
-  }, [stopAutoScroll]);
+  }, [stopAutoScroll, startAutoScroll]);
 
-  // 仅在流式输出且「用户当前在底部附近」时自动滚动；用户一旦上滑则停止跟随，直到再次滑到底部
+  // 仅在流式输出时自动滚动。关键：只在「刚开始流式」那一刻判断是否启用跟随，
+  // 后续内容更新不再重置用户意愿——这样用户上滑后不会被自动拉回底部。
   useEffect(() => {
-    if (!isStreaming) return;
     const el = scrollRef.current;
     if (!el) return;
-    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-    if (distanceFromBottom <= STREAMING_FOLLOW_THRESHOLD_PX) {
-      shouldAutoFollowRef.current = true;
+    if (!isStreaming) {
+      prevIsStreamingRef.current = false;
+      return;
+    }
+    // 流式刚启动（false → true）：若用户在底部则启用跟随
+    if (!prevIsStreamingRef.current) {
+      const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
+      if (distanceFromBottom <= FOLLOW_AT_BOTTOM_PX) {
+        shouldAutoFollowRef.current = true;
+      }
+      prevIsStreamingRef.current = true;
     }
     if (!shouldAutoFollowRef.current) return;
     startAutoScroll(el);

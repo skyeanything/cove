@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { RefreshCw, ChevronRight, Plus, Pencil, Trash2 } from "lucide-react";
+import { RefreshCw, ChevronRight, Pencil, Trash2, MessageSquarePlus } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,15 +35,33 @@ import type { Skill } from "@/lib/ai/skills/types";
 import type { ExternalSkillWithSource } from "@/stores/skillsStore";
 import { cn } from "@/lib/utils";
 
-const SKILL_TEMPLATE = `---
-name: my-skill
-description: A brief description of what this skill does
----
+// ─── Frontmatter helpers ────────────────────────────────────────────
 
-# My Skill
+interface SkillFields {
+  name: string;
+  emoji: string;
+  description: string;
+  instructions: string;
+}
 
-Instructions for the AI agent...
-`;
+function parseSkillFields(content: string): SkillFields {
+  const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
+  if (!match) return { name: "", emoji: "", description: "", instructions: content };
+  const block = match[1]!;
+  const body = match[2]!.trim();
+  const get = (key: string) => {
+    const m = block.match(new RegExp(`^${key}\\s*:\\s*(.+)$`, "m"));
+    return m ? m[1]!.trim().replace(/^["']|["']$/g, "") : "";
+  };
+  return { name: get("name"), emoji: get("emoji"), description: get("description"), instructions: body };
+}
+
+function buildSkillMd({ name, emoji, description, instructions }: SkillFields): string {
+  const lines = ["---", `name: ${name}`];
+  if (emoji.trim()) lines.push(`emoji: ${emoji.trim()}`);
+  lines.push(`description: ${description}`, "---", "", instructions);
+  return lines.join("\n");
+}
 
 // ─── Section heading ────────────────────────────────────────────────
 function SectionHeading({
@@ -233,46 +251,43 @@ function ExternalSkillRow({
   );
 }
 
-// ─── Skill Editor Dialog ────────────────────────────────────────────
-function SkillEditorDialog({
+// ─── Structured Skill Edit Dialog ───────────────────────────────────
+function SkillEditDialog({
   open,
   onOpenChange,
-  initialName,
-  initialContent,
-  isNew,
+  fields,
   onSave,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  initialName: string;
-  initialContent: string;
-  isNew: boolean;
-  onSave: (name: string, content: string) => Promise<void>;
+  fields: SkillFields;
+  onSave: (fields: SkillFields) => Promise<void>;
 }) {
   const { t } = useTranslation();
-  const [name, setName] = useState(initialName);
-  const [content, setContent] = useState(initialContent);
+  const [emoji, setEmoji] = useState(fields.emoji);
+  const [description, setDescription] = useState(fields.description);
+  const [instructions, setInstructions] = useState(fields.instructions);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
   useEffect(() => {
     if (open) {
-      setName(initialName);
-      setContent(initialContent);
+      setEmoji(fields.emoji);
+      setDescription(fields.description);
+      setInstructions(fields.instructions);
       setError("");
     }
-  }, [open, initialName, initialContent]);
+  }, [open, fields]);
 
   const handleSave = async () => {
-    const trimmedName = name.trim();
-    if (!trimmedName) {
-      setError(t("skills.nameHint"));
+    if (!description.trim()) {
+      setError(t("skills.descriptionPlaceholder"));
       return;
     }
     setSaving(true);
     setError("");
     try {
-      await onSave(trimmedName, content);
+      await onSave({ name: fields.name, emoji, description, instructions });
       onOpenChange(false);
     } catch (e) {
       setError(String(e));
@@ -285,38 +300,46 @@ function SkillEditorDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>
-            {isNew ? t("skills.newSkill") : t("skills.editSkill")}
-          </DialogTitle>
+          <DialogTitle>{t("skills.editSkill")}</DialogTitle>
           <DialogDescription className="sr-only">
-            {isNew ? t("skills.newSkill") : t("skills.editSkill")}
+            {t("skills.editSkill")}
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-3 py-2">
           <div>
-            <Label className="mb-1.5 text-[12px]">
-              {t("skills.nameLabel")}
-            </Label>
+            <Label className="mb-1.5 text-[12px]">{t("skills.nameLabel")}</Label>
             <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder={t("skills.namePlaceholder")}
-              disabled={!isNew}
-              className="font-mono text-[13px]"
+              value={fields.name}
+              disabled
+              className="font-mono text-[13px] opacity-60"
             />
-            <p className="mt-1 text-[11px] text-muted-foreground/70">
-              {t("skills.nameHint")}
-            </p>
           </div>
           <div>
-            <Label className="mb-1.5 text-[12px]">
-              {t("skills.contentLabel")}
-            </Label>
+            <Label className="mb-1.5 text-[12px]">{t("skills.emojiLabel")}</Label>
+            <Input
+              value={emoji}
+              onChange={(e) => setEmoji(e.target.value)}
+              placeholder={t("skills.emojiPlaceholder")}
+              className="text-[13px]"
+            />
+          </div>
+          <div>
+            <Label className="mb-1.5 text-[12px]">{t("skills.descriptionLabel")}</Label>
             <Textarea
-              value={content}
-              onChange={(e) => setContent(e.target.value)}
-              placeholder={t("skills.contentPlaceholder")}
-              rows={14}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder={t("skills.descriptionPlaceholder")}
+              rows={3}
+              className="resize-none text-[13px] leading-relaxed"
+            />
+          </div>
+          <div>
+            <Label className="mb-1.5 text-[12px]">{t("skills.instructionsLabel")}</Label>
+            <Textarea
+              value={instructions}
+              onChange={(e) => setInstructions(e.target.value)}
+              placeholder={t("skills.instructionsPlaceholder")}
+              rows={10}
               className="resize-none font-mono text-[12px] leading-relaxed"
             />
           </div>
@@ -333,7 +356,7 @@ function SkillEditorDialog({
             {t("skills.cancel")}
           </Button>
           <Button size="sm" onClick={handleSave} disabled={saving}>
-            {isNew ? t("skills.create") : t("skills.save")}
+            {t("skills.save")}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -455,11 +478,14 @@ export function SkillsPage() {
   const totalCount =
     bundledSkills.length + userSkills.length + discoveredSkills.length;
 
-  // Editor state
-  const [editorOpen, setEditorOpen] = useState(false);
-  const [editorName, setEditorName] = useState("");
-  const [editorContent, setEditorContent] = useState("");
-  const [editorIsNew, setEditorIsNew] = useState(true);
+  // Edit dialog state
+  const [editOpen, setEditOpen] = useState(false);
+  const [editFields, setEditFields] = useState<SkillFields>({
+    name: "",
+    emoji: "",
+    description: "",
+    instructions: "",
+  });
 
   // Delete state
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -474,28 +500,16 @@ export function SkillsPage() {
     loadExternalSkills(workspacePath ?? null);
   }, [loadExternalSkills, workspacePath]);
 
-  const handleNew = () => {
-    setEditorName("");
-    setEditorContent(SKILL_TEMPLATE);
-    setEditorIsNew(true);
-    setEditorOpen(true);
-  };
-
   const handleEdit = (ext: ExternalSkillWithSource) => {
-    // Reconstruct the raw content with frontmatter
     const { meta, content } = ext.skill;
-    const lines = ["---"];
-    lines.push(`name: ${meta.name}`);
-    if (meta.description) lines.push(`description: ${meta.description}`);
-    if (meta.emoji) lines.push(`emoji: ${meta.emoji}`);
-    if (meta.metadata) {
-      lines.push(`metadata: ${JSON.stringify(meta.metadata)}`);
-    }
-    lines.push("---", "", content);
-    setEditorName(meta.name);
-    setEditorContent(lines.join("\n"));
-    setEditorIsNew(false);
-    setEditorOpen(true);
+    const raw = buildSkillMd({
+      name: meta.name,
+      emoji: meta.emoji ?? "",
+      description: meta.description ?? "",
+      instructions: content,
+    });
+    setEditFields(parseSkillFields(raw));
+    setEditOpen(true);
   };
 
   const handleDelete = (name: string) => {
@@ -503,8 +517,9 @@ export function SkillsPage() {
     setDeleteOpen(true);
   };
 
-  const handleSave = async (name: string, content: string) => {
-    await saveSkill(name, content, workspacePath ?? null);
+  const handleSaveEdit = async (fields: SkillFields) => {
+    const content = buildSkillMd(fields);
+    await saveSkill(fields.name, content, workspacePath ?? null);
   };
 
   const handleConfirmDelete = async () => {
@@ -549,24 +564,17 @@ export function SkillsPage() {
         </div>
 
         {/* ── User skills section (cove) ── */}
-        <SectionHeading
-          action={
-            <button
-              type="button"
-              onClick={handleNew}
-              className="flex cursor-pointer items-center gap-1 rounded-md px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:bg-background-tertiary hover:text-foreground"
-            >
-              <Plus className="size-3" strokeWidth={1.5} />
-              {t("skills.newSkill")}
-            </button>
-          }
-        >
-          {t("skills.userSkills")}
-        </SectionHeading>
+        <SectionHeading>{t("skills.userSkills")}</SectionHeading>
         {userSkills.length === 0 ? (
-          <p className="mx-5 rounded-xl border border-dashed border-border px-4 py-6 text-center text-[12px] text-muted-foreground/60">
-            ~/.cove/skills
-          </p>
+          <div className="mx-5 flex flex-col gap-2 rounded-xl border border-dashed border-border px-4 py-5">
+            <p className="text-center text-[12px] text-muted-foreground/60">
+              ~/.cove/skills
+            </p>
+            <p className="flex items-center justify-center gap-1.5 text-[12px] text-muted-foreground/50">
+              <MessageSquarePlus className="size-3.5" strokeWidth={1.5} />
+              {t("skills.createViaChat")}
+            </p>
+          </div>
         ) : (
           <div className="mx-5 divide-y divide-border rounded-xl border border-border bg-background-secondary">
             {userSkills.map((ext) => (
@@ -611,13 +619,11 @@ export function SkillsPage() {
       </div>
 
       {/* Dialogs */}
-      <SkillEditorDialog
-        open={editorOpen}
-        onOpenChange={setEditorOpen}
-        initialName={editorName}
-        initialContent={editorContent}
-        isNew={editorIsNew}
-        onSave={handleSave}
+      <SkillEditDialog
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        fields={editFields}
+        onSave={handleSaveEdit}
       />
       <DeleteSkillDialog
         open={deleteOpen}

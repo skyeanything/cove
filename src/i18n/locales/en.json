@@ -201,7 +201,7 @@
     "autoSelectHint": "AI automatically selects relevant skills",
     "scanning": "Scanning local skill directories…",
     "noSkills": "No skills available",
-    "sourceApp": "App",
+    "sourceApp": "Built-in",
     "builtIn": "BUILT-IN",
     "external": "EXTERNAL",
     "skillDirs": "SKILL DIRECTORIES",
@@ -234,7 +234,14 @@
     "saveSuccess": "Skill saved",
     "deleteSuccess": "Skill deleted",
     "userSkills": "USER SKILLS",
-    "discoveredSkills": "DISCOVERED"
+    "discoveredSkills": "DISCOVERED",
+    "emojiLabel": "Emoji (optional)",
+    "emojiPlaceholder": "🛠️",
+    "descriptionLabel": "Description",
+    "descriptionPlaceholder": "Briefly describe what this skill does and when to use it",
+    "instructionsLabel": "Instructions",
+    "instructionsPlaceholder": "Detailed instructions for the AI agent…",
+    "createViaChat": "Use skill-creator in chat to create a new skill"
   },
   "workspace": {
     "title": "WORKSPACE",
