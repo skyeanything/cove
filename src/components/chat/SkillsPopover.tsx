@@ -53,7 +53,6 @@ function useMergedSkills(): { meta: SkillMeta; source?: string }[] {
   return deduped;
 }
 
-
 export function SkillsPopover({
   trigger,
 }: {

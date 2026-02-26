@@ -74,6 +74,7 @@ pub(super) fn is_text_like_extension(file_name: &str) -> bool {
         ext.as_str(),
         "txt"
             | "md"
+            | "qmd"
             | "json"
             | "csv"
             | "ts"

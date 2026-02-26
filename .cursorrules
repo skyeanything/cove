@@ -25,12 +25,22 @@
 
 ## 开发规则
 
+- 大型任务必须先建 Epic issue 再拆分子 issue（见 `.agent/workflows/issue-decomposition.md`）
 - 所有新功能必须在独立 worktree 中开发（见 `.agent/workflows/worktree-parallel.md`）
 - 修改 `src-tauri/` 后必须运行 `cargo check` 验证
 - 提交前运行 `pnpm run build` 确认无类型错误
 - 使用 `lucide-react` 图标，stroke-width 1.5，大小 16/18/20px
 - 使用 `cn()` 工具合并 Tailwind 类名
 - 禁止 `any` 类型，严格 TypeScript
+
+## Skill 系统
+
+- 内置 Skill 在 `src/skills/*/SKILL.md`，用户 Skill 在 `~/.cove/skills/`
+- Frontmatter 字段：`name`(必填)、`description`(必填)、`emoji`、`always`、`requires`、`metadata`
+- 编辑保存 Skill 时必须保留所有 frontmatter 字段（包括 UI 未展示的 `always`、`requires` 等）
+- 工具注册表在 `src/lib/ai/tools/index.ts`：`AGENT_TOOLS`（静态）+ `getAgentTools()`（动态过滤）
+- `write_skill` 仅在 `skill-creator` 已启用时注册（Tool Gating）
+- Skill 列表 React key 使用 `${source}:${name}` 复合键
 
 ## 设计规范摘要
 

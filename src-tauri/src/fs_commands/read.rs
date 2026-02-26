@@ -1,11 +1,10 @@
 use std::fs;
-use std::io::Read;
 
 use serde::{Deserialize, Serialize};
 
 use super::detection::{
     is_binary_content, mime_from_extension, mime_from_magic, path_has_binary_extension,
-    LINE_MAX_CHARS, READ_DATA_URL_MAX_BYTES, READ_MAX_BYTES,
+    path_has_text_extension, LINE_MAX_CHARS, READ_DATA_URL_MAX_BYTES, READ_MAX_BYTES,
 };
 use super::validation::ensure_inside_workspace_exists;
 use super::FsError;
@@ -35,16 +34,18 @@ pub fn read_file(args: ReadFileArgs) -> Result<String, FsError> {
     if meta.len() > READ_MAX_BYTES {
         return Err(FsError::TooLarge);
     }
-    if path_has_binary_extension(&abs) {
+    let is_known_text = path_has_text_extension(&abs);
+    if !is_known_text && path_has_binary_extension(&abs) {
         return Err(FsError::BinaryFile);
     }
-    let mut f = fs::File::open(&abs).map_err(FsError::from)?;
-    if is_binary_content(&mut f).map_err(FsError::from)? {
-        return Err(FsError::BinaryFile);
+    if !is_known_text {
+        let mut f = fs::File::open(&abs).map_err(FsError::from)?;
+        if is_binary_content(&mut f).map_err(FsError::from)? {
+            return Err(FsError::BinaryFile);
+        }
     }
-    f = fs::File::open(&abs).map_err(FsError::from)?;
-    let mut content = String::new();
-    f.read_to_string(&mut content).map_err(FsError::from)?;
+    let bytes = fs::read(&abs).map_err(FsError::from)?;
+    let content = String::from_utf8_lossy(&bytes).into_owned();
 
     let offset = args.offset.unwrap_or(0) as usize;
     let limit = args.limit.unwrap_or(2000) as usize;
@@ -93,17 +94,18 @@ pub fn read_file_raw(args: ReadFileRawArgs) -> Result<String, FsError> {
     if meta.len() > READ_MAX_BYTES {
         return Err(FsError::TooLarge);
     }
-    if path_has_binary_extension(&abs) {
+    let is_known_text = path_has_text_extension(&abs);
+    if !is_known_text && path_has_binary_extension(&abs) {
         return Err(FsError::BinaryFile);
     }
-    let mut f = fs::File::open(&abs).map_err(FsError::from)?;
-    if is_binary_content(&mut f).map_err(FsError::from)? {
-        return Err(FsError::BinaryFile);
+    if !is_known_text {
+        let mut f = fs::File::open(&abs).map_err(FsError::from)?;
+        if is_binary_content(&mut f).map_err(FsError::from)? {
+            return Err(FsError::BinaryFile);
+        }
     }
-    f = fs::File::open(&abs).map_err(FsError::from)?;
-    let mut content = String::new();
-    f.read_to_string(&mut content).map_err(FsError::from)?;
-    Ok(content)
+    let bytes = fs::read(&abs).map_err(FsError::from)?;
+    Ok(String::from_utf8_lossy(&bytes).into_owned())
 }
 
 // ---------------------------------------------------------------------------

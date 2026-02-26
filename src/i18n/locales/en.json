@@ -14,7 +14,10 @@
       "shortcutEnter": "Enter",
       "shortcutModifierEnter": "⌘ Enter / Ctrl+Enter",
       "skillDirs": "Skill directories (extra)",
-      "skillDirsHint": "One path per line; ~ for home. Built-in already includes ~/.claude/skills, ~/.cursor/skills-cursor, etc."
+      "skillDirsHint": "One path per line; ~ for home. Built-in already includes ~/.claude/skills, ~/.cursor/skills-cursor, etc.",
+      "shellSandbox": "Shell Sandbox",
+      "sandboxEnabled": "Enabled (kernel-level isolation)",
+      "sandboxDisabled": "Disabled"
     },
     "appearanceComingSoon": "Appearance settings coming soon"
   },
@@ -185,7 +188,9 @@
     "contentToWrite": "Content to write:",
     "arguments": "Arguments:",
     "oldString": "Old string:",
-    "newString": "New string:"
+    "newString": "New string:",
+    "jsCode": "JavaScript code:",
+    "sandboxed": "Sandboxed"
   },
   "permission": {
     "title": "Confirmation required",

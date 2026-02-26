@@ -34,6 +34,7 @@ import {
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import type { Skill } from "@/lib/ai/skills/types";
 import type { ExternalSkillWithSource } from "@/stores/skillsStore";
+import { invoke } from "@tauri-apps/api/core";
 import { cn } from "@/lib/utils";
 
 // ─── Frontmatter helpers ────────────────────────────────────────────
@@ -43,8 +44,8 @@ interface SkillFields {
   emoji: string;
   description: string;
   instructions: string;
-  /** Frontmatter lines for fields unknown to the editor; preserved verbatim on save */
-  _extraFrontmatter: string[];
+  /** Frontmatter lines not recognised as known fields — preserved on round-trip */
+  extraFrontmatter: string[];
 }
 
 /** Unescape a YAML inline scalar value (double-quoted or single-quoted or bare). */
@@ -77,12 +78,12 @@ function yamlInlineString(str: string): string {
   return `"${escaped}"`;
 }
 
-const KNOWN_FM_KEYS = new Set(["name", "emoji", "description"]);
+const KNOWN_FRONTMATTER_KEYS = new Set(["name", "emoji", "description"]);
 
 function parseSkillFields(content: string): SkillFields {
   const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
   if (!match) {
-    return { name: "", emoji: "", description: "", instructions: content, _extraFrontmatter: [] };
+    return { name: "", emoji: "", description: "", instructions: content, extraFrontmatter: [] };
   }
   const block = match[1]!;
   const body = match[2]!.trim();
@@ -92,13 +93,11 @@ function parseSkillFields(content: string): SkillFields {
     return m ? unquoteYaml(m[1]!.trim()) : "";
   };
 
-  // Collect lines not belonging to known top-level keys (preserves ordering and block values)
-  const extraLines: string[] = [];
+  const extra: string[] = [];
   for (const line of block.split(/\r?\n/)) {
     const keyMatch = line.match(/^([\w-]+)\s*:/);
-    if (!keyMatch || !KNOWN_FM_KEYS.has(keyMatch[1]!)) {
-      extraLines.push(line);
-    }
+    if (keyMatch && KNOWN_FRONTMATTER_KEYS.has(keyMatch[1]!)) continue;
+    if (line.trim()) extra.push(line);
   }
 
   return {
@@ -106,16 +105,15 @@ function parseSkillFields(content: string): SkillFields {
     emoji: get("emoji"),
     description: get("description"),
     instructions: body,
-    _extraFrontmatter: extraLines,
+    extraFrontmatter: extra,
   };
 }
 
-function buildSkillMd({ name, emoji, description, instructions, _extraFrontmatter }: SkillFields): string {
+function buildSkillMd({ name, emoji, description, instructions, extraFrontmatter }: SkillFields): string {
   const lines = ["---", `name: ${name}`];
   if (emoji.trim()) lines.push(`emoji: ${emoji.trim()}`);
   lines.push(`description: ${yamlInlineString(description)}`);
-  // Preserve any extra frontmatter fields verbatim
-  if (_extraFrontmatter.length > 0) lines.push(..._extraFrontmatter);
+  if (extraFrontmatter.length > 0) lines.push(...extraFrontmatter);
   lines.push("---", "", instructions);
   return lines.join("\n");
 }
@@ -159,6 +157,7 @@ function BuiltInSkillRow({
       <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
+            {meta.emoji && <span className="text-sm">{meta.emoji}</span>}
             <span className="text-[13px] font-medium text-foreground">
               {meta.name}
             </span>
@@ -184,7 +183,6 @@ function BuiltInSkillRow({
         </div>
         <Switch checked={enabled} onCheckedChange={onToggle} size="sm" />
       </div>
-      {/* Expandable content */}
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
@@ -236,6 +234,7 @@ function ExternalSkillRow({
       <div className="flex items-center gap-3">
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
+            {meta.emoji && <span className="text-sm">{meta.emoji}</span>}
             <span className="text-[13px] font-medium text-foreground">
               {meta.name}
             </span>
@@ -279,7 +278,6 @@ function ExternalSkillRow({
           <Switch checked={enabled} onCheckedChange={onToggle} size="sm" />
         </div>
       </div>
-      {/* Expandable content */}
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
@@ -342,7 +340,7 @@ function SkillEditDialog({
     setSaving(true);
     setError("");
     try {
-      await onSave({ name: fields.name, emoji, description, instructions, _extraFrontmatter: fields._extraFrontmatter });
+      await onSave({ name: fields.name, emoji, description, instructions, extraFrontmatter: fields.extraFrontmatter });
       onOpenChange(false);
     } catch (e) {
       setError(String(e));
@@ -542,17 +540,19 @@ export function SkillsPage() {
 
   // Edit dialog state
   const [editOpen, setEditOpen] = useState(false);
+  const [editFolderName, setEditFolderName] = useState("");
   const [editFields, setEditFields] = useState<SkillFields>({
     name: "",
     emoji: "",
     description: "",
     instructions: "",
-    _extraFrontmatter: [],
+    extraFrontmatter: [],
   });
 
   // Delete state
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteName, setDeleteName] = useState("");
+  const [deleteFolderName, setDeleteFolderName] = useState("");
 
   useEffect(() => {
     loadEnabledSkillNames();
@@ -563,24 +563,38 @@ export function SkillsPage() {
     loadExternalSkills(workspacePath ?? null);
   }, [loadExternalSkills, workspacePath]);
 
-  const handleEdit = (ext: ExternalSkillWithSource) => {
-    // Parse directly from the raw file content — no roundtrip through buildSkillMd
-    setEditFields(parseSkillFields(ext.skill.content));
+  const handleEdit = async (ext: ExternalSkillWithSource) => {
+    setEditFolderName(ext.folderName);
+    try {
+      const raw = await invoke<string>("read_skill", { name: ext.folderName });
+      setEditFields(parseSkillFields(raw));
+    } catch {
+      // Fallback: reconstruct from parsed meta (loses extra frontmatter)
+      const { meta, content } = ext.skill;
+      setEditFields({
+        name: meta.name,
+        emoji: meta.emoji ?? "",
+        description: meta.description ?? "",
+        instructions: content,
+        extraFrontmatter: [],
+      });
+    }
     setEditOpen(true);
   };
 
-  const handleDelete = (name: string) => {
-    setDeleteName(name);
+  const handleDelete = (ext: ExternalSkillWithSource) => {
+    setDeleteName(ext.skill.meta.name);
+    setDeleteFolderName(ext.folderName);
     setDeleteOpen(true);
   };
 
   const handleSaveEdit = async (fields: SkillFields) => {
     const content = buildSkillMd(fields);
-    await saveSkill(fields.name, content, workspacePath ?? null);
+    await saveSkill(editFolderName, content, workspacePath ?? null, fields.name);
   };
 
   const handleConfirmDelete = async () => {
-    await deleteSkillAction(deleteName, workspacePath ?? null);
+    await deleteSkillAction(deleteFolderName, workspacePath ?? null, deleteName);
   };
 
   return (
@@ -612,7 +626,7 @@ export function SkillsPage() {
         <div className="mx-5 divide-y divide-border rounded-xl border border-border bg-background-secondary">
           {bundledSkills.map((skill) => (
             <BuiltInSkillRow
-              key={skill.meta.name}
+              key={`builtin:${skill.meta.name}`}
               skill={skill}
               enabled={enabledSkillNames.includes(skill.meta.name)}
               onToggle={() => toggleSkillEnabled(skill.meta.name)}
@@ -636,13 +650,13 @@ export function SkillsPage() {
           <div className="mx-5 divide-y divide-border rounded-xl border border-border bg-background-secondary">
             {userSkills.map((ext) => (
               <ExternalSkillRow
-                key={ext.skill.meta.name}
+                key={ext.path}
                 ext={ext}
                 enabled={enabledSkillNames.includes(ext.skill.meta.name)}
                 onToggle={() => toggleSkillEnabled(ext.skill.meta.name)}
                 isCoveSkill
                 onEdit={() => handleEdit(ext)}
-                onDelete={() => handleDelete(ext.skill.meta.name)}
+                onDelete={() => handleDelete(ext)}
               />
             ))}
           </div>
@@ -663,7 +677,7 @@ export function SkillsPage() {
           <div className="mx-5 divide-y divide-border rounded-xl border border-border">
             {discoveredSkills.map((ext) => (
               <ExternalSkillRow
-                key={ext.skill.meta.name}
+                key={ext.path}
                 ext={ext}
                 enabled={enabledSkillNames.includes(ext.skill.meta.name)}
                 onToggle={() => toggleSkillEnabled(ext.skill.meta.name)}
