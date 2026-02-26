@@ -23,7 +23,7 @@ export function buildSystemPrompt(options: {
 
   if (options.officellmAvailable) {
     parts.push(
-      "officellm is available. For document operations (DOCX/PPTX/XLSX), use the officellm skill for JS API guidance. Load the 'officellm' skill when the user asks about document manipulation.",
+      "The officellm binary is detected on host. This does not guarantee direct CLI access in the current toolset. For document operations (DOCX/PPTX/XLSX), load the 'officellm' skill for guidance; if execution tools are unavailable, state the limitation instead of attempting unsupported commands.",
     );
   }
 
