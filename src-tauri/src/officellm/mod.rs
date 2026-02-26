@@ -23,8 +23,7 @@ pub async fn officellm_call(
     args: HashMap<String, String>,
 ) -> Result<CommandResult, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        let has_session = server::SESSION.lock().map(|g| g.is_some()).unwrap_or(false);
-        if has_session {
+        if server::has_session() {
             server::call(&cmd, &args)
         } else {
             cli::call(&cmd, &args)

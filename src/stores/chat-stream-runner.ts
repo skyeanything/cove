@@ -47,8 +47,8 @@ export async function runStreamLoop(
   const model = getModel(provider, modelId);
   const modelOption = getModelOption(provider, modelId);
   const enabledSkillNames = await getEnabledSkillNames();
-  const tools = getAgentTools(enabledSkillNames);
   const officellmAvailable = await isOfficellmAvailable();
+  const tools = getAgentTools(enabledSkillNames, { officellm: officellmAvailable });
 
   let streamResult: StreamResult | null = null;
   for (let attempt = 1; attempt <= RETRYABLE_ATTEMPTS; attempt++) {

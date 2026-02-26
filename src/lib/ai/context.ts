@@ -23,7 +23,7 @@ export function buildSystemPrompt(options: {
 
   if (options.officellmAvailable) {
     parts.push(
-      "The officellm binary is detected on host. This does not guarantee direct CLI access in the current toolset. For document operations (DOCX/PPTX/XLSX), load the 'officellm' skill for guidance; if execution tools are unavailable, state the limitation instead of attempting unsupported commands.",
+      "officellm is available. Use the officellm tool for document operations (DOCX/PPTX/XLSX). Workflow: detect → open(path) → call(command, args) → save → close. Load the 'officellm' skill for detailed command reference.",
     );
   }
 
