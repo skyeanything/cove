@@ -5,6 +5,7 @@ import { editTool } from "./edit";
 import { bashTool } from "./bash";
 import { fetchUrlTool } from "./fetch-url";
 import { skillTool, createSkillTool, createSkillResourceTool } from "./skill";
+import { writeSkillTool } from "./write-skill";
 
 export const AGENT_TOOLS = {
   read: readTool,
@@ -14,6 +15,7 @@ export const AGENT_TOOLS = {
   bash: bashTool,
   fetch_url: fetchUrlTool,
   skill: skillTool,
+  write_skill: writeSkillTool,
 } as const;
 
 export type AgentToolId = keyof typeof AGENT_TOOLS;
@@ -29,5 +31,6 @@ export function getAgentTools(enabledSkillNames: string[]) {
     fetch_url: fetchUrlTool,
     skill: createSkillTool(enabledSkillNames),
     skill_resource: createSkillResourceTool(enabledSkillNames),
+    write_skill: writeSkillTool,
   } as const;
 }

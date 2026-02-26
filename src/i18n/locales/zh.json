@@ -201,7 +201,7 @@
     "autoSelectHint": "AI 会按需使用您选择的技能",
     "scanning": "正在扫描本机技能目录…",
     "noSkills": "暂无可用技能",
-    "sourceApp": "App",
+    "sourceApp": "内置",
     "builtIn": "内置",
     "external": "外部",
     "skillDirs": "技能目录",
@@ -234,7 +234,14 @@
     "saveSuccess": "技能已保存",
     "deleteSuccess": "技能已删除",
     "userSkills": "用户技能",
-    "discoveredSkills": "已发现"
+    "discoveredSkills": "已发现",
+    "emojiLabel": "Emoji（可选）",
+    "emojiPlaceholder": "🛠️",
+    "descriptionLabel": "描述",
+    "descriptionPlaceholder": "简要描述该技能的用途，以及何时使用",
+    "instructionsLabel": "指令",
+    "instructionsPlaceholder": "AI 代理的详细操作说明…",
+    "createViaChat": "在对话中使用 skill-creator 技能来创建新技能"
   },
   "workspace": {
     "title": "工作目录",
