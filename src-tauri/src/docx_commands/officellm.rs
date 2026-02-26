@@ -6,6 +6,7 @@ use base64::Engine;
 
 use super::cache::{evict_lru, fnv1a, get_cache_dir};
 use super::conversion::temp_prefix;
+use crate::officellm::detect::default_bin_path;
 
 // ── officellm to-pdf 转换（DOCX 专用）────────────────────────────────────────
 
@@ -42,10 +43,8 @@ pub(super) fn convert_docx_via_officellm(app: tauri::AppHandle, data_url: String
 
     fs::write(&input_path, &bytes).map_err(|e| format!("写入临时文件失败: {e}"))?;
 
-    // ── 4. 调用 officellm to-pdf ────────────────────────────────────────────────
-    let bin = dirs::home_dir()
-        .ok_or("无法获取用户 home 目录")?
-        .join(".officellm/bin/officellm");
+    // ── 4. 调用 officellm to-pdf（通过统一的 detect 模块获取路径）──────────────
+    let bin = default_bin_path().ok_or("无法获取用户 home 目录")?;
 
     if !bin.exists() {
         let _ = fs::remove_file(&input_path);

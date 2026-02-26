@@ -6,6 +6,7 @@ export function buildSystemPrompt(options: {
   assistant?: Assistant;
   customInstructions?: string;
   workspacePath?: string;
+  officellmAvailable?: boolean;
 }): string {
   const parts: string[] = [];
 
@@ -19,6 +20,12 @@ export function buildSystemPrompt(options: {
   parts.push(
     "Tools: read (files in workspace); write/edit only after reading; prefer bash+rg for search, bash+curl for web; dangerous bash requires user approval.",
   );
+
+  if (options.officellmAvailable) {
+    parts.push(
+      "officellm is available. Use the officellm tool for document operations (DOCX/PPTX/XLSX). Workflow: detect → open(path) → call(command, args) → save → close. Load the 'officellm' skill for detailed command reference.",
+    );
+  }
 
   if (options.assistant?.system_instruction) {
     parts.push(options.assistant.system_instruction);

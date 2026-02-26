@@ -188,12 +188,24 @@ src/
 - 超出时在文件顶部添加 `// FILE_SIZE_EXCEPTION: <原因>` 注释
 - `src/components/ui/` 下的 shadcn 原语文件豁免（CLAUDE.md 明确标注 DO NOT modify）
 
-### Git Worktree 工作流
-- 所有功能开发在独立 worktree 中进行，主目录保持 main 分支干净
-- 新建 worktree：`./scripts/start-worktree.sh <type> <issue-id> <desc>`
-- Worktree 根目录：`/Users/lizc/code/cove-worktrees/`
-- 分支规范：`feature/issue-<id>-<desc>`、`fix/issue-<id>-<desc>`
-- Code Review 必须在独立 review worktree 中进行
+### Git Worktree 工作流（Hard Constraint）
+
+**MUST**:
+- 所有功能开发 MUST 在独立 worktree 中进行，主目录（`/Users/lizc/code/cove/`）保持 main 分支干净
+- 开始开发前 MUST 先有对应的 GitHub Issue
+- 使用脚本创建 worktree：`./scripts/start-worktree.sh <type> <issue-id> <desc>`
+- 分支命名 MUST 包含 Issue 编号：
+  - 新功能：`feature/issue-<id>-<desc>`
+  - Bug 修复：`fix/issue-<id>-<desc>`
+  - 文档：`docs/issue-<id>-<desc>`
+  - 重构：`refactor/issue-<id>-<desc>`
+- PR body MUST 包含 `Closes #<id>` 关联 Issue
+- PR 标题格式：`feat: ...`、`fix: ...`、`docs: ...`、`refactor: ...`、`chore: ...`
+
+**MUST NOT**:
+- MUST NOT 在主仓库目录（`/Users/lizc/code/cove/`）直接开发功能分支
+- MUST NOT 创建不含 Issue 编号的分支
+- MUST NOT 直接推送到 main 分支
 
 ### 构建 & 测试基准线
 ```bash
@@ -203,6 +215,7 @@ cd src-tauri && cargo check          # Rust 静态检查
 python3 scripts/check-file-size.py  # 文件大小校验
 ```
 
-### AI 开发规则
-- 查看 `AGENTS.md` 了解必读顺序
-- 查看 `.agent/workflows/` 了解具体工作流
+### AI 开发规则（Hard Constraint）
+- 开始任何开发工作前，MUST 按 `AGENTS.md` 中的顺序阅读所有必读文档
+- MUST 先阅读 `.agent/workflows/worktree-parallel.md`，再开始写任何代码
+- 如果当前工作目录是 `/Users/lizc/code/cove/`（主仓库），MUST NOT 在此创建功能分支或编写功能代码
