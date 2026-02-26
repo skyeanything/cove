@@ -242,9 +242,13 @@ metadata:                 # 可选，额外元数据
 - `write_skill` 仅在 `skill-creator` 已启用时注册
 - `officellm` 通过 `options.officellm` 控制
 
+### Folder Name vs Frontmatter Name
+
+外部 Skill 的磁盘文件夹名（`folderName`）可能与 frontmatter 中的 `name` 字段不一致。所有 Tauri CRUD 操作（`read_skill`、`write_skill`、`delete_skill`）必须使用 `folderName`（来自发现阶段），而非 `meta.name`。`ExternalSkillWithSource.folderName` 专门用于此目的。
+
 ### React Key 规范
 
-Skill 列表中的 React key 使用 `${source}:${name}` 复合键，防止不同来源同名 Skill 导致 key 冲突。
+外部 Skill 列表中的 React key 使用 `ext.path`（磁盘完整路径），保证即使同 source + 同名但来自不同发现根目录的 Skill 也不会冲突。
 
 ## Development Workflow
 

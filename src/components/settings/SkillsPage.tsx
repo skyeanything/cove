@@ -493,6 +493,7 @@ export function SkillsPage() {
 
   // Edit dialog state
   const [editOpen, setEditOpen] = useState(false);
+  const [editFolderName, setEditFolderName] = useState("");
   const [editFields, setEditFields] = useState<SkillFields>({
     name: "",
     emoji: "",
@@ -504,6 +505,7 @@ export function SkillsPage() {
   // Delete state
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteName, setDeleteName] = useState("");
+  const [deleteFolderName, setDeleteFolderName] = useState("");
 
   useEffect(() => {
     loadEnabledSkillNames();
@@ -515,8 +517,9 @@ export function SkillsPage() {
   }, [loadExternalSkills, workspacePath]);
 
   const handleEdit = async (ext: ExternalSkillWithSource) => {
+    setEditFolderName(ext.folderName);
     try {
-      const raw = await invoke<string>("read_skill", { name: ext.skill.meta.name });
+      const raw = await invoke<string>("read_skill", { name: ext.folderName });
       setEditFields(parseSkillFields(raw));
     } catch {
       // Fallback: reconstruct from parsed meta (loses extra frontmatter)
@@ -532,18 +535,19 @@ export function SkillsPage() {
     setEditOpen(true);
   };
 
-  const handleDelete = (name: string) => {
-    setDeleteName(name);
+  const handleDelete = (ext: ExternalSkillWithSource) => {
+    setDeleteName(ext.skill.meta.name);
+    setDeleteFolderName(ext.folderName);
     setDeleteOpen(true);
   };
 
   const handleSaveEdit = async (fields: SkillFields) => {
     const content = buildSkillMd(fields);
-    await saveSkill(fields.name, content, workspacePath ?? null);
+    await saveSkill(editFolderName, content, workspacePath ?? null);
   };
 
   const handleConfirmDelete = async () => {
-    await deleteSkillAction(deleteName, workspacePath ?? null);
+    await deleteSkillAction(deleteFolderName, workspacePath ?? null);
   };
 
   return (
@@ -599,13 +603,13 @@ export function SkillsPage() {
           <div className="mx-5 divide-y divide-border rounded-xl border border-border bg-background-secondary">
             {userSkills.map((ext) => (
               <ExternalSkillRow
-                key={`${ext.source}:${ext.skill.meta.name}`}
+                key={ext.path}
                 ext={ext}
                 enabled={enabledSkillNames.includes(ext.skill.meta.name)}
                 onToggle={() => toggleSkillEnabled(ext.skill.meta.name)}
                 isCoveSkill
                 onEdit={() => handleEdit(ext)}
-                onDelete={() => handleDelete(ext.skill.meta.name)}
+                onDelete={() => handleDelete(ext)}
               />
             ))}
           </div>
@@ -621,7 +625,7 @@ export function SkillsPage() {
           <div className="mx-5 divide-y divide-border rounded-xl border border-border">
             {discoveredSkills.map((ext) => (
               <ExternalSkillRow
-                key={`${ext.source}:${ext.skill.meta.name}`}
+                key={ext.path}
                 ext={ext}
                 enabled={enabledSkillNames.includes(ext.skill.meta.name)}
                 onToggle={() => toggleSkillEnabled(ext.skill.meta.name)}

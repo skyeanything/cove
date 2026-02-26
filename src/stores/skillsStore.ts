@@ -35,6 +35,8 @@ export interface ExternalSkillWithSource {
   source: string;
   /** File path of the skill on disk */
   path: string;
+  /** Folder name on disk (may differ from frontmatter name) — use for Tauri CRUD ops */
+  folderName: string;
 }
 
 /** 从 settings 读取已勾选 skill 名称；若为空则用内置 skill 名单填充并保存 */
@@ -91,6 +93,7 @@ export const useSkillsStore = create<SkillsState>()((set, get) => ({
         skill: parseSkillFromRaw(e.content, e.name),
         source: e.source,
         path: e.path,
+        folderName: e.name,
       }));
       set({ externalSkills: withSource, loaded: true });
     } catch {
