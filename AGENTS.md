@@ -5,9 +5,10 @@
 ## 必读顺序
 
 1. **`.agent/workflows/worktree-parallel.md`** — Git Worktree 并行开发流程（新功能必须在独立 worktree 中开发）
-2. **`.agent/workflows/build-and-test.md`** — 构建与测试命令（提交前必须通过）
-3. **`.agent/workflows/submit-pr.md`** — PR 提交规范与流程
-4. **`CLAUDE.md`** — 项目设计规范、技术栈、代码约定（Hard Constraints）
+2. **`.agent/workflows/agent-defaults.md`** — Agent 默认行为（KISS、Review 角色、PR Review 输出规则）
+3. **`.agent/workflows/build-and-test.md`** — 构建与测试命令（提交前必须通过）
+4. **`.agent/workflows/submit-pr.md`** — PR 提交规范与流程
+5. **`CLAUDE.md`** — 项目设计规范、技术栈、代码约定（Hard Constraints）
 
 ## 优先级
 
@@ -27,6 +28,7 @@ CLAUDE.md Hard Constraints
 | Rust 静态检查 | `cd src-tauri && cargo check` |
 | 文件大小校验 | `python3 scripts/check-file-size.py` |
 | 创建 PR | `gh pr create --title "type: desc" --body "..."` |
+| 审查 PR 并回写评论 | `gh pr review <id> --comment ...` / `gh pr comment <id> ...` |
 
 ## 文件大小限制（Hard Constraint）
 
@@ -35,3 +37,9 @@ CLAUDE.md Hard Constraints
 - `.rs` Rust 文件：**300 行**上限
 - 超出时在文件顶部添加 `// FILE_SIZE_EXCEPTION: <原因>`
 - `src/components/ui/` 下的 shadcn 原语文件豁免
+
+## Code Review 强制规则
+
+- 任务是 review PR 时，必须将 review 结论写回对应 PR 讨论区，不能只在本地终端输出。
+- 优先使用 `gh pr review`；若因权限/平台限制无法提交（例如审查自己创建的 PR 不能 `request-changes`），必须 fallback 到 `gh pr comment`。
+- 即使无阻塞问题，也必须在 PR 留下明确结论（例如 “No blocking issues”）。
