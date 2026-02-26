@@ -18,7 +18,7 @@
 | **MiniMax** | API Key | [platform.minimaxi.com](https://platform.minimaxi.com) | MiniMax-Text 系列 |
 | **OpenRouter** | API Key | [openrouter.ai](https://openrouter.ai) | 统一入口，路由到 200+ 模型 |
 | **阿里云 DashScope** | API Key | [dashscope.aliyuncs.com](https://dashscope.aliyuncs.com) | 通义千问系列（Qwen） |
-| **腾讯云** | SecretId + SecretKey + Region | [cloud.tencent.com/product/hunyuan](https://cloud.tencent.com/product/hunyuan) | 混元大模型 |
+| **腾讯云** | API Key | [cloud.tencent.com/product/hunyuan](https://cloud.tencent.com/product/hunyuan) | 混元大模型（hunyuan-turbo 等） |
 | **火山引擎 Ark** | API Key | [www.volcengine.com/product/ark](https://www.volcengine.com/product/ark) | 豆包 / Doubao 系列 |
 | **Ollama** | 本地地址（默认 `http://localhost:11434`） | — | 本地运行开源模型，数据不出本机 |
 
