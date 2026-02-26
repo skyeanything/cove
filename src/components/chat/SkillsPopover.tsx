@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Wand2, Loader2 } from "lucide-react";
+import { Wand2, Loader2, Lock } from "lucide-react";
 import {
   Popover,
   PopoverContent,
@@ -175,12 +175,20 @@ function SkillItem({
   const displaySource = source != null && source !== "" ? (source.toLowerCase() === "app" ? sourceAppLabel : sourceLabel(source)) : null;
   return (
     <li className="flex items-start gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-background-tertiary/80">
-      <Checkbox
-        checked={enabled}
-        onCheckedChange={() => onToggle()}
-        className="mt-0.5 shrink-0"
-        aria-label={meta.name}
-      />
+      {meta.always ? (
+        <Lock
+          className="mt-0.5 h-4 w-4 shrink-0 text-foreground-tertiary"
+          strokeWidth={1.5}
+          aria-label="always enabled"
+        />
+      ) : (
+        <Checkbox
+          checked={enabled}
+          onCheckedChange={() => onToggle()}
+          className="mt-0.5 shrink-0"
+          aria-label={meta.name}
+        />
+      )}
       <div className="min-w-0 flex-1 overflow-hidden">
         <div className="flex flex-wrap items-center gap-1.5">
           <span className="text-[13px] font-medium text-foreground">{meta.name}</span>
@@ -190,6 +198,11 @@ function SkillItem({
               title={source ?? ""}
             >
               {displaySource}
+            </span>
+          )}
+          {meta.always && (
+            <span className="shrink-0 rounded bg-success/15 px-1 py-0.5 text-[10px] font-medium text-success">
+              always on
             </span>
           )}
         </div>

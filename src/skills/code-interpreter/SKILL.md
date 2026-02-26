@@ -8,21 +8,19 @@ requires:
     - js_interpreter
 ---
 
-# Code Interpreter Skill
+You have a **built-in QuickJS JavaScript interpreter** available via the `js_interpreter` tool. You CAN execute JavaScript code directly — no external runtime or installation required.
 
-When the user needs computation, data processing, or file manipulation, prefer `js_interpreter` over `bash` with external runtimes (Python, Node, etc.) — the user may not have them installed.
+## Rule: prefer `js_interpreter` over `bash` for JS-capable tasks
 
-## When to use `js_interpreter`
-
+**ALWAYS use `js_interpreter` (not bash) for:**
 - Math calculations and numeric analysis
 - JSON parsing, transforming, and formatting
 - String processing and regex matching
 - Reading workspace files and processing their content
 - Quick data aggregation (sum, average, filter, sort)
-- Any task that can be done in pure JavaScript without external dependencies
+- Any task expressible in pure JavaScript
 
-## When to use `bash` instead
-
+**Use `bash` only when `js_interpreter` cannot help:**
 - System commands: `git`, `npm`, `cargo`, `pnpm`, etc.
 - Shell features: pipes, redirects, environment variables
 - Network access: `curl`, `wget`
@@ -36,15 +34,10 @@ When the user needs computation, data processing, or file manipulation, prefer `
 | `workspace.readFile(path)` | Read a file (relative to workspace root) |
 | `workspace.writeFile(path, content)` | Write a file |
 | `workspace.listDir(path)` | List directory contents |
-| `Math.*` | Standard math functions |
-| `JSON.*` | JSON parse/stringify |
-| `Date`, `RegExp`, `Map`, `Set` | Built-in JS globals |
+| `Math.*`, `JSON.*`, `Date`, `RegExp`, `Map`, `Set` | Standard JS built-ins |
 
 **Not available**: `fetch`, `require`, `import`, `process`, `fs`, `XMLHttpRequest`.
 
 ## Limits
-
-- **Memory**: 64 MB
-- **Timeout**: 30s default, adjustable up to 60s via `timeout` parameter
-- **No network**: Cannot make HTTP requests
-- **File scope**: Only files within the active workspace
+- **Memory**: 64 MB  |  **Timeout**: 30s default (max 60s via `timeout` param)
+- **No network**  |  **File scope**: active workspace only
