@@ -33,6 +33,7 @@ import {
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import type { Skill } from "@/lib/ai/skills/types";
 import type { ExternalSkillWithSource } from "@/stores/skillsStore";
+import { invoke } from "@tauri-apps/api/core";
 import { cn } from "@/lib/utils";
 
 // ─── Frontmatter helpers ────────────────────────────────────────────
@@ -42,24 +43,36 @@ interface SkillFields {
   emoji: string;
   description: string;
   instructions: string;
+  /** Frontmatter lines not recognised as known fields — preserved on round-trip */
+  extraFrontmatter: string[];
 }
+
+const KNOWN_FRONTMATTER_KEYS = new Set(["name", "emoji", "description"]);
 
 function parseSkillFields(content: string): SkillFields {
   const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?([\s\S]*)$/);
-  if (!match) return { name: "", emoji: "", description: "", instructions: content };
+  if (!match) return { name: "", emoji: "", description: "", instructions: content, extraFrontmatter: [] };
   const block = match[1]!;
   const body = match[2]!.trim();
   const get = (key: string) => {
     const m = block.match(new RegExp(`^${key}\\s*:\\s*(.+)$`, "m"));
     return m ? m[1]!.trim().replace(/^["']|["']$/g, "") : "";
   };
-  return { name: get("name"), emoji: get("emoji"), description: get("description"), instructions: body };
+  const extra: string[] = [];
+  for (const line of block.split(/\r?\n/)) {
+    const keyMatch = line.match(/^(\w[\w-]*)\s*:/);
+    if (keyMatch && KNOWN_FRONTMATTER_KEYS.has(keyMatch[1]!)) continue;
+    if (line.trim()) extra.push(line);
+  }
+  return { name: get("name"), emoji: get("emoji"), description: get("description"), instructions: body, extraFrontmatter: extra };
 }
 
-function buildSkillMd({ name, emoji, description, instructions }: SkillFields): string {
+function buildSkillMd({ name, emoji, description, instructions, extraFrontmatter }: SkillFields): string {
   const lines = ["---", `name: ${name}`];
   if (emoji.trim()) lines.push(`emoji: ${emoji.trim()}`);
-  lines.push(`description: ${description}`, "---", "", instructions);
+  lines.push(`description: ${description}`);
+  for (const line of extraFrontmatter) lines.push(line);
+  lines.push("---", "", instructions);
   return lines.join("\n");
 }
 
@@ -287,7 +300,7 @@ function SkillEditDialog({
     setSaving(true);
     setError("");
     try {
-      await onSave({ name: fields.name, emoji, description, instructions });
+      await onSave({ name: fields.name, emoji, description, instructions, extraFrontmatter: fields.extraFrontmatter });
       onOpenChange(false);
     } catch (e) {
       setError(String(e));
@@ -485,6 +498,7 @@ export function SkillsPage() {
     emoji: "",
     description: "",
     instructions: "",
+    extraFrontmatter: [],
   });
 
   // Delete state
@@ -500,15 +514,21 @@ export function SkillsPage() {
     loadExternalSkills(workspacePath ?? null);
   }, [loadExternalSkills, workspacePath]);
 
-  const handleEdit = (ext: ExternalSkillWithSource) => {
-    const { meta, content } = ext.skill;
-    const raw = buildSkillMd({
-      name: meta.name,
-      emoji: meta.emoji ?? "",
-      description: meta.description ?? "",
-      instructions: content,
-    });
-    setEditFields(parseSkillFields(raw));
+  const handleEdit = async (ext: ExternalSkillWithSource) => {
+    try {
+      const raw = await invoke<string>("read_skill", { name: ext.skill.meta.name });
+      setEditFields(parseSkillFields(raw));
+    } catch {
+      // Fallback: reconstruct from parsed meta (loses extra frontmatter)
+      const { meta, content } = ext.skill;
+      setEditFields({
+        name: meta.name,
+        emoji: meta.emoji ?? "",
+        description: meta.description ?? "",
+        instructions: content,
+        extraFrontmatter: [],
+      });
+    }
     setEditOpen(true);
   };
 
@@ -555,7 +575,7 @@ export function SkillsPage() {
         <div className="mx-5 divide-y divide-border rounded-xl border border-border bg-background-secondary">
           {bundledSkills.map((skill) => (
             <BuiltInSkillRow
-              key={skill.meta.name}
+              key={`builtin:${skill.meta.name}`}
               skill={skill}
               enabled={enabledSkillNames.includes(skill.meta.name)}
               onToggle={() => toggleSkillEnabled(skill.meta.name)}
@@ -579,7 +599,7 @@ export function SkillsPage() {
           <div className="mx-5 divide-y divide-border rounded-xl border border-border bg-background-secondary">
             {userSkills.map((ext) => (
               <ExternalSkillRow
-                key={ext.skill.meta.name}
+                key={`${ext.source}:${ext.skill.meta.name}`}
                 ext={ext}
                 enabled={enabledSkillNames.includes(ext.skill.meta.name)}
                 onToggle={() => toggleSkillEnabled(ext.skill.meta.name)}
@@ -601,7 +621,7 @@ export function SkillsPage() {
           <div className="mx-5 divide-y divide-border rounded-xl border border-border">
             {discoveredSkills.map((ext) => (
               <ExternalSkillRow
-                key={ext.skill.meta.name}
+                key={`${ext.source}:${ext.skill.meta.name}`}
                 ext={ext}
                 enabled={enabledSkillNames.includes(ext.skill.meta.name)}
                 onToggle={() => toggleSkillEnabled(ext.skill.meta.name)}
