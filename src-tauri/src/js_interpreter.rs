@@ -207,13 +207,20 @@ fn register_workspace_fns<'js>(
     let officellm_fn = Function::new(
         ctx.clone(),
         move |cmd: String, mut args: HashMap<String, String>| -> rquickjs::Result<String> {
-            // 相对路径解析为绝对路径（适用于 i/o/input/output/path）
-            for key in &["i", "o", "input", "output", "path"] {
+            // 路径边界校验：防 `..` 逃逸，拒绝 workspace 外路径（绝对/相对均检查）
+            // 输入类路径文件必须存在，输出类路径可不存在
+            for key in &["i", "input", "path"] {
                 if let Some(v) = args.get(*key) {
-                    if !std::path::Path::new(v).is_absolute() {
-                        let abs = std::path::Path::new(&wr4).join(v);
-                        args.insert(key.to_string(), abs.to_string_lossy().into_owned());
-                    }
+                    let abs = ensure_inside_workspace_exists(&wr4, v)
+                        .map_err(|e| js_err(&format!("{e:?}")))?;
+                    args.insert(key.to_string(), abs.to_string_lossy().into_owned());
+                }
+            }
+            for key in &["o", "output"] {
+                if let Some(v) = args.get(*key) {
+                    let abs = ensure_inside_workspace_may_not_exist(&wr4, v)
+                        .map_err(|e| js_err(&format!("{e:?}")))?;
+                    args.insert(key.to_string(), abs.to_string_lossy().into_owned());
                 }
             }
 

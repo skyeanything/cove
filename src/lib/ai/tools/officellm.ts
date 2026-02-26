@@ -66,7 +66,7 @@ export const officellmTool = tool({
           if (!command) return "Error: 'command' is required for the 'call' action.";
           const result = await invoke<CommandResult>("officellm_call", {
             cmd: command,
-            args: args ?? {},
+            args: args ?? [],
           });
           if (result.status === "error") {
             return `Error: ${result.error ?? "unknown error"}`;
