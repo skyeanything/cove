@@ -278,6 +278,16 @@ metadata:                 # 可选，额外元数据
 - MUST NOT 创建不含 Issue 编号的分支
 - MUST NOT 直接推送到 main 分支
 
+### Issue 拆分规范（Hard Constraint）
+
+大型任务 MUST 先创建 Epic issue，再拆分为子 issue。详细规则见 **`.agent/workflows/issue-decomposition.md`**。
+
+核心原则：
+- **粒度**：每个子 issue MUST 能在一个 AI Code Agent session 内完成（200-600 行源码、2-5 个文件）
+- **独立性**：独立开发、独立 PR、独立 CI 验证，无循环依赖
+- **可验证性**：MUST 含验收标准（checkbox）+ 验证命令（可自动化判定）
+- **分组**：按职责域分组，复杂模块（>300 行）独立为一个 issue
+
 ### 构建 & 测试基准线
 ```bash
 pnpm run build                       # 前端构建（含 tsc 类型检查）

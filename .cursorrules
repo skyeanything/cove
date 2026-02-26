@@ -25,6 +25,7 @@
 
 ## 开发规则
 
+- 大型任务必须先建 Epic issue 再拆分子 issue（见 `.agent/workflows/issue-decomposition.md`）
 - 所有新功能必须在独立 worktree 中开发（见 `.agent/workflows/worktree-parallel.md`）
 - 修改 `src-tauri/` 后必须运行 `cargo check` 验证
 - 提交前运行 `pnpm run build` 确认无类型错误
