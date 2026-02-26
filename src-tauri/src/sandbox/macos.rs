@@ -64,6 +64,15 @@ fn generate_profile(workspace_root: &str, policy: &SandboxPolicy) -> String {
     lines.push("(allow file-write* (subpath \"/tmp\"))".to_string());
     lines.push("(allow file-write* (subpath \"/private/tmp\"))".to_string());
 
+    // 允许写入 ~/.officellm（TMPDIR 重定向目标，含 tmp/config/cache 等子目录）
+    if let Some(home) = dirs::home_dir() {
+        let officellm_dir = home.join(".officellm");
+        lines.push(format!(
+            "(allow file-write* (subpath \"{}\"))",
+            escape_seatbelt(&officellm_dir.to_string_lossy())
+        ));
+    }
+
     // 额外允许写入的路径
     for path in &policy.allow_write {
         let expanded = expand_tilde(path);
