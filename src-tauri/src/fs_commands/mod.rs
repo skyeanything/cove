@@ -9,6 +9,14 @@ mod write;
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_detection;
+#[cfg(test)]
+mod tests_list;
+#[cfg(test)]
+mod tests_read;
+#[cfg(test)]
+mod tests_validation;
 
 pub use list::*;
 pub use office::*;
