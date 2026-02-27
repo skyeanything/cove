@@ -1,4 +1,3 @@
-// @vitest-environment happy-dom
 import { describe, it, expect, afterEach, vi } from "vitest";
 
 vi.mock("@/db/repos/assistantRepo", () => ({
@@ -45,11 +44,29 @@ import {
 } from "@/test-utils/fixtures/messages";
 import { makeProvider } from "@/test-utils/fixtures/providers";
 
+// Explicit localStorage stub — tests are environment-agnostic.
+// happy-dom's localStorage may be a plain {} without Web Storage methods in
+// some versions, causing TypeError on .clear()/.setItem()/.removeItem().
+const _lsStore = new Map<string, string>();
+const localStorageMock = {
+  getItem: (key: string): string | null => _lsStore.get(key) ?? null,
+  setItem: (key: string, value: string): void => {
+    _lsStore.set(key, value);
+  },
+  removeItem: (key: string): void => {
+    _lsStore.delete(key);
+  },
+  clear: (): void => {
+    _lsStore.clear();
+  },
+};
+vi.stubGlobal("localStorage", localStorageMock);
+
 const resetStore = createStoreReset(useDataStore);
 afterEach(() => {
   resetStore();
   vi.clearAllMocks();
-  localStorage.clear();
+  localStorageMock.clear();
 });
 
 // Helper: build mock Prompt
