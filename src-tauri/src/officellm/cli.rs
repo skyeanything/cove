@@ -97,3 +97,87 @@ fn parse_output(child: &mut std::process::Child, success: bool) -> Result<Comman
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_util::with_home;
+
+    #[test]
+    fn call_errors_when_binary_not_found() {
+        with_home(|_home| {
+            let err = call("test", &[]).unwrap_err();
+            assert!(err.contains("未找到 officellm"));
+        });
+    }
+
+    #[test]
+    fn call_error_includes_install_hint() {
+        with_home(|_home| {
+            let err = call("test", &[]).unwrap_err();
+            assert!(err.contains(".officellm/bin/officellm"));
+            assert!(err.contains("https://github.com/nicepkg/officellm"));
+        });
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn parse_output_json_success() {
+        let mut child = std::process::Command::new("sh")
+            .args(["-c", r#"echo '{"status":"success","data":"ok"}'"#])
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .unwrap();
+        let _ = child.wait();
+        let r = parse_output(&mut child, true).unwrap();
+        assert_eq!(r.status, "success");
+        assert_eq!(r.data, serde_json::json!("ok"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn parse_output_plain_text_wrapped() {
+        let mut child = std::process::Command::new("sh")
+            .args(["-c", "echo 'plain text'"])
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .unwrap();
+        let _ = child.wait();
+        let r = parse_output(&mut child, true).unwrap();
+        assert_eq!(r.status, "success");
+        assert!(r.data.is_string());
+        assert!(r.data.as_str().unwrap().contains("plain text"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn parse_output_failure_prefers_stderr() {
+        let mut child = std::process::Command::new("sh")
+            .args(["-c", "echo err >&2; exit 1"])
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .unwrap();
+        let _ = child.wait();
+        let r = parse_output(&mut child, false).unwrap();
+        assert_eq!(r.status, "error");
+        assert!(r.error.as_deref().unwrap().contains("err"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn parse_output_failure_falls_back_to_stdout() {
+        let mut child = std::process::Command::new("sh")
+            .args(["-c", "echo out; exit 1"])
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()
+            .unwrap();
+        let _ = child.wait();
+        let r = parse_output(&mut child, false).unwrap();
+        assert_eq!(r.status, "error");
+        assert!(r.error.as_deref().unwrap().contains("out"));
+    }
+}

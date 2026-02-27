@@ -39,3 +39,66 @@ pub fn detect() -> DetectResult {
         path: Some(path_str),
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_util::with_home;
+
+    #[test]
+    fn default_bin_path_returns_path_under_home() {
+        with_home(|home| {
+            let p = default_bin_path().unwrap();
+            assert!(p.starts_with(home));
+            assert!(p.ends_with(".officellm/bin/officellm"));
+        });
+    }
+
+    #[test]
+    fn detect_unavailable_when_binary_missing() {
+        with_home(|_home| {
+            let r = detect();
+            assert!(!r.available);
+            assert!(r.version.is_none());
+            assert!(r.path.is_none());
+        });
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn detect_available_with_fake_binary() {
+        use std::os::unix::fs::PermissionsExt;
+
+        with_home(|home| {
+            let bin = home.join(".officellm/bin/officellm");
+            std::fs::create_dir_all(bin.parent().unwrap()).unwrap();
+            std::fs::write(&bin, "#!/bin/sh\necho '1.2.3'\n").unwrap();
+            std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o755))
+                .unwrap();
+
+            let r = detect();
+            assert!(r.available);
+            assert_eq!(r.version.as_deref(), Some("1.2.3"));
+            assert!(r.path.is_some());
+        });
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn detect_available_binary_version_empty() {
+        use std::os::unix::fs::PermissionsExt;
+
+        with_home(|home| {
+            let bin = home.join(".officellm/bin/officellm");
+            std::fs::create_dir_all(bin.parent().unwrap()).unwrap();
+            // Script outputs nothing
+            std::fs::write(&bin, "#!/bin/sh\n").unwrap();
+            std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o755))
+                .unwrap();
+
+            let r = detect();
+            assert!(r.available);
+            assert!(r.version.is_none());
+        });
+    }
+}
