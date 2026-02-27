@@ -58,9 +58,10 @@ pub(super) fn convert_docx_via_officellm(app: tauri::AppHandle, data_url: String
     let output_str = output_path.to_string_lossy().into_owned();
 
     log::info!("[office-preview] officellm to-pdf -i {input_str} -o {output_str}");
-    let result = Command::new(&bin)
-        .args(["to-pdf", "-i", &input_str, "-o", &output_str])
-        .output();
+    let mut cmd = Command::new(&bin);
+    cmd.args(["to-pdf", "-i", &input_str, "-o", &output_str]);
+    crate::officellm::env::apply_tmp_env(&mut cmd);
+    let result = cmd.output();
 
     // 立即清理临时输入文件
     let _ = fs::remove_file(&input_path);

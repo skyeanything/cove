@@ -20,6 +20,10 @@ pub const EVENT_OPEN_SETTINGS: &str = "open-settings";
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+  // 在覆盖 TMPDIR 之前，先捕获真实的系统 temp 目录
+  // （供 Seatbelt 沙箱 profile 使用，允许 native 库写入原始 temp 路径）
+  crate::officellm::env::init_original_temp_dir();
+
   // 覆盖 TMPDIR，防止 macOS sandbox 阻断 /var/folders/...
   // 子进程（含沙箱内 bash）会继承此环境变量
   // 安全：set_var 在单线程初始化阶段调用，无竞态风险

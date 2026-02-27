@@ -64,6 +64,17 @@ fn generate_profile(workspace_root: &str, policy: &SandboxPolicy) -> String {
     lines.push("(allow file-write* (subpath \"/tmp\"))".to_string());
     lines.push("(allow file-write* (subpath \"/private/tmp\"))".to_string());
 
+    // 允许写入真实的系统 temp 目录（e.g. /var/folders/.../T/）。
+    // native 库通过 confstr(_CS_DARWIN_USER_TEMP_DIR) 获取此路径，不受 TMPDIR 覆盖影响。
+    let sys_tmp = crate::officellm::env::original_temp_dir();
+    let sys_tmp_str = sys_tmp.to_string_lossy();
+    if sys_tmp_str != "/tmp" && !sys_tmp_str.contains(".officellm") {
+        lines.push(format!(
+            "(allow file-write* (subpath \"{}\"))",
+            escape_seatbelt(&sys_tmp_str)
+        ));
+    }
+
     // 允许写入 ~/.officellm（TMPDIR 重定向目标，含 tmp/config/cache 等子目录）
     if let Some(home) = dirs::home_dir() {
         let officellm_dir = home.join(".officellm");

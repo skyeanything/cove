@@ -2,6 +2,26 @@
 
 use std::path::PathBuf;
 use std::process::Command;
+use std::sync::OnceLock;
+
+/// Stores the real system temp dir captured before we override TMPDIR.
+static ORIGINAL_TEMP_DIR: OnceLock<PathBuf> = OnceLock::new();
+
+/// Snapshot the real system temp dir **before** any `set_var("TMPDIR", …)`.
+/// Must be called once at startup in `lib::run()`.
+pub fn init_original_temp_dir() {
+    ORIGINAL_TEMP_DIR.get_or_init(|| std::env::temp_dir());
+}
+
+/// Returns the real system temp dir captured at startup
+/// (e.g. `/var/folders/c1/.../T/`). Falls back to `std::env::temp_dir()`
+/// if `init_original_temp_dir()` was never called.
+pub fn original_temp_dir() -> PathBuf {
+    ORIGINAL_TEMP_DIR
+        .get()
+        .cloned()
+        .unwrap_or_else(|| std::env::temp_dir())
+}
 
 /// Returns the dedicated tmp directory for officellm (`~/.officellm/tmp`),
 /// creating it if needed. Falls back to `/tmp`.
