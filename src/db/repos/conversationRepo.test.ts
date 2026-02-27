@@ -81,17 +81,27 @@ describe("conversationRepo", () => {
     });
 
     it("groups conversations into time buckets", async () => {
+      // Derive bucket timestamps from local midnight, same as the repo
+      const now = new Date("2025-06-15T12:00:00Z");
+      const todayStart = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate(),
+      );
+      const yesterdayStart = new Date(todayStart.getTime() - 86400000);
+      const past7Start = new Date(todayStart.getTime() - 7 * 86400000);
+
       const todayConv = makeConversation({
-        updated_at: "2025-06-15T10:00:00Z",
+        updated_at: new Date(todayStart.getTime() + 3600000).toISOString(),
       });
       const yesterdayConv = makeConversation({
-        updated_at: "2025-06-14T10:00:00Z",
+        updated_at: new Date(yesterdayStart.getTime() + 3600000).toISOString(),
       });
       const past7Conv = makeConversation({
-        updated_at: "2025-06-10T10:00:00Z",
+        updated_at: new Date(past7Start.getTime() + 3600000).toISOString(),
       });
       const earlierConv = makeConversation({
-        updated_at: "2025-05-01T10:00:00Z",
+        updated_at: new Date(past7Start.getTime() - 86400000).toISOString(),
       });
       db.select.mockResolvedValueOnce([
         todayConv,
