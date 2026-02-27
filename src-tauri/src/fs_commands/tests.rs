@@ -1,9 +1,13 @@
-use super::read::{read_file, ReadFileArgs};
+use super::list::{stat_file, ListDirArgs, StatFileArgs};
+use super::read::{ReadFileArgs, ReadFileAsDataUrlArgs, ReadFileRawArgs};
+use super::read::read_file;
 use super::write::{write_file, WriteFileArgs};
-use super::list::{stat_file, StatFileArgs};
 use super::FsError;
 
-/// 前端 invoke 传的是 camelCase 且包在 args 里；此处验证反序列化契约。
+// ---------------------------------------------------------------------------
+// Args deserialization (camelCase JSON contract)
+// ---------------------------------------------------------------------------
+
 #[test]
 fn read_file_args_deserialize_from_camel_case_json() {
     let json = r#"{"workspaceRoot":"/tmp/ws","path":"a/b.txt","limit":10}"#;
@@ -32,11 +36,39 @@ fn stat_file_args_deserialize_from_camel_case_json() {
 }
 
 #[test]
+fn list_dir_args_deserialize() {
+    let json = r#"{"workspaceRoot":"/tmp","path":"sub","includeHidden":false}"#;
+    let args: ListDirArgs = serde_json::from_str(json).unwrap();
+    assert_eq!(args.workspace_root, "/tmp");
+    assert_eq!(args.path, "sub");
+    assert_eq!(args.include_hidden, Some(false));
+}
+
+#[test]
+fn read_file_raw_args_deserialize() {
+    let json = r#"{"workspaceRoot":"/ws","path":"a.txt"}"#;
+    let args: ReadFileRawArgs = serde_json::from_str(json).unwrap();
+    assert_eq!(args.workspace_root, "/ws");
+    assert_eq!(args.path, "a.txt");
+}
+
+#[test]
+fn read_file_as_data_url_args_deserialize() {
+    let json = r#"{"workspaceRoot":"/ws","path":"img.png"}"#;
+    let args: ReadFileAsDataUrlArgs = serde_json::from_str(json).unwrap();
+    assert_eq!(args.workspace_root, "/ws");
+    assert_eq!(args.path, "img.png");
+}
+
+// ---------------------------------------------------------------------------
+// read_file (core tests)
+// ---------------------------------------------------------------------------
+
+#[test]
 fn read_file_returns_line_numbered_content() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path().to_str().unwrap();
-    let f = dir.path().join("hello.txt");
-    std::fs::write(&f, "line1\nline2\nline3\n").unwrap();
+    std::fs::write(dir.path().join("hello.txt"), "line1\nline2\nline3\n").unwrap();
 
     let out = read_file(ReadFileArgs {
         workspace_root: root.to_string(),
@@ -94,6 +126,10 @@ fn read_file_binary_extension_rejected() {
     assert!(matches!(result, Err(FsError::BinaryFile)));
 }
 
+// ---------------------------------------------------------------------------
+// write_file
+// ---------------------------------------------------------------------------
+
 #[test]
 fn write_file_creates_file_and_parent_dir() {
     let dir = tempfile::tempdir().unwrap();
@@ -124,6 +160,41 @@ fn write_file_outside_workspace_rejected() {
     });
     assert!(matches!(result, Err(FsError::OutsideWorkspace)));
 }
+
+#[test]
+fn write_file_overwrites_existing() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().to_str().unwrap();
+    let f = dir.path().join("over.txt");
+    std::fs::write(&f, "old").unwrap();
+
+    write_file(WriteFileArgs {
+        workspace_root: root.to_string(),
+        path: "over.txt".to_string(),
+        content: "new".to_string(),
+    })
+    .unwrap();
+
+    assert_eq!(std::fs::read_to_string(&f).unwrap(), "new");
+}
+
+#[test]
+fn write_file_rejects_directory_path() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().to_str().unwrap();
+    std::fs::create_dir(dir.path().join("existing_dir")).unwrap();
+
+    let result = write_file(WriteFileArgs {
+        workspace_root: root.to_string(),
+        path: "existing_dir".to_string(),
+        content: "x".to_string(),
+    });
+    assert!(matches!(result, Err(FsError::NotAllowed(_))));
+}
+
+// ---------------------------------------------------------------------------
+// stat_file
+// ---------------------------------------------------------------------------
 
 #[test]
 fn stat_file_returns_metadata() {
