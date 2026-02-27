@@ -187,3 +187,42 @@ log "[as] export done"
         BASE64.encode(&pdf_bytes)
     ))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- temp_prefix ---
+
+    #[test]
+    fn temp_prefix_starts_with_cove() {
+        assert!(temp_prefix().starts_with("cove-"));
+    }
+
+    #[test]
+    fn temp_prefix_consecutive_calls_differ() {
+        let a = temp_prefix();
+        std::thread::sleep(std::time::Duration::from_micros(2));
+        let b = temp_prefix();
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn temp_prefix_valid_chars() {
+        let p = temp_prefix();
+        assert!(p.chars().all(|c| c.is_ascii_alphanumeric() || c == '-'));
+    }
+
+    // --- find_office_app ---
+
+    #[test]
+    fn find_office_app_nonexistent_returns_none() {
+        let result = find_office_app(&["NonExistentApp12345", "AnotherFakeApp99999"]);
+        assert_eq!(result, None);
+    }
+
+    #[test]
+    fn find_office_app_empty_candidates_returns_none() {
+        assert_eq!(find_office_app(&[]), None);
+    }
+}
