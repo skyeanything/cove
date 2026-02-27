@@ -10,4 +10,3 @@
 # 请及时从此列表中删除（check-file-size.py 会检测并报告 stale 条目）。
 #
 
-src-tauri/src/officellm/server/mod.rs
