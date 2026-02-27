@@ -1,6 +1,8 @@
 use std::fs;
 use std::path::Path;
 
+use base64::engine::general_purpose::STANDARD as BASE64_STANDARD;
+use base64::Engine;
 use serde::Deserialize;
 
 use super::validation::{ensure_inside_workspace_exists, ensure_inside_workspace_may_not_exist};
@@ -235,4 +237,35 @@ pub fn open_with_app(args: OpenWithAppArgs) -> Result<(), FsError> {
     cmd.arg(abs_str);
     cmd.spawn().map_err(|e| FsError::Io(e.to_string()))?;
     Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// write_binary_file
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WriteBinaryFileArgs {
+    pub workspace_root: String,
+    pub path: String,
+    /// Base64-encoded binary content
+    pub content_base64: String,
+}
+
+#[tauri::command]
+pub fn write_binary_file(args: WriteBinaryFileArgs) -> Result<String, FsError> {
+    let abs = ensure_inside_workspace_may_not_exist(&args.workspace_root, &args.path)?;
+    if abs.is_dir() {
+        return Err(FsError::NotAllowed("path is a directory".into()));
+    }
+    if let Some(parent) = abs.parent() {
+        if !parent.exists() {
+            fs::create_dir_all(parent).map_err(FsError::from)?;
+        }
+    }
+    let bytes = BASE64_STANDARD
+        .decode(&args.content_base64)
+        .map_err(|e| FsError::Io(format!("base64 decode failed: {e}")))?;
+    fs::write(&abs, bytes).map_err(FsError::from)?;
+    Ok(abs.to_string_lossy().into_owned())
 }
