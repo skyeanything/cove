@@ -181,3 +181,107 @@ pub fn watch_workspace_command(
     let canonical = path.canonicalize().map_err(|e| e.to_string())?;
     watch_workspace(app_handle, state.inner().clone(), canonical)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use notify::event::{AccessKind, CreateKind, ModifyKind, RemoveKind};
+
+    #[test]
+    fn kind_from_event_maps_create_modify_remove() {
+        let create = Event::new(EventKind::Create(CreateKind::File));
+        assert!(matches!(kind_from_event(&create), Some(FileChangeKind::Create)));
+        let modify = Event::new(EventKind::Modify(ModifyKind::Any));
+        assert!(matches!(kind_from_event(&modify), Some(FileChangeKind::Modify)));
+        let remove = Event::new(EventKind::Remove(RemoveKind::File));
+        assert!(matches!(kind_from_event(&remove), Some(FileChangeKind::Remove)));
+    }
+
+    #[test]
+    fn kind_from_event_returns_none_for_access_and_other() {
+        let access = Event::new(EventKind::Access(AccessKind::Read));
+        assert!(kind_from_event(&access).is_none());
+        let other = Event::new(EventKind::Other);
+        assert!(kind_from_event(&other).is_none());
+    }
+
+    #[test]
+    fn is_ignored_filters_all_ignore_dirs() {
+        let root = Path::new("/workspace");
+        for dir in IGNORE_DIRS {
+            let p = root.join(dir).join("file.rs");
+            assert!(is_ignored(&p, root), "{dir} should be ignored");
+        }
+    }
+
+    #[test]
+    fn is_ignored_passes_normal_paths() {
+        let root = Path::new("/workspace");
+        assert!(!is_ignored(&root.join("src/main.rs"), root));
+        assert!(!is_ignored(&root.join("README.md"), root));
+    }
+
+    #[test]
+    fn is_ignored_catches_nested_ignored_dir() {
+        let root = Path::new("/workspace");
+        let p = root.join("packages/foo/node_modules/bar/index.js");
+        assert!(is_ignored(&p, root));
+    }
+
+    #[test]
+    fn to_relative_path_inside_root() {
+        let root = Path::new("/workspace");
+        assert_eq!(
+            to_relative_path(root, &root.join("src/main.rs")),
+            Some("src/main.rs".into())
+        );
+    }
+
+    #[test]
+    fn to_relative_path_outside_root_returns_none() {
+        let root = Path::new("/workspace");
+        assert_eq!(to_relative_path(root, Path::new("/other/file.rs")), None);
+    }
+
+    #[test]
+    fn collect_paths_filters_ignored_and_converts() {
+        let root = Path::new("/workspace");
+        let mut e = Event::new(EventKind::Create(CreateKind::File));
+        e.paths = vec![
+            root.join("src/main.rs"),
+            root.join("node_modules/foo/bar.js"),
+            root.join("lib/util.rs"),
+        ];
+        let result = collect_paths(&e, root);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].0, "src/main.rs");
+        assert_eq!(result[1].0, "lib/util.rs");
+    }
+
+    #[test]
+    fn collect_paths_returns_empty_for_access_event() {
+        let root = Path::new("/workspace");
+        let mut e = Event::new(EventKind::Access(AccessKind::Read));
+        e.paths = vec![root.join("src/main.rs")];
+        assert!(collect_paths(&e, root).is_empty());
+    }
+
+    #[test]
+    fn watcher_state_new_is_none() {
+        let s = WatcherState::new();
+        assert!(s.watcher.lock().unwrap().is_none());
+    }
+
+    #[test]
+    fn stop_watching_no_panic_on_empty_state() {
+        let s = WatcherState::new();
+        stop_watching(&s);
+    }
+
+    #[test]
+    fn watch_workspace_args_deserialize_camel_case() {
+        let json = r#"{"workspaceRoot":"/tmp/ws"}"#;
+        let args: WatchWorkspaceArgs = serde_json::from_str(json).unwrap();
+        assert_eq!(args.workspace_root, "/tmp/ws");
+    }
+}
