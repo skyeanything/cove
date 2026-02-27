@@ -14,3 +14,8 @@ export {
   makeAssistant,
   makeMessagePair,
 } from "./fixtures/messages";
+export {
+  makePrompt,
+  makeWorkspace,
+  makeMcpServer,
+} from "./fixtures/repos";
