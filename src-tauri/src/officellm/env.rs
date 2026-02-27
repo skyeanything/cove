@@ -17,5 +17,9 @@ pub fn tmp_dir() -> PathBuf {
 /// so the child process uses a known-writable temp directory.
 pub fn apply_tmp_env(command: &mut Command) {
     let dir = tmp_dir();
-    command.env("TMPDIR", &dir).env("TEMP", &dir).env("TMP", &dir);
+    command
+        .env("TMPDIR", &dir)
+        .env("TEMP", &dir)
+        .env("TMP", &dir)
+        .env("OFFICELLM_TEMP", &dir);
 }

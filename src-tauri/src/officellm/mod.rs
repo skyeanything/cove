@@ -2,7 +2,7 @@
 
 pub mod cli;
 pub mod detect;
-pub(crate) mod env;
+pub mod env;
 pub mod server;
 pub mod types;
 
