@@ -35,6 +35,8 @@ export const mcpServerRepo = {
       idx++;
     }
 
+    if (fields.length === 0) return;
+
     values.push(id);
 
     await db.execute(

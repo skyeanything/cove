@@ -63,6 +63,11 @@ describe("mcpServerRepo", () => {
       expect(params).toEqual(["Renamed", 0, "m-1"]);
     });
 
+    it("no-ops when payload is empty", async () => {
+      await mcpServerRepo.update("m-1", {});
+      expect(db.execute).not.toHaveBeenCalled();
+    });
+
     it("skips id and created_at fields", async () => {
       await mcpServerRepo.update("m-1", { id: "x", created_at: "x", name: "New" });
       const [sql] = db.execute.mock.calls[0];
