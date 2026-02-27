@@ -49,7 +49,7 @@ function withNoWorkspace() {
 function withPermission(allowed: boolean) {
   mockPermission.mockReturnValue({
     ask: vi.fn().mockResolvedValue(allowed),
-  } as ReturnType<typeof mockPermission>);
+  } as unknown as ReturnType<typeof mockPermission>);
 }
 
 // ── Import tool after mocks ───────────────────────────────────────────────────
@@ -128,7 +128,7 @@ describe("bashTool – BLOCK commands", () => {
 describe("bashTool – SAFE commands (no permission prompt)", () => {
   it("executes ls without permission ask", async () => {
     const mockAsk = vi.fn().mockResolvedValue(true);
-    mockPermission.mockReturnValue({ ask: mockAsk } as ReturnType<typeof mockPermission>);
+    mockPermission.mockReturnValue({ ask: mockAsk } as unknown as ReturnType<typeof mockPermission>);
 
     let invoked = false;
     setupTauriMocks({
@@ -164,7 +164,7 @@ describe("bashTool – SAFE commands (no permission prompt)", () => {
 describe("bashTool – CONFIRM commands (permission prompt)", () => {
   it("calls permission ask for curl and executes when allowed", async () => {
     const mockAsk = vi.fn().mockResolvedValue(true);
-    mockPermission.mockReturnValue({ ask: mockAsk } as ReturnType<typeof mockPermission>);
+    mockPermission.mockReturnValue({ ask: mockAsk } as unknown as ReturnType<typeof mockPermission>);
 
     setupTauriMocks({
       run_command: () => defaultRunResult({ stdout: "curl response" }),
@@ -177,7 +177,7 @@ describe("bashTool – CONFIRM commands (permission prompt)", () => {
 
   it("returns cancel message when user denies", async () => {
     const mockAsk = vi.fn().mockResolvedValue(false);
-    mockPermission.mockReturnValue({ ask: mockAsk } as ReturnType<typeof mockPermission>);
+    mockPermission.mockReturnValue({ ask: mockAsk } as unknown as ReturnType<typeof mockPermission>);
 
     let invoked = false;
     setupTauriMocks({
