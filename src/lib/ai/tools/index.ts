@@ -9,6 +9,7 @@ import { skillTool, createSkillTool, createSkillResourceTool } from "./skill";
 import { writeSkillTool } from "./write-skill";
 import { officellmTool } from "./officellm";
 import { jsInterpreterTool } from "./jsInterpreter";
+import { renderMermaidTool } from "./render-mermaid";
 
 export const AGENT_TOOLS = {
   read: readTool,
@@ -20,6 +21,7 @@ export const AGENT_TOOLS = {
   skill: skillTool,
   officellm: officellmTool,
   js_interpreter: jsInterpreterTool,
+  render_mermaid: renderMermaidTool,
 } as const;
 
 export type AgentToolId = keyof typeof AGENT_TOOLS;
@@ -48,6 +50,7 @@ export function getAgentTools(
   }
   if (options?.officellm) {
     tools.officellm = officellmTool;
+    tools.render_mermaid = renderMermaidTool;
   }
   return tools;
 }
