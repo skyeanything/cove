@@ -30,13 +30,7 @@ pub fn call(cmd: &str, args: &[String]) -> Result<CommandResult, String> {
         command.arg(arg);
     }
 
-    let tmp_dir = dirs::home_dir()
-        .map(|h| h.join(".officellm/tmp"))
-        .unwrap_or_else(|| std::path::PathBuf::from("/tmp"));
-    let _ = std::fs::create_dir_all(&tmp_dir);
-    command.env("TMPDIR", &tmp_dir)
-           .env("TEMP", &tmp_dir)
-           .env("TMP", &tmp_dir);
+    super::env::apply_tmp_env(&mut command);
 
     command.stdout(std::process::Stdio::piped());
     command.stderr(std::process::Stdio::piped());
