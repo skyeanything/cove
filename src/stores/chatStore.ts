@@ -45,7 +45,7 @@ async function tryCompress(
     const ctxWin = opt?.context_window ?? 128_000;
     const result = await maybeCompressContext(msgs, convId, ctxWin, getModel(provider, modelId));
     if (result.compressed) {
-      setFn({ messages: result.messages, compressionNotice: "compressed" });
+      setFn({ messages: result.messages, compressionNotice: "compressed", summaryUpTo: result.summaryUpTo ?? null });
       return { messages: result.messages, summaryUpTo: result.summaryUpTo };
     }
   } finally {
@@ -67,6 +67,8 @@ interface ChatState {
   error: string | null;
   isCompressing: boolean;
   compressionNotice: string | null;
+  /** Persisted summary_up_to from the conversation — messages before this are covered by summary */
+  summaryUpTo: string | null;
   modelId: string | null;
   providerId: string | null;
   providerType: string | null;
@@ -98,12 +100,16 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   error: null,
   isCompressing: false,
   compressionNotice: null,
+  summaryUpTo: null,
   modelId: null,
   providerId: null,
   providerType: null,
 
   async loadMessages(conversationId: string) {
-    const messages = await messageRepo.getByConversation(conversationId);
+    const [messages, conversation] = await Promise.all([
+      messageRepo.getByConversation(conversationId),
+      conversationRepo.getById(conversationId),
+    ]);
     const attachmentsByMessage: Record<string, Attachment[]> = {};
     await Promise.all(
       messages.map(async (message) => {
@@ -111,7 +117,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         if (attachments.length > 0) attachmentsByMessage[message.id] = attachments;
       }),
     );
-    set({ messages, attachmentsByMessage, draftAttachments: [], error: null });
+    set({ messages, attachmentsByMessage, draftAttachments: [], error: null, summaryUpTo: conversation?.summary_up_to ?? null });
     await useWorkspaceStore.getState().loadFromConversation(conversationId);
   },
 
@@ -212,7 +218,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       const compressed = await tryCompress(updatedMessages, conversationId, provider, modelId, set, get);
       updatedMessages = compressed.messages;
 
-      const modelMessages = toModelMessages(updatedMessages, { summaryUpTo: compressed.summaryUpTo });
+      const modelMessages = toModelMessages(updatedMessages, { summaryUpTo: compressed.summaryUpTo ?? get().summaryUpTo ?? undefined });
       const fetchBlock = await getFetchBlockForText(trimmedContent);
 
       if (draftAttachments.length > 0) {
@@ -327,7 +333,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 
     try {
       const compressed = await tryCompress(remaining, conversationId, provider, modelId, set, get);
-      const modelMessages = toModelMessages(compressed.messages, { summaryUpTo: compressed.summaryUpTo });
+      const modelMessages = toModelMessages(compressed.messages, { summaryUpTo: compressed.summaryUpTo ?? get().summaryUpTo ?? undefined });
       const last = compressed.messages[compressed.messages.length - 1];
       const lastUserContent = last?.role === "user" ? (last.content ?? "") : "";
       injectFetchBlockIntoLastUserMessage(modelMessages, await getFetchBlockForText(lastUserContent));
@@ -368,7 +374,8 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     const conversation = await conversationRepo.getById(conversationId);
     if (conversation?.summary_up_to && msg.created_at <= conversation.summary_up_to) {
       await messageRepo.deleteSummaryMessage(conversationId);
-      await conversationRepo.update(conversationId, { summary_up_to: undefined });
+      await conversationRepo.update(conversationId, { summary_up_to: null });
+      set({ summaryUpTo: null });
     }
 
     await messageRepo.deleteAfter(conversationId, msg.created_at);
@@ -398,7 +405,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     try {
       const compressed = await tryCompress(updatedMessages, conversationId, provider, modelId, set, get);
       updatedMessages = compressed.messages;
-      const modelMessages = toModelMessages(updatedMessages, { summaryUpTo: compressed.summaryUpTo });
+      const modelMessages = toModelMessages(updatedMessages, { summaryUpTo: compressed.summaryUpTo ?? get().summaryUpTo ?? undefined });
       injectFetchBlockIntoLastUserMessage(modelMessages, await getFetchBlockForText(newContent));
 
       const { streamResult, finalError } = await runStreamLoop(
@@ -431,6 +438,6 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   },
 
   reset() {
-    set({ messages: [], attachmentsByMessage: {}, draftAttachments: [], error: null, isCompressing: false, compressionNotice: null, ...STREAM_RESET });
+    set({ messages: [], attachmentsByMessage: {}, draftAttachments: [], error: null, isCompressing: false, compressionNotice: null, summaryUpTo: null, ...STREAM_RESET });
   },
 }));
