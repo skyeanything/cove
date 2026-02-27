@@ -102,7 +102,7 @@ describe("workspaceStore", () => {
     });
 
     it("creates default workspace when none exists in DB", async () => {
-      vi.mocked(workspaceRepo.getDefault).mockResolvedValue(null);
+      vi.mocked(workspaceRepo.getDefault).mockResolvedValue(undefined);
       vi.mocked(workspaceRepo.create).mockResolvedValue(undefined);
       vi.mocked(appDataDir).mockResolvedValue(
         "/Users/test/.local/share/cove",
@@ -211,7 +211,7 @@ describe("workspaceStore", () => {
   describe("add", () => {
     it("creates a new workspace and returns it", async () => {
       const path = "/Users/test/projects/new-project";
-      vi.mocked(workspaceRepo.getByPath).mockResolvedValue(null);
+      vi.mocked(workspaceRepo.getByPath).mockResolvedValue(undefined);
       vi.mocked(workspaceRepo.create).mockResolvedValue(undefined);
       vi.mocked(workspaceRepo.getAll).mockResolvedValue([]);
 
@@ -235,7 +235,7 @@ describe("workspaceStore", () => {
     });
 
     it("uses extractName to derive workspace name from path", async () => {
-      vi.mocked(workspaceRepo.getByPath).mockResolvedValue(null);
+      vi.mocked(workspaceRepo.getByPath).mockResolvedValue(undefined);
       vi.mocked(workspaceRepo.create).mockResolvedValue(undefined);
       vi.mocked(workspaceRepo.getAll).mockResolvedValue([]);
 

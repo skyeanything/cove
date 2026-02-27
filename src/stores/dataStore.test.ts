@@ -107,7 +107,9 @@ describe("dataStore", () => {
 
     it("calls workspaceStore.init()", async () => {
       const mockInit = vi.fn().mockResolvedValue(undefined);
-      vi.mocked(useWorkspaceStore.getState).mockReturnValue({ init: mockInit });
+      vi.mocked(useWorkspaceStore.getState).mockReturnValue(
+        { init: mockInit } as unknown as ReturnType<typeof useWorkspaceStore.getState>,
+      );
 
       vi.mocked(assistantRepo.getAll).mockResolvedValue([]);
       vi.mocked(conversationRepo.getAll).mockResolvedValue([]);
