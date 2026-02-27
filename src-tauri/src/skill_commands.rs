@@ -107,3 +107,129 @@ pub fn read_skill(name: String) -> Result<String, String> {
     fs::read_to_string(&skill_path)
         .map_err(|e| format!("Failed to read SKILL.md: {e}"))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+    use std::sync::Mutex;
+
+    static SERIAL: Mutex<()> = Mutex::new(());
+
+    /// Set $HOME to a canonicalized tempdir, run `f`, then restore.
+    fn with_home<F: FnOnce(&Path)>(f: F) {
+        let _lock = SERIAL.lock().unwrap();
+        let td = tempfile::TempDir::new().unwrap();
+        let canon = td.path().canonicalize().unwrap();
+        let prev = std::env::var_os("HOME");
+        unsafe { std::env::set_var("HOME", &canon) };
+        f(&canon);
+        match prev {
+            Some(v) => unsafe { std::env::set_var("HOME", v) },
+            None => unsafe { std::env::remove_var("HOME") },
+        }
+    }
+
+    // --- validate_skill_name ---
+
+    #[test]
+    fn validate_accepts_valid_names() {
+        assert!(validate_skill_name("my-skill").is_ok());
+        assert!(validate_skill_name("a").is_ok());
+        assert!(validate_skill_name("abc123").is_ok());
+        assert!(validate_skill_name(&"a".repeat(64)).is_ok());
+    }
+
+    #[test]
+    fn validate_rejects_empty() {
+        assert!(validate_skill_name("").is_err());
+    }
+
+    #[test]
+    fn validate_rejects_too_long() {
+        assert!(validate_skill_name(&"a".repeat(65)).is_err());
+    }
+
+    #[test]
+    fn validate_rejects_uppercase() {
+        assert!(validate_skill_name("MySkill").is_err());
+    }
+
+    #[test]
+    fn validate_rejects_special_chars() {
+        for name in ["../foo", "a_b", "a b", "a/b"] {
+            assert!(validate_skill_name(name).is_err(), "should reject {name}");
+        }
+    }
+
+    #[test]
+    fn validate_rejects_leading_trailing_hyphen() {
+        assert!(validate_skill_name("-foo").is_err());
+        assert!(validate_skill_name("foo-").is_err());
+        assert!(validate_skill_name("-").is_err());
+    }
+
+    // --- CRUD ---
+
+    #[test]
+    fn write_read_roundtrip() {
+        with_home(|_| {
+            let content = "---\nname: hello\n---\nHello world";
+            write_skill("hello".into(), content.into()).unwrap();
+            let read = read_skill("hello".into()).unwrap();
+            assert_eq!(read, content);
+        });
+    }
+
+    #[test]
+    fn write_creates_directory_structure() {
+        with_home(|home| {
+            write_skill("test-skill".into(), "content".into()).unwrap();
+            let md = home.join(".cove/skills/test-skill/SKILL.md");
+            assert!(md.is_file());
+        });
+    }
+
+    #[test]
+    fn write_overwrites_existing() {
+        with_home(|_| {
+            write_skill("over".into(), "v1".into()).unwrap();
+            write_skill("over".into(), "v2".into()).unwrap();
+            assert_eq!(read_skill("over".into()).unwrap(), "v2");
+        });
+    }
+
+    #[test]
+    fn delete_removes_skill_dir() {
+        with_home(|home| {
+            write_skill("del-me".into(), "x".into()).unwrap();
+            delete_skill("del-me".into()).unwrap();
+            assert!(!home.join(".cove/skills/del-me").is_dir());
+        });
+    }
+
+    #[test]
+    fn delete_nonexistent_returns_error() {
+        with_home(|_| {
+            let err = delete_skill("no-exist".into()).unwrap_err();
+            assert!(err.to_lowercase().contains("not found"), "got: {err}");
+        });
+    }
+
+    #[test]
+    fn read_nonexistent_returns_error() {
+        with_home(|_| {
+            assert!(read_skill("no-exist".into()).is_err());
+        });
+    }
+
+    #[test]
+    fn crud_rejects_invalid_name() {
+        for name in ["../bad", "BAD", ""] {
+            let n = name.to_string();
+            assert!(write_skill(n.clone(), "x".into()).is_err());
+            assert!(read_skill(n.clone()).is_err());
+            assert!(delete_skill(n).is_err());
+        }
+    }
+}
