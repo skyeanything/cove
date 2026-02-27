@@ -236,6 +236,22 @@ describe("toModelMessages", () => {
     expect((result[1] as { content: unknown[] }).content).toEqual([{ type: "text", text: "new question" }]);
   });
 
+  it("places summary as first message even when not first in input", () => {
+    const msgs: Message[] = [
+      { id: "1", conversation_id: "c1", role: "user", content: "old question", created_at: "2025-01-01T00:01:00Z" },
+      { id: "s1", conversation_id: "c1", role: "system", content: "Summary text", parent_id: "__context_summary__", created_at: "2025-01-01T00:03:00Z" },
+      { id: "2", conversation_id: "c1", role: "user", content: "new question", created_at: "2025-01-01T00:05:00Z" },
+    ];
+    const result = toModelMessages(msgs, { summaryUpTo: "2025-01-01T00:02:00Z" });
+
+    // Summary first, then only the new question (old question skipped)
+    expect(result).toHaveLength(2);
+    expect(result[0]!.role).toBe("system");
+    expect((result[0] as { content: string }).content).toBe("Summary text");
+    expect(result[1]!.role).toBe("user");
+    expect((result[1] as { content: unknown[] }).content).toEqual([{ type: "text", text: "new question" }]);
+  });
+
   it("behaves identically without options", () => {
     const msgs: Message[] = [
       { id: "1", conversation_id: "c1", role: "user", content: "hi", created_at: "" },

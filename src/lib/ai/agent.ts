@@ -154,14 +154,12 @@ export function toModelMessages(
 ): ModelMessage[] {
   const result: ModelMessage[] = [];
   const summaryUpTo = options?.summaryUpTo;
+  let summaryMessage: ModelMessage | null = null;
 
   for (const msg of dbMessages) {
-    // Summary message → inject as system message
+    // Summary message → collect for injection at position 0
     if (msg.parent_id === "__context_summary__") {
-      result.push({
-        role: "system",
-        content: msg.content ?? "",
-      });
+      summaryMessage = { role: "system", content: msg.content ?? "" };
       continue;
     }
 
@@ -193,6 +191,11 @@ export function toModelMessages(
         content: msg.content ?? "",
       });
     }
+  }
+
+  // Always inject summary as the first message
+  if (summaryMessage) {
+    result.unshift(summaryMessage);
   }
 
   return result;
