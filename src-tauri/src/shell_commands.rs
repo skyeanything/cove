@@ -153,3 +153,148 @@ fn spawn_plain_command(
         .stdin(Stdio::null())
         .spawn()
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_util::with_home;
+
+    #[test]
+    fn args_deserialize_camel_case() {
+        let json = r#"{"workspaceRoot":"/tmp","command":"echo hi","workdir":"sub","timeoutMs":5000}"#;
+        let args: RunCommandArgs = serde_json::from_str(json).unwrap();
+        assert_eq!(args.workspace_root, "/tmp");
+        assert_eq!(args.command, "echo hi");
+        assert_eq!(args.workdir.as_deref(), Some("sub"));
+        assert_eq!(args.timeout_ms, Some(5000));
+    }
+
+    #[test]
+    fn args_defaults_for_optional_fields() {
+        let json = r#"{"workspaceRoot":"/tmp","command":"echo"}"#;
+        let args: RunCommandArgs = serde_json::from_str(json).unwrap();
+        assert!(args.workdir.is_none());
+        assert!(args.timeout_ms.is_none());
+    }
+
+    #[test]
+    fn result_serializes_camel_case() {
+        let r = RunCommandResult {
+            stdout: String::new(),
+            stderr: String::new(),
+            exit_code: 0,
+            timed_out: false,
+            sandboxed: true,
+        };
+        let json = serde_json::to_string(&r).unwrap();
+        assert!(json.contains("exitCode"));
+        assert!(json.contains("timedOut"));
+        assert!(json.contains("sandboxed"));
+        assert!(!json.contains("exit_code"));
+        assert!(!json.contains("timed_out"));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn echo_captures_stdout() {
+        with_home(|_| {
+            let dir = tempfile::tempdir().unwrap();
+            let root = dir.path().canonicalize().unwrap();
+            let r = run_command(RunCommandArgs {
+                workspace_root: root.to_str().unwrap().to_string(),
+                command: "echo hello".into(),
+                workdir: None,
+                timeout_ms: Some(10_000),
+            })
+            .unwrap();
+            assert_eq!(r.exit_code, 0);
+            assert_eq!(r.stdout.trim(), "hello");
+            assert!(!r.timed_out);
+        });
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn stderr_captured() {
+        with_home(|_| {
+            let dir = tempfile::tempdir().unwrap();
+            let root = dir.path().canonicalize().unwrap();
+            let r = run_command(RunCommandArgs {
+                workspace_root: root.to_str().unwrap().to_string(),
+                command: "echo err >&2".into(),
+                workdir: None,
+                timeout_ms: Some(10_000),
+            })
+            .unwrap();
+            assert!(r.stderr.contains("err"));
+        });
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn exit_code_nonzero() {
+        with_home(|_| {
+            let dir = tempfile::tempdir().unwrap();
+            let root = dir.path().canonicalize().unwrap();
+            let r = run_command(RunCommandArgs {
+                workspace_root: root.to_str().unwrap().to_string(),
+                command: "exit 42".into(),
+                workdir: None,
+                timeout_ms: Some(10_000),
+            })
+            .unwrap();
+            assert_eq!(r.exit_code, 42);
+        });
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn timeout_kills_long_command() {
+        with_home(|_| {
+            let dir = tempfile::tempdir().unwrap();
+            let root = dir.path().canonicalize().unwrap();
+            let r = run_command(RunCommandArgs {
+                workspace_root: root.to_str().unwrap().to_string(),
+                command: "sleep 60".into(),
+                workdir: None,
+                timeout_ms: Some(500),
+            })
+            .unwrap();
+            assert!(r.timed_out);
+            assert_eq!(r.exit_code, -1);
+        });
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn workdir_outside_workspace_rejected() {
+        with_home(|_| {
+            let dir = tempfile::tempdir().unwrap();
+            let root = dir.path().canonicalize().unwrap();
+            let r = run_command(RunCommandArgs {
+                workspace_root: root.to_str().unwrap().to_string(),
+                command: "pwd".into(),
+                workdir: Some("/tmp".into()),
+                timeout_ms: Some(5_000),
+            });
+            assert!(r.is_err());
+        });
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn default_workdir_is_workspace_root() {
+        with_home(|_| {
+            let dir = tempfile::tempdir().unwrap();
+            let root = dir.path().canonicalize().unwrap();
+            let r = run_command(RunCommandArgs {
+                workspace_root: root.to_str().unwrap().to_string(),
+                command: "pwd".into(),
+                workdir: None,
+                timeout_ms: Some(10_000),
+            })
+            .unwrap();
+            assert_eq!(r.stdout.trim(), root.to_str().unwrap());
+        });
+    }
+}
