@@ -67,3 +67,47 @@ pub struct ParseDocumentTextResult {
     pub truncated: bool,
     pub warnings: Vec<String>,
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn serde_save_file_args() {
+        let json = r#"{"sourcePath":"/tmp/file.pdf"}"#;
+        let args: SaveAttachmentFileArgs = serde_json::from_str(json).unwrap();
+        assert_eq!(args.source_path, "/tmp/file.pdf");
+    }
+
+    #[test]
+    fn serde_read_text_args_full() {
+        let json = r#"{"path":"/tmp/doc.pdf","maxBytes":1024,"pageRange":"1-3"}"#;
+        let args: ReadAttachmentTextArgs = serde_json::from_str(json).unwrap();
+        assert_eq!(args.path, "/tmp/doc.pdf");
+        assert_eq!(args.max_bytes, Some(1024));
+        assert_eq!(args.page_range, Some("1-3".to_string()));
+    }
+
+    #[test]
+    fn serde_read_text_args_optional_defaults() {
+        let json = r#"{"path":"/tmp/doc.txt"}"#;
+        let args: ReadAttachmentTextArgs = serde_json::from_str(json).unwrap();
+        assert_eq!(args.path, "/tmp/doc.txt");
+        assert_eq!(args.max_bytes, None);
+        assert_eq!(args.page_range, None);
+    }
+
+    #[test]
+    fn serde_result_serializes_camel_case() {
+        let result = ParseDocumentTextResult {
+            file_type: "pdf".to_string(),
+            content: "hello".to_string(),
+            truncated: false,
+            warnings: vec![],
+        };
+        let json = serde_json::to_string(&result).unwrap();
+        assert!(json.contains("\"fileType\""));
+        assert!(json.contains("\"truncated\""));
+        assert!(!json.contains("file_type"));
+    }
+}
