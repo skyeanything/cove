@@ -129,9 +129,12 @@ fn workspace_may_not_exist_traversal() {
 
 #[test]
 fn workspace_may_not_exist_absolute_outside() {
-    let dir = tempfile::tempdir().unwrap();
-    let root = dir.path().to_str().unwrap();
+    let workspace = tempfile::tempdir().unwrap();
+    let root = workspace.path().to_str().unwrap();
+    // Use a path inside a separate temp dir — guaranteed outside the workspace
+    let outside = tempfile::tempdir().unwrap();
+    let outside_path = outside.path().join("outside.txt");
 
-    let result = ensure_inside_workspace_may_not_exist(root, "/tmp/outside.txt");
+    let result = ensure_inside_workspace_may_not_exist(root, outside_path.to_str().unwrap());
     assert!(matches!(result, Err(FsError::OutsideWorkspace)));
 }
