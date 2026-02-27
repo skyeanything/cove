@@ -100,11 +100,16 @@ fn read_file_offset_limit() {
 
 #[test]
 fn read_file_outside_workspace_rejected() {
-    let dir = tempfile::tempdir().unwrap();
-    let root = dir.path().to_str().unwrap();
+    let workspace = tempfile::tempdir().unwrap();
+    let root = workspace.path().to_str().unwrap();
+    // Create a real file in a separate temp dir (outside the workspace)
+    let outside = tempfile::tempdir().unwrap();
+    let outside_file = outside.path().join("outside.txt");
+    std::fs::write(&outside_file, "x").unwrap();
+
     let result = read_file(ReadFileArgs {
         workspace_root: root.to_string(),
-        path: "/etc/hosts".to_string(),
+        path: outside_file.to_str().unwrap().to_string(),
         offset: None,
         limit: Some(5),
     });

@@ -57,10 +57,14 @@ fn workspace_exists_relative_inside() {
 
 #[test]
 fn workspace_exists_absolute_outside() {
-    let dir = tempfile::tempdir().unwrap();
-    let root = dir.path().to_str().unwrap();
+    let workspace = tempfile::tempdir().unwrap();
+    let root = workspace.path().to_str().unwrap();
+    // Create a real file in a separate temp dir (outside the workspace)
+    let outside = tempfile::tempdir().unwrap();
+    let outside_file = outside.path().join("outside.txt");
+    std::fs::write(&outside_file, "x").unwrap();
 
-    let result = ensure_inside_workspace_exists(root, "/etc/hosts");
+    let result = ensure_inside_workspace_exists(root, outside_file.to_str().unwrap());
     assert!(matches!(result, Err(FsError::OutsideWorkspace)));
 }
 
@@ -92,7 +96,10 @@ fn workspace_exists_symlink_escaping() {
     let dir = tempfile::tempdir().unwrap();
     let root = dir.path().to_str().unwrap();
     // Create a symlink pointing outside the workspace
-    std::os::unix::fs::symlink("/etc/hosts", dir.path().join("escape.txt")).unwrap();
+    let outside = tempfile::tempdir().unwrap();
+    let outside_file = outside.path().join("target.txt");
+    std::fs::write(&outside_file, "x").unwrap();
+    std::os::unix::fs::symlink(&outside_file, dir.path().join("escape.txt")).unwrap();
 
     let result = ensure_inside_workspace_exists(root, "escape.txt");
     assert!(matches!(result, Err(FsError::OutsideWorkspace)));

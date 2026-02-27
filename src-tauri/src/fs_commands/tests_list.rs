@@ -185,12 +185,16 @@ fn stat_file_binary_by_extension() {
 
 #[test]
 fn stat_file_outside_workspace() {
-    let dir = tempfile::tempdir().unwrap();
-    let root = dir.path().to_str().unwrap();
+    let workspace = tempfile::tempdir().unwrap();
+    let root = workspace.path().to_str().unwrap();
+    // Create a real file in a separate temp dir (outside the workspace)
+    let outside = tempfile::tempdir().unwrap();
+    let outside_file = outside.path().join("outside.txt");
+    std::fs::write(&outside_file, "x").unwrap();
 
     let result = stat_file(StatFileArgs {
         workspace_root: root.to_string(),
-        path: "/etc/hosts".to_string(),
+        path: outside_file.to_str().unwrap().to_string(),
     });
     assert!(matches!(result, Err(FsError::OutsideWorkspace)));
 }
