@@ -165,22 +165,7 @@ pub fn discover_external_skills(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::sync::Mutex;
-
-    static SERIAL: Mutex<()> = Mutex::new(());
-
-    fn with_home<F: FnOnce(&Path)>(f: F) {
-        let _lock = SERIAL.lock().unwrap();
-        let td = tempfile::TempDir::new().unwrap();
-        let canon = td.path().canonicalize().unwrap();
-        let prev = std::env::var_os("HOME");
-        unsafe { std::env::set_var("HOME", &canon) };
-        f(&canon);
-        match prev {
-            Some(v) => unsafe { std::env::set_var("HOME", v) },
-            None => unsafe { std::env::remove_var("HOME") },
-        }
-    }
+    use crate::test_util::with_home;
 
     fn write_md(dir: &Path, content: &str) {
         fs::create_dir_all(dir).unwrap();

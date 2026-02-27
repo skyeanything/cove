@@ -111,24 +111,7 @@ pub fn read_skill(name: String) -> Result<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::Path;
-    use std::sync::Mutex;
-
-    static SERIAL: Mutex<()> = Mutex::new(());
-
-    /// Set $HOME to a canonicalized tempdir, run `f`, then restore.
-    fn with_home<F: FnOnce(&Path)>(f: F) {
-        let _lock = SERIAL.lock().unwrap();
-        let td = tempfile::TempDir::new().unwrap();
-        let canon = td.path().canonicalize().unwrap();
-        let prev = std::env::var_os("HOME");
-        unsafe { std::env::set_var("HOME", &canon) };
-        f(&canon);
-        match prev {
-            Some(v) => unsafe { std::env::set_var("HOME", v) },
-            None => unsafe { std::env::remove_var("HOME") },
-        }
-    }
+    use crate::test_util::with_home;
 
     // --- validate_skill_name ---
 
