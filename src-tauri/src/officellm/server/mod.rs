@@ -4,13 +4,19 @@
 //! 被临时取出执行阻塞读写。close() 可随时 kill 子进程，has_session() 始终准确。
 
 use std::io::{BufRead, BufReader, Read, Write};
-use std::process::{Child, ChildStdin, ChildStdout, Command, ExitStatus, Stdio};
+use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use super::detect::default_bin_path;
-use super::types::{CommandResult, JsonRpcRequest, JsonRpcResponse, SessionInfo};
+use super::types::{CommandResult, JsonRpcRequest, SessionInfo};
+
+mod parsing;
+use parsing::{format_exit_status, parse_response};
+
+#[cfg(test)]
+mod tests;
 
 const IO_TIMEOUT: Duration = Duration::from_secs(60);
 
@@ -31,21 +37,6 @@ struct ServerSession {
 struct SessionIO {
     stdin: ChildStdin,
     reader: BufReader<ChildStdout>,
-}
-
-/// 格式化进程退出状态，包含 Unix 信号信息
-fn format_exit_status(status: &ExitStatus) -> String {
-    if let Some(code) = status.code() {
-        return format!("exit code {code}");
-    }
-    #[cfg(unix)]
-    {
-        use std::os::unix::process::ExitStatusExt;
-        if let Some(sig) = status.signal() {
-            return format!("killed by signal {sig}");
-        }
-    }
-    "unknown exit status".to_string()
 }
 
 /// 从子进程 stderr 读取所有已缓冲内容
@@ -90,7 +81,11 @@ pub fn open(path: &str) -> Result<(), String> {
             let exit_info = format_exit_status(&status);
             return Err(format!(
                 "officellm serve 启动后立即退出 ({exit_info}){}",
-                if msg.is_empty() { String::new() } else { format!(": {msg}") }
+                if msg.is_empty() {
+                    String::new()
+                } else {
+                    format!(": {msg}")
+                }
             ));
         }
         Ok(None) => {
@@ -108,7 +103,10 @@ pub fn open(path: &str) -> Result<(), String> {
     let stdout = child.stdout.take().ok_or("stdout pipe 不可用")?;
 
     // 发送 JSON-RPC open 请求，在服务进程中打开文档
-    let io = SessionIO { stdin, reader: BufReader::new(stdout) };
+    let io = SessionIO {
+        stdin,
+        reader: BufReader::new(stdout),
+    };
     let io = send_open_request(io, path).map_err(|e| {
         let _ = child.kill();
         let _ = child.wait();
@@ -130,7 +128,10 @@ pub fn open(path: &str) -> Result<(), String> {
 fn take_io() -> Result<(SessionIO, u64), String> {
     let mut guard = SESSION.lock().map_err(|e| format!("锁获取失败: {e}"))?;
     let session = guard.as_mut().ok_or("无活跃会话，请先调用 open()")?;
-    let io = session.io.take().ok_or("会话正在处理其他请求，请稍候")?;
+    let io = session
+        .io
+        .take()
+        .ok_or("会话正在处理其他请求，请稍候")?;
     let id = session.next_id.fetch_add(1, Ordering::Relaxed);
     Ok((io, id))
 }
@@ -159,11 +160,20 @@ pub fn call(cmd: &str, args: &[String]) -> Result<CommandResult, String> {
     let (io, id) = take_io()?;
     let params = serde_json::json!({ "command": cmd, "args": args });
     let request = JsonRpcRequest {
-        jsonrpc: "2.0", id, method: "call".to_string(), params: Some(params),
+        jsonrpc: "2.0",
+        id,
+        method: "call".to_string(),
+        params: Some(params),
     };
     match send_request(io, &request) {
-        Ok((io, result)) => { return_io(io); Ok(result) }
-        Err(e) => { kill_on_io_error(); Err(e) }
+        Ok((io, result)) => {
+            return_io(io);
+            Ok(result)
+        }
+        Err(e) => {
+            kill_on_io_error();
+            Err(e)
+        }
     }
 }
 
@@ -172,21 +182,38 @@ pub fn save(path: Option<&str>) -> Result<CommandResult, String> {
     let (io, id) = take_io()?;
     let params = path.map(|p| serde_json::json!({ "path": p }));
     let request = JsonRpcRequest {
-        jsonrpc: "2.0", id, method: "save".to_string(), params,
+        jsonrpc: "2.0",
+        id,
+        method: "save".to_string(),
+        params,
     };
     match send_request(io, &request) {
-        Ok((io, result)) => { return_io(io); Ok(result) }
-        Err(e) => { kill_on_io_error(); Err(e) }
+        Ok((io, result)) => {
+            return_io(io);
+            Ok(result)
+        }
+        Err(e) => {
+            kill_on_io_error();
+            Err(e)
+        }
     }
 }
 
 /// 关闭当前会话，终止 officellm serve 进程
 pub fn close() -> Result<(), String> {
     let session = {
-        SESSION.lock().map_err(|e| format!("锁获取失败: {e}"))?.take()
+        SESSION
+            .lock()
+            .map_err(|e| format!("锁获取失败: {e}"))?
+            .take()
     };
-    let Some(mut session) = session else { return Ok(()) };
-    log::info!("[officellm-server] closing session for: {}", session.document_path);
+    let Some(mut session) = session else {
+        return Ok(());
+    };
+    log::info!(
+        "[officellm-server] closing session for: {}",
+        session.document_path
+    );
     let _ = session.child.kill();
     let _ = session.child.wait();
     Ok(())
@@ -200,7 +227,9 @@ pub fn has_session() -> bool {
 /// 查询当前会话状态
 pub fn status() -> Result<Option<SessionInfo>, String> {
     let guard = SESSION.lock().map_err(|e| format!("锁获取失败: {e}"))?;
-    let Some(session) = guard.as_ref() else { return Ok(None) };
+    let Some(session) = guard.as_ref() else {
+        return Ok(None);
+    };
     Ok(Some(SessionInfo {
         document_path: session.document_path.clone(),
         pid: session.child.id(),
@@ -212,10 +241,13 @@ pub fn status() -> Result<Option<SessionInfo>, String> {
 fn send_open_request(io: SessionIO, path: &str) -> Result<SessionIO, String> {
     let SessionIO { mut stdin, mut reader } = io;
     let request = JsonRpcRequest {
-        jsonrpc: "2.0", id: 1, method: "open".to_string(),
+        jsonrpc: "2.0",
+        id: 1,
+        method: "open".to_string(),
         params: Some(serde_json::json!({ "path": path })),
     };
-    let payload = serde_json::to_string(&request).map_err(|e| format!("序列化失败: {e}"))?;
+    let payload =
+        serde_json::to_string(&request).map_err(|e| format!("序列化失败: {e}"))?;
     writeln!(stdin, "{payload}").map_err(|e| format!("发送 open 请求失败: {e}"))?;
     stdin.flush().map_err(|e| format!("flush 失败: {e}"))?;
     let (tx, rx) = std::sync::mpsc::channel();
@@ -224,11 +256,12 @@ fn send_open_request(io: SessionIO, path: &str) -> Result<SessionIO, String> {
         let result = reader.read_line(&mut line);
         let _ = tx.send((reader, line, result));
     });
-    let (reader, line, read_result) = rx.recv_timeout(Duration::from_secs(10))
+    let (reader, line, read_result) = rx
+        .recv_timeout(Duration::from_secs(10))
         .map_err(|_| "open 响应超时 (10s)".to_string())?;
     read_result.map_err(|e| format!("读取 open 响应失败: {e}"))?;
-    let resp: JsonRpcResponse =
-        serde_json::from_str(&line).map_err(|e| format!("解析 open 响应失败: {e}"))?;
+    let resp: super::types::JsonRpcResponse = serde_json::from_str(&line)
+        .map_err(|e| format!("解析 open 响应失败: {e}"))?;
     if let Some(err) = resp.error {
         return Err(format!("open 失败: {}", err.message));
     }
@@ -241,7 +274,8 @@ fn send_request(
     io: SessionIO, request: &JsonRpcRequest,
 ) -> Result<(SessionIO, CommandResult), String> {
     let SessionIO { mut stdin, mut reader } = io;
-    let payload = serde_json::to_string(request).map_err(|e| format!("序列化失败: {e}"))?;
+    let payload = serde_json::to_string(request)
+        .map_err(|e| format!("序列化失败: {e}"))?;
     writeln!(stdin, "{payload}").map_err(|e| format!("写入 stdin 失败: {e}"))?;
     stdin.flush().map_err(|e| format!("flush 失败: {e}"))?;
 
@@ -260,23 +294,4 @@ fn send_request(
     }
     let result = parse_response(&line)?;
     Ok((SessionIO { stdin, reader }, result))
-}
-
-/// 解析 JSON-RPC 响应为 CommandResult
-fn parse_response(line: &str) -> Result<CommandResult, String> {
-    let resp: JsonRpcResponse = serde_json::from_str(line)
-        .map_err(|e| format!("解析 JSON-RPC 响应失败: {e}"))?;
-    if let Some(err) = resp.error {
-        return Ok(CommandResult {
-            status: "error".to_string(), data: serde_json::Value::Null,
-            error: Some(err.message), metrics: None,
-        });
-    }
-    let result = resp.result.unwrap_or(serde_json::Value::Null);
-    let payload = result.get("output").cloned().unwrap_or(result);
-    if let Ok(mut r) = serde_json::from_value::<CommandResult>(payload.clone()) {
-        if r.status == "failure" { r.status = "error".to_string(); }
-        return Ok(r);
-    }
-    Ok(CommandResult { status: "success".to_string(), data: payload, error: None, metrics: None })
 }
