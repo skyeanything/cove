@@ -7,6 +7,7 @@ async function runMigrations(database: Database): Promise<void> {
     "ALTER TABLE messages ADD COLUMN parts TEXT",
     "ALTER TABLE conversations ADD COLUMN provider_type TEXT",
     "CREATE VIRTUAL TABLE IF NOT EXISTS message_fts USING fts5(body, conversation_id UNINDEXED, message_id UNINDEXED)",
+    "ALTER TABLE conversations ADD COLUMN summary_up_to TEXT",
   ];
   for (const sql of migrations) {
     try {

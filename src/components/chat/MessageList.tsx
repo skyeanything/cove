@@ -1,7 +1,9 @@
+// FILE_SIZE_EXCEPTION: Added SummaryCard component for context compression
 import {
   Pencil,
   Check,
   X,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEffect, useRef, useState, useCallback } from "react";
@@ -171,6 +173,10 @@ export function MessageList() {
 }
 
 function MessageBubble({ message }: { message: Message }) {
+  // Summary card for context compression
+  if (message.parent_id === "__context_summary__") {
+    return <SummaryCard content={message.content ?? ""} />;
+  }
   if (message.role === "user") {
     return <UserMessage messageId={message.id} content={message.content ?? ""} />;
   }
@@ -316,6 +322,31 @@ function UserMessage({ messageId, content }: { messageId: string; content: strin
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+function SummaryCard({ content }: { content: string }) {
+  const { t } = useTranslation();
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div className="mb-6">
+      <button
+        type="button"
+        onClick={() => setExpanded(!expanded)}
+        className="flex w-full cursor-pointer items-center gap-2 rounded-lg border border-border bg-background-tertiary/50 px-3 py-2 text-left text-[13px] text-muted-foreground transition-colors hover:bg-background-tertiary"
+      >
+        <ChevronRight
+          className={`size-3.5 shrink-0 transition-transform duration-150 ${expanded ? "rotate-90" : ""}`}
+          strokeWidth={1.5}
+        />
+        <span className="font-medium">{t("chat.summaryLabel")}</span>
+      </button>
+      {expanded && (
+        <div className="mt-1 rounded-lg border border-border bg-background-tertiary/30 px-3 py-2 text-[13px] leading-relaxed whitespace-pre-wrap text-foreground-secondary">
+          {content}
+        </div>
+      )}
     </div>
   );
 }
