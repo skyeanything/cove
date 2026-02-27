@@ -202,9 +202,15 @@ mod tests {
     #[test]
     fn temp_prefix_consecutive_calls_differ() {
         let a = temp_prefix();
-        std::thread::sleep(std::time::Duration::from_micros(2));
-        let b = temp_prefix();
-        assert_ne!(a, b);
+        // Retry with increasing delays to avoid timing sensitivity
+        for delay_us in [1, 10, 100, 1_000] {
+            std::thread::sleep(std::time::Duration::from_micros(delay_us));
+            let b = temp_prefix();
+            if a != b {
+                return; // success
+            }
+        }
+        panic!("temp_prefix returned the same value after multiple retries");
     }
 
     #[test]

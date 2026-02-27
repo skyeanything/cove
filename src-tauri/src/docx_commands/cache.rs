@@ -103,20 +103,24 @@ mod tests {
     #[test]
     fn evict_lru_at_limit_removes_oldest() {
         let dir = tempdir().unwrap();
-        // Create exactly MAX_CACHE_FILES PDFs
+        // Create exactly MAX_CACHE_FILES PDFs with distinct mtimes
         for i in 0..MAX_CACHE_FILES {
             let p = dir.path().join(format!("{i:04}.pdf"));
             let mut f = File::create(&p).unwrap();
             writeln!(f, "pdf {i}").unwrap();
-            // Small sleep to ensure distinct mtimes
+            // Sleep to ensure distinct mtimes
             std::thread::sleep(std::time::Duration::from_millis(10));
         }
         evict_lru(dir.path());
         let remaining: Vec<_> = fs::read_dir(dir.path())
             .unwrap()
             .filter_map(|e| e.ok())
+            .filter(|e| e.path().extension().map_or(false, |x| x == "pdf"))
             .collect();
-        assert!(remaining.len() < MAX_CACHE_FILES);
+        // evict_lru removes (len - MAX + 1) = 1 file, leaving MAX - 1
+        assert_eq!(remaining.len(), MAX_CACHE_FILES - 1);
+        // The oldest file (0000.pdf) should have been removed
+        assert!(!dir.path().join("0000.pdf").exists());
     }
 
     #[test]
