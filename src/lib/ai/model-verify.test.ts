@@ -131,6 +131,13 @@ describe("verifyApiKey", () => {
         }),
       );
     });
+
+    it("propagates network error when fetch rejects (timeout/offline)", async () => {
+      const networkError = new TypeError("Failed to fetch");
+      fetchMock.mockRejectedValue(networkError);
+      const provider = makeProvider("anthropic", { base_url: "https://api.anthropic.com" });
+      await expect(verifyApiKey(provider)).rejects.toThrow("Failed to fetch");
+    });
   });
 
   describe("google", () => {
@@ -166,6 +173,13 @@ describe("verifyApiKey", () => {
       fetchMock.mockResolvedValue(makeJsonResponse({ message: "Server Error" }, 500, "Internal Server Error"));
       const provider = makeProvider("google");
       await expect(verifyApiKey(provider)).rejects.toThrow("Connection failed");
+    });
+
+    it("propagates network error when fetch rejects (timeout/offline)", async () => {
+      const abortError = new DOMException("The operation was aborted.", "AbortError");
+      fetchMock.mockRejectedValue(abortError);
+      const provider = makeProvider("google");
+      await expect(verifyApiKey(provider)).rejects.toThrow("The operation was aborted.");
     });
   });
 
@@ -313,6 +327,13 @@ describe("verifyApiKey", () => {
           }),
         }),
       );
+    });
+
+    it("propagates network error when fetch rejects (timeout/offline)", async () => {
+      const networkError = new TypeError("Network request failed");
+      fetchMock.mockRejectedValue(networkError);
+      const provider = makeProvider("openai", { base_url: "https://api.openai.com/v1" });
+      await expect(verifyApiKey(provider)).rejects.toThrow("Network request failed");
     });
   });
 });
