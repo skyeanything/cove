@@ -104,3 +104,19 @@ pub(super) fn convert_qmd_via_quarto(
         BASE64.encode(&pdf_bytes)
     ))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn find_quarto_returns_valid_path_or_none() {
+        match find_quarto() {
+            Some(path) => {
+                assert!(!path.is_empty());
+                assert!(std::path::Path::new(&path).exists());
+            }
+            None => {} // quarto not installed — acceptable
+        }
+    }
+}

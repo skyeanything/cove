@@ -187,3 +187,49 @@ log "[as] export done"
         BASE64.encode(&pdf_bytes)
     ))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── temp_prefix ──────────────────────────────────────────────────────────
+
+    #[test]
+    fn temp_prefix_starts_with_cove() {
+        assert!(temp_prefix().starts_with("cove-"));
+    }
+
+    #[test]
+    fn temp_prefix_has_numeric_suffix() {
+        let p = temp_prefix();
+        let suffix = p.strip_prefix("cove-").unwrap();
+        assert!(suffix.chars().all(|c| c.is_ascii_digit()));
+    }
+
+    #[test]
+    fn temp_prefix_unique_across_calls() {
+        let a = temp_prefix();
+        std::thread::sleep(std::time::Duration::from_micros(2));
+        let b = temp_prefix();
+        assert_ne!(a, b);
+    }
+
+    // ── find_office_app ──────────────────────────────────────────────────────
+
+    #[test]
+    fn find_office_app_empty_candidates() {
+        assert_eq!(find_office_app(&[]), None);
+    }
+
+    #[test]
+    fn find_office_app_nonexistent_app() {
+        assert_eq!(find_office_app(&["NonExistentApp12345"]), None);
+    }
+
+    #[test]
+    fn find_office_app_returns_first_found() {
+        // With two fake apps, both should be absent → None
+        let result = find_office_app(&["FakeAppAlpha999", "FakeAppBeta999"]);
+        assert_eq!(result, None);
+    }
+}

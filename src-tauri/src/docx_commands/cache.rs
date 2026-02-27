@@ -48,3 +48,105 @@ pub(super) fn evict_lru(dir: &Path) {
         let _ = fs::remove_file(path);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs::File;
+    use std::io::Write;
+    use std::time::{Duration, SystemTime};
+    use tempfile::tempdir;
+
+    // ── fnv1a ────────────────────────────────────────────────────────────────
+
+    #[test]
+    fn fnv1a_empty_input() {
+        // FNV-1a offset basis = 0xcbf29ce484222325
+        assert_eq!(fnv1a(b""), "cbf29ce484222325");
+    }
+
+    #[test]
+    fn fnv1a_known_value() {
+        // Well-known FNV-1a 64-bit hash of "hello"
+        assert_eq!(fnv1a(b"hello"), "a430d84680aabd0b");
+    }
+
+    #[test]
+    fn fnv1a_output_is_16_char_hex() {
+        let h = fnv1a(b"test data");
+        assert_eq!(h.len(), 16);
+        assert!(h.chars().all(|c| c.is_ascii_hexdigit()));
+    }
+
+    #[test]
+    fn fnv1a_deterministic() {
+        let input = b"determinism check";
+        assert_eq!(fnv1a(input), fnv1a(input));
+    }
+
+    #[test]
+    fn fnv1a_different_inputs_differ() {
+        assert_ne!(fnv1a(b"alpha"), fnv1a(b"beta"));
+    }
+
+    // ── evict_lru ────────────────────────────────────────────────────────────
+
+    #[test]
+    fn evict_lru_no_eviction_below_threshold() {
+        let dir = tempdir().unwrap();
+        for i in 0..5 {
+            File::create(dir.path().join(format!("{i}.pdf"))).unwrap();
+        }
+        evict_lru(dir.path());
+        let count = fs::read_dir(dir.path())
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .count();
+        assert_eq!(count, 5);
+    }
+
+    #[test]
+    fn evict_lru_removes_oldest_at_threshold() {
+        let dir = tempdir().unwrap();
+        let base = SystemTime::UNIX_EPOCH + Duration::from_secs(1_000_000);
+        // Create MAX_CACHE_FILES PDFs with staggered mtimes
+        for i in 0..MAX_CACHE_FILES {
+            let path = dir.path().join(format!("{i:04}.pdf"));
+            let mut f = File::create(&path).unwrap();
+            f.write_all(b"pdf").unwrap();
+            let mtime = base + Duration::from_secs(i as u64);
+            let times = fs::FileTimes::new().set_modified(mtime);
+            f.set_times(times).unwrap();
+        }
+        evict_lru(dir.path());
+        // Should have removed 1 file (the oldest)
+        let remaining: Vec<_> = fs::read_dir(dir.path())
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .collect();
+        assert_eq!(remaining.len(), MAX_CACHE_FILES - 1);
+        // The oldest file (0000.pdf) should be gone
+        assert!(!dir.path().join("0000.pdf").exists());
+    }
+
+    #[test]
+    fn evict_lru_ignores_non_pdf_files() {
+        let dir = tempdir().unwrap();
+        for i in 0..MAX_CACHE_FILES {
+            File::create(dir.path().join(format!("{i}.txt"))).unwrap();
+        }
+        evict_lru(dir.path());
+        let count = fs::read_dir(dir.path())
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .count();
+        assert_eq!(count, MAX_CACHE_FILES);
+    }
+
+    #[test]
+    fn evict_lru_handles_nonexistent_directory() {
+        let dir = tempdir().unwrap();
+        let bad_path = dir.path().join("does-not-exist");
+        evict_lru(&bad_path); // should not panic
+    }
+}
