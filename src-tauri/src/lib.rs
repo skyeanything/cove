@@ -24,10 +24,7 @@ pub fn run() {
   // 子进程（含沙箱内 bash）会继承此环境变量
   // 安全：set_var 在单线程初始化阶段调用，无竞态风险
   {
-    let tmp_dir = dirs::home_dir()
-      .map(|h| h.join(".officellm/tmp"))
-      .unwrap_or_else(|| std::path::PathBuf::from("/tmp"));
-    let _ = std::fs::create_dir_all(&tmp_dir);
+    let tmp_dir = officellm::env::tmp_dir();
     unsafe {
       std::env::set_var("TMPDIR", &tmp_dir);
       std::env::set_var("TEMP", &tmp_dir);

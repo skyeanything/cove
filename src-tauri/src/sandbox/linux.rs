@@ -63,6 +63,17 @@ pub fn build_command(
         "--bind".to_string(), "/tmp".to_string(), "/tmp".to_string(),
     ]);
 
+    // ~/.officellm 可写（与 macOS sandbox 对齐）
+    if let Some(home) = dirs::home_dir() {
+        let officellm_dir = home.join(".officellm");
+        if officellm_dir.exists() {
+            let s = officellm_dir.to_string_lossy().into_owned();
+            args.extend_from_slice(&[
+                "--bind".to_string(), s.clone(), s,
+            ]);
+        }
+    }
+
     // 额外允许写入的路径
     for path in &policy.allow_write {
         let expanded = expand_tilde(path);

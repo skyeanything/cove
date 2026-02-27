@@ -57,7 +57,11 @@ pub fn run_command(args: RunCommandArgs) -> Result<RunCommandResult, String> {
     };
 
     // 尝试沙箱化执行
-    let policy = sandbox::load_policy();
+    let mut policy = sandbox::load_policy();
+    // officellm tmp dir 始终加入白名单，由 cove 内部管理
+    policy.allow_write.push(
+        crate::officellm::env::tmp_dir().to_string_lossy().into_owned(),
+    );
     let sandbox_cmd = sandbox::build_sandbox_command(&args.command, &args.workspace_root, &policy);
 
     let (mut child, sandboxed) = if let Some((program, sb_args)) = sandbox_cmd {
