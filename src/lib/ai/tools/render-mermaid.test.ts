@@ -1,5 +1,5 @@
 // @vitest-environment happy-dom
-import { describe, expect, it, vi, beforeEach } from "vitest";
+import { afterEach, describe, expect, it, vi, beforeEach } from "vitest";
 import { setupTauriMocks } from "@/test-utils";
 
 // ── Store mocks ──────────────────────────────────────────────────────────────
@@ -111,6 +111,11 @@ beforeEach(() => {
   withWorkspace("/workspace");
   mockRender.mockResolvedValue({ svg: SVG_STUB });
   setupCanvasMocks();
+});
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 // ── No workspace ─────────────────────────────────────────────────────────────
