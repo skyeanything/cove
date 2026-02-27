@@ -48,3 +48,96 @@ pub(super) fn evict_lru(dir: &Path) {
         let _ = fs::remove_file(path);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs::File;
+    use std::io::Write;
+    use tempfile::tempdir;
+
+    // --- fnv1a ---
+
+    #[test]
+    fn fnv1a_empty_returns_offset_basis() {
+        // FNV-1a 64-bit offset basis = 14695981039346656037 = 0xcbf29ce484222325
+        assert_eq!(fnv1a(b""), "cbf29ce484222325");
+    }
+
+    #[test]
+    fn fnv1a_known_input() {
+        let h = fnv1a(b"hello");
+        assert_eq!(h.len(), 16, "output must be 16 hex chars");
+        // Determinism: same input always gives same output
+        assert_eq!(h, fnv1a(b"hello"));
+    }
+
+    #[test]
+    fn fnv1a_different_inputs_differ() {
+        assert_ne!(fnv1a(b"hello"), fnv1a(b"world"));
+    }
+
+    #[test]
+    fn fnv1a_output_is_hex() {
+        let h = fnv1a(b"test data");
+        assert!(h.chars().all(|c| c.is_ascii_hexdigit()));
+        assert_eq!(h.len(), 16);
+    }
+
+    // --- evict_lru ---
+
+    #[test]
+    fn evict_lru_under_limit_keeps_all() {
+        let dir = tempdir().unwrap();
+        for i in 0..10 {
+            File::create(dir.path().join(format!("{i}.pdf"))).unwrap();
+        }
+        evict_lru(dir.path());
+        let count = fs::read_dir(dir.path())
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .count();
+        assert_eq!(count, 10);
+    }
+
+    #[test]
+    fn evict_lru_at_limit_removes_oldest() {
+        let dir = tempdir().unwrap();
+        // Create exactly MAX_CACHE_FILES PDFs
+        for i in 0..MAX_CACHE_FILES {
+            let p = dir.path().join(format!("{i:04}.pdf"));
+            let mut f = File::create(&p).unwrap();
+            writeln!(f, "pdf {i}").unwrap();
+            // Small sleep to ensure distinct mtimes
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        evict_lru(dir.path());
+        let remaining: Vec<_> = fs::read_dir(dir.path())
+            .unwrap()
+            .filter_map(|e| e.ok())
+            .collect();
+        assert!(remaining.len() < MAX_CACHE_FILES);
+    }
+
+    #[test]
+    fn evict_lru_ignores_non_pdf() {
+        let dir = tempdir().unwrap();
+        for i in 0..MAX_CACHE_FILES {
+            File::create(dir.path().join(format!("{i}.pdf"))).unwrap();
+        }
+        // Add non-PDF files — should not count toward limit
+        File::create(dir.path().join("readme.txt")).unwrap();
+        File::create(dir.path().join("data.docx")).unwrap();
+        evict_lru(dir.path());
+        // Non-PDF files must survive
+        assert!(dir.path().join("readme.txt").exists());
+        assert!(dir.path().join("data.docx").exists());
+    }
+
+    #[test]
+    fn evict_lru_nonexistent_dir_no_panic() {
+        let dir = tempdir().unwrap();
+        let bogus = dir.path().join("does-not-exist");
+        evict_lru(&bogus); // should not panic
+    }
+}
