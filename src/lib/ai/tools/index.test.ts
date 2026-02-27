@@ -9,6 +9,7 @@ vi.mock("./bash", () => ({ bashTool: { _id: "bash" } }));
 vi.mock("./fetch-url", () => ({ fetchUrlTool: { _id: "fetch_url" } }));
 vi.mock("./officellm", () => ({ officellmTool: { _id: "officellm" } }));
 vi.mock("./jsInterpreter", () => ({ jsInterpreterTool: { _id: "js_interpreter" } }));
+vi.mock("./render-mermaid", () => ({ renderMermaidTool: { _id: "render_mermaid" } }));
 vi.mock("./write-skill", () => ({ writeSkillTool: { _id: "write_skill" } }));
 vi.mock("./skill", () => ({
   skillTool: { _id: "skill" },
@@ -19,7 +20,7 @@ vi.mock("./skill", () => ({
 import { AGENT_TOOLS, getAgentTools } from "./index";
 
 describe("AGENT_TOOLS", () => {
-  it("contains all 9 default tool keys", () => {
+  it("contains all 10 default tool keys", () => {
     const keys = Object.keys(AGENT_TOOLS);
     expect(keys).toEqual(
       expect.arrayContaining([
@@ -32,9 +33,10 @@ describe("AGENT_TOOLS", () => {
         "skill",
         "officellm",
         "js_interpreter",
+        "render_mermaid",
       ]),
     );
-    expect(keys).toHaveLength(9);
+    expect(keys).toHaveLength(10);
   });
 });
 
@@ -57,6 +59,7 @@ describe("getAgentTools", () => {
     );
     expect(keys).not.toContain("write_skill");
     expect(keys).not.toContain("officellm");
+    expect(keys).not.toContain("render_mermaid");
   });
 
   it("includes write_skill when skill-creator is enabled", () => {
@@ -69,20 +72,25 @@ describe("getAgentTools", () => {
     expect(Object.keys(tools)).not.toContain("write_skill");
   });
 
-  it("includes officellm when option is true", () => {
+  it("includes officellm and render_mermaid when option is true", () => {
     const tools = getAgentTools([], { officellm: true });
-    expect(Object.keys(tools)).toContain("officellm");
+    const keys = Object.keys(tools);
+    expect(keys).toContain("officellm");
+    expect(keys).toContain("render_mermaid");
   });
 
-  it("does not include officellm when option is false or omitted", () => {
+  it("does not include officellm or render_mermaid when option is false or omitted", () => {
     expect(Object.keys(getAgentTools([]))).not.toContain("officellm");
+    expect(Object.keys(getAgentTools([]))).not.toContain("render_mermaid");
     expect(Object.keys(getAgentTools([], { officellm: false }))).not.toContain("officellm");
+    expect(Object.keys(getAgentTools([], { officellm: false }))).not.toContain("render_mermaid");
   });
 
-  it("includes both write_skill and officellm when both conditions met", () => {
+  it("includes write_skill, officellm, and render_mermaid when all conditions met", () => {
     const tools = getAgentTools(["skill-creator"], { officellm: true });
     const keys = Object.keys(tools);
     expect(keys).toContain("write_skill");
     expect(keys).toContain("officellm");
+    expect(keys).toContain("render_mermaid");
   });
 });
