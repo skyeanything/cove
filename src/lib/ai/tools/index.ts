@@ -44,13 +44,13 @@ export function getAgentTools(
     skill: createSkillTool(enabledSkillNames),
     skill_resource: createSkillResourceTool(enabledSkillNames),
     js_interpreter: jsInterpreterTool,
-    render_mermaid: renderMermaidTool,
   };
   if (enabledSkillNames.includes("skill-creator")) {
     tools.write_skill = writeSkillTool;
   }
   if (options?.officellm) {
     tools.officellm = officellmTool;
+    tools.render_mermaid = renderMermaidTool;
   }
   return tools;
 }

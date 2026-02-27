@@ -253,7 +253,7 @@ pub struct WriteBinaryFileArgs {
 }
 
 #[tauri::command]
-pub fn write_binary_file(args: WriteBinaryFileArgs) -> Result<String, FsError> {
+pub fn write_binary_file(app: tauri::AppHandle, args: WriteBinaryFileArgs) -> Result<String, FsError> {
     let abs = ensure_inside_workspace_may_not_exist(&args.workspace_root, &args.path)?;
     if abs.is_dir() {
         return Err(FsError::NotAllowed("path is a directory".into()));
@@ -267,5 +267,18 @@ pub fn write_binary_file(args: WriteBinaryFileArgs) -> Result<String, FsError> {
         .decode(&args.content_base64)
         .map_err(|e| FsError::Io(format!("base64 decode failed: {e}")))?;
     fs::write(&abs, bytes).map_err(FsError::from)?;
+    let root = Path::new(&args.workspace_root).canonicalize().map_err(FsError::from)?;
+    let rel = abs
+        .strip_prefix(&root)
+        .map(|p| p.to_string_lossy().replace('\\', "/"))
+        .unwrap_or_else(|_| args.path.clone());
+    use tauri::Emitter;
+    let _ = app.emit(
+        crate::workspace_watcher::EVENT_WORKSPACE_FILE_CHANGED,
+        crate::workspace_watcher::WorkspaceFileChangedPayload {
+            path: rel,
+            kind: crate::workspace_watcher::FileChangeKind::Create,
+        },
+    );
     Ok(abs.to_string_lossy().into_owned())
 }

@@ -5,6 +5,8 @@ import { useWorkspaceStore } from "@/stores/workspaceStore";
 
 /**
  * Convert an SVG string to a PNG base64 string (without the data URL prefix).
+ * NOTE: Relies on browser APIs (DOMParser, canvas, Image, Blob) — only works
+ * in the Tauri webview, not in headless/background contexts.
  */
 async function svgToPngBase64(svgStr: string, scale: number): Promise<string> {
   // Parse dimensions from SVG
@@ -92,19 +94,25 @@ export const renderMermaidTool = tool({
     }
     const workspaceRoot = activeWorkspace.path;
     const resolvedScale = scale ?? 2;
-    const outputName = filename || `mermaid-${Date.now()}.png`;
+    let outputName = filename || `mermaid-${Date.now()}.png`;
+    if (!outputName.toLowerCase().endsWith(".png")) {
+      outputName += ".png";
+    }
 
     try {
       // Dynamic import mermaid
       const mermaid = (await import("mermaid")).default;
       mermaid.initialize({
         startOnLoad: false,
-        securityLevel: "loose",
+        securityLevel: "strict",
         theme: theme ?? "default",
       });
 
       const renderID = `mermaid-render-${Date.now()}`;
       const { svg } = await mermaid.render(renderID, code);
+
+      // Clean up orphaned render container from DOM
+      document.getElementById(renderID)?.remove();
 
       // Convert SVG to PNG base64
       const pngBase64 = await svgToPngBase64(svg, resolvedScale);
