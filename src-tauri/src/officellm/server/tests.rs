@@ -60,12 +60,14 @@ fn parse_response_raw_value_in_output() {
 
 // ── format_exit_status ──────────────────────────────────────────────────
 
+#[cfg(unix)]
 #[test]
 fn format_exit_status_code_zero() {
     let status = std::process::Command::new("true").status().unwrap();
     assert_eq!(format_exit_status(&status), "exit code 0");
 }
 
+#[cfg(unix)]
 #[test]
 fn format_exit_status_nonzero() {
     let status = std::process::Command::new("false").status().unwrap();
