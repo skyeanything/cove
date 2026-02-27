@@ -17,18 +17,8 @@ vi.mock("./stream-debug", () => ({
 }));
 
 /** Helper: create an async iterable from an array */
-function asyncIter(parts: Array<Record<string, unknown>>): AsyncIterable<Record<string, unknown>> {
-  return {
-    [Symbol.asyncIterator]() {
-      let i = 0;
-      return {
-        async next() {
-          if (i < parts.length) return { value: parts[i++], done: false };
-          return { value: undefined, done: true };
-        },
-      };
-    },
-  };
+async function* asyncIter(parts: Array<Record<string, unknown>>) {
+  for (const p of parts) yield p;
 }
 
 /** Helper: create a StreamLike from an array of stream parts */
@@ -47,18 +37,12 @@ function makeErrorStream(
   parts: Array<Record<string, unknown>>,
   error: Error,
 ): StreamLike {
+  async function* errorIter() {
+    for (const p of parts) yield p;
+    throw error;
+  }
   return {
-    fullStream: {
-      [Symbol.asyncIterator]() {
-        let i = 0;
-        return {
-          async next() {
-            if (i < parts.length) return { value: parts[i++], done: false };
-            throw error;
-          },
-        };
-      },
-    },
+    fullStream: errorIter(),
     usage: Promise.resolve({}),
   } as unknown as StreamLike;
 }
@@ -139,11 +123,11 @@ describe("handleAgentStream", () => {
     const result = await handleAgentStream(stream, () => {});
 
     expect(result.toolCalls).toHaveLength(1);
-    expect(result.toolCalls[0].id).toBe("tc-1");
-    expect(result.toolCalls[0].toolName).toBe("read");
-    expect(result.toolCalls[0].args).toEqual({ filePath: "a.ts" });
-    expect(result.toolCalls[0].result).toBe("file content");
-    expect(result.toolCalls[0].isLoading).toBe(false);
+    expect(result.toolCalls[0]!.id).toBe("tc-1");
+    expect(result.toolCalls[0]!.toolName).toBe("read");
+    expect(result.toolCalls[0]!.args).toEqual({ filePath: "a.ts" });
+    expect(result.toolCalls[0]!.result).toBe("file content");
+    expect(result.toolCalls[0]!.isLoading).toBe(false);
   });
 
   // --- streaming tool calls (input-start/delta/end) ---
@@ -160,11 +144,11 @@ describe("handleAgentStream", () => {
     const result = await handleAgentStream(stream, () => {});
 
     expect(result.toolCalls).toHaveLength(1);
-    expect(result.toolCalls[0].args).toEqual({ command: "ls" });
-    expect(result.toolCalls[0].result).toBe("dir listing");
-    expect(result.toolCalls[0].isLoading).toBe(false);
+    expect(result.toolCalls[0]!.args).toEqual({ command: "ls" });
+    expect(result.toolCalls[0]!.result).toBe("dir listing");
+    expect(result.toolCalls[0]!.isLoading).toBe(false);
     // argsJsonStream should be cleaned up
-    expect(result.toolCalls[0].argsJsonStream).toBeUndefined();
+    expect(result.toolCalls[0]!.argsJsonStream).toBeUndefined();
   });
 
   it("handles tool-input-end with invalid JSON gracefully", async () => {
@@ -176,7 +160,7 @@ describe("handleAgentStream", () => {
 
     const result = await handleAgentStream(stream, () => {});
 
-    expect(result.toolCalls[0].args).toEqual({});
+    expect(result.toolCalls[0]!.args).toEqual({});
   });
 
   // --- tool-call updating existing streaming tool ---
@@ -190,8 +174,8 @@ describe("handleAgentStream", () => {
     const result = await handleAgentStream(stream, () => {});
 
     expect(result.toolCalls).toHaveLength(1);
-    expect(result.toolCalls[0].args).toEqual({ filePath: "b.ts" });
-    expect(result.toolCalls[0].argsJsonStream).toBeUndefined();
+    expect(result.toolCalls[0]!.args).toEqual({ filePath: "b.ts" });
+    expect(result.toolCalls[0]!.argsJsonStream).toBeUndefined();
   });
 
   // --- mixed text + tool ---
@@ -209,9 +193,9 @@ describe("handleAgentStream", () => {
     expect(result.content).toBe("Let me read Done.");
     expect(result.toolCalls).toHaveLength(1);
     expect(result.parts).toHaveLength(3); // text, tool, text
-    expect(result.parts[0].type).toBe("text");
-    expect(result.parts[1].type).toBe("tool");
-    expect(result.parts[2].type).toBe("text");
+    expect(result.parts[0]!.type).toBe("text");
+    expect(result.parts[1]!.type).toBe("tool");
+    expect(result.parts[2]!.type).toBe("text");
   });
 
   // --- onPartType callback ---
@@ -324,8 +308,8 @@ describe("handleAgentStream", () => {
     const result = await handleAgentStream(stream, () => {});
 
     expect(result.toolCalls).toHaveLength(1);
-    expect(result.toolCalls[0].toolName).toBe("edit");
-    expect(result.toolCalls[0].args).toEqual({ old: "a" });
+    expect(result.toolCalls[0]!.toolName).toBe("edit");
+    expect(result.toolCalls[0]!.args).toEqual({ old: "a" });
   });
 
   // --- tool durationMs ---
@@ -339,7 +323,7 @@ describe("handleAgentStream", () => {
     const result = await handleAgentStream(stream, () => {});
 
     // durationMs should be set (>= 0)
-    expect(result.toolCalls[0].durationMs).toBeDefined();
-    expect(typeof result.toolCalls[0].durationMs).toBe("number");
+    expect(result.toolCalls[0]!.durationMs).toBeDefined();
+    expect(typeof result.toolCalls[0]!.durationMs).toBe("number");
   });
 });

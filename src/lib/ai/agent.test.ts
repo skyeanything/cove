@@ -80,7 +80,7 @@ describe("toModelMessages", () => {
     const result = toModelMessages(msgs);
 
     expect(result).toHaveLength(1);
-    expect(result[0].role).toBe("assistant");
+    expect(result[0]!.role).toBe("assistant");
   });
 
   it("reconstructs assistant message with tool calls and results", () => {
@@ -95,12 +95,12 @@ describe("toModelMessages", () => {
 
     // assistant message + tool result message
     expect(result).toHaveLength(2);
-    expect(result[0].role).toBe("assistant");
+    expect(result[0]!.role).toBe("assistant");
     // The assistant content should contain text + tool-call + reasoning (for DeepSeek compat)
-    const assistantContent = (result[0] as { content: unknown[] }).content;
+    const assistantContent = (result[0]! as { content: unknown[] }).content;
     expect(assistantContent.some((p: unknown) => (p as { type: string }).type === "tool-call")).toBe(true);
     // Tool result message
-    expect(result[1].role).toBe("tool");
+    expect(result[1]!.role).toBe("tool");
   });
 
   it("uses placeholder for interrupted tool call (no result)", () => {
@@ -113,8 +113,8 @@ describe("toModelMessages", () => {
     const result = toModelMessages(msgs);
 
     expect(result).toHaveLength(2);
-    const toolMsg = result[1] as { content: Array<{ output: { value: string } }> };
-    expect(toolMsg.content[0].output.value).toContain("interrupted");
+    const toolMsg = result[1]! as { content: Array<{ output: { value: string } }> };
+    expect(toolMsg.content[0]!.output.value).toContain("interrupted");
   });
 
   it("falls back to content when parts is invalid JSON", () => {
@@ -161,7 +161,7 @@ describe("toModelMessages", () => {
     const result = toModelMessages(msgs);
 
     expect(result).toHaveLength(1);
-    const content = (result[0] as { content: unknown[] }).content;
+    const content = (result[0]! as { content: unknown[] }).content;
     // Should have text but not reasoning
     expect(content).toEqual([{ type: "text", text: "answer" }]);
   });
@@ -184,9 +184,9 @@ describe("toModelMessages", () => {
     const result = toModelMessages(msgs);
 
     expect(result).toHaveLength(3);
-    expect(result[0].role).toBe("system");
-    expect(result[1].role).toBe("user");
-    expect(result[2].role).toBe("assistant");
+    expect(result[0]!.role).toBe("system");
+    expect(result[1]!.role).toBe("user");
+    expect(result[2]!.role).toBe("assistant");
   });
 
   it("normalizes non-string tool result to JSON", () => {
@@ -197,10 +197,10 @@ describe("toModelMessages", () => {
       { id: "1", conversation_id: "c1", role: "assistant", content: "", parts, created_at: "" },
     ];
     const result = toModelMessages(msgs);
-    const toolMsg = result[1] as { content: Array<{ output: { type: string; value: string } }> };
-    expect(toolMsg.content[0].output.type).toBe("text");
+    const toolMsg = result[1]! as { content: Array<{ output: { type: string; value: string } }> };
+    expect(toolMsg.content[0]!.output.type).toBe("text");
     // JSON.stringify with indent
-    expect(toolMsg.content[0].output.value).toContain("42");
+    expect(toolMsg.content[0]!.output.value).toContain("42");
   });
 });
 
@@ -214,7 +214,7 @@ describe("runAgent", () => {
     runAgent({ model: fakeModel, messages: fakeMessages });
 
     expect(mockStreamText).toHaveBeenCalledTimes(1);
-    const call = mockStreamText.mock.calls[0][0];
+    const call = mockStreamText.mock.calls[0]![0];
     expect(call.model).toBe(fakeModel);
     expect(call.messages).toBe(fakeMessages);
     expect(call.system).toBe("default-system-prompt");
@@ -225,7 +225,7 @@ describe("runAgent", () => {
   it("uses provided system prompt", () => {
     runAgent({ model: fakeModel, messages: fakeMessages, system: "custom prompt" });
 
-    const call = mockStreamText.mock.calls[0][0];
+    const call = mockStreamText.mock.calls[0]![0];
     expect(call.system).toBe("custom prompt");
     expect(mockBuildSystemPrompt).not.toHaveBeenCalled();
   });
@@ -234,7 +234,7 @@ describe("runAgent", () => {
     const customTools = { myTool: "custom" } as never;
     runAgent({ model: fakeModel, messages: fakeMessages, tools: customTools });
 
-    const call = mockStreamText.mock.calls[0][0];
+    const call = mockStreamText.mock.calls[0]![0];
     expect(call.tools).toBe(customTools);
   });
 
@@ -248,21 +248,21 @@ describe("runAgent", () => {
     const ac = new AbortController();
     runAgent({ model: fakeModel, messages: fakeMessages, abortSignal: ac.signal });
 
-    const call = mockStreamText.mock.calls[0][0];
+    const call = mockStreamText.mock.calls[0]![0];
     expect(call.abortSignal).toBe(ac.signal);
   });
 
   it("passes maxOutputTokens when positive", () => {
     runAgent({ model: fakeModel, messages: fakeMessages, maxOutputTokens: 4096 });
 
-    const call = mockStreamText.mock.calls[0][0];
+    const call = mockStreamText.mock.calls[0]![0];
     expect((call as Record<string, unknown>).maxOutputTokens).toBe(4096);
   });
 
   it("omits maxOutputTokens when zero", () => {
     runAgent({ model: fakeModel, messages: fakeMessages, maxOutputTokens: 0 });
 
-    const call = mockStreamText.mock.calls[0][0];
+    const call = mockStreamText.mock.calls[0]![0];
     expect((call as Record<string, unknown>).maxOutputTokens).toBeUndefined();
   });
 
