@@ -10,6 +10,9 @@ mod skill_commands;
 mod skill_discovery;
 mod workspace_watcher;
 
+#[cfg(test)]
+mod test_util;
+
 use std::sync::Arc;
 use tauri::menu::{IconMenuItem, MenuItemKind};
 use tauri::Emitter;

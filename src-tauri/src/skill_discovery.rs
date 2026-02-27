@@ -161,3 +161,109 @@ pub fn discover_external_skills(
 
     Ok(all)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_util::with_home;
+
+    fn write_md(dir: &Path, content: &str) {
+        fs::create_dir_all(dir).unwrap();
+        fs::write(dir.join(SKILL_FILENAME), content).unwrap();
+    }
+
+    // --- scan_skill_root ---
+
+    #[test]
+    fn scan_nested_layout() {
+        let td = tempfile::TempDir::new().unwrap();
+        let root = td.path();
+        write_md(&root.join("my-skill"), "---\nname: my-skill\n---");
+        let found = scan_skill_root(root, "test");
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].name, "my-skill");
+        assert_eq!(found[0].source, "test");
+        assert!(found[0].content.contains("my-skill"));
+    }
+
+    #[test]
+    fn scan_flat_layout() {
+        let td = tempfile::TempDir::new().unwrap();
+        let root = td.path().join("skills");
+        write_md(&root, "flat content");
+        let found = scan_skill_root(&root, "src");
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].name, "skills");
+        assert_eq!(found[0].content, "flat content");
+    }
+
+    #[test]
+    fn scan_mixed_layout() {
+        let td = tempfile::TempDir::new().unwrap();
+        let root = td.path().join("mix");
+        write_md(&root, "flat");
+        write_md(&root.join("nested"), "nested");
+        let found = scan_skill_root(&root, "s");
+        assert_eq!(found.len(), 2);
+    }
+
+    #[test]
+    fn scan_empty_dir() {
+        let td = tempfile::TempDir::new().unwrap();
+        assert!(scan_skill_root(td.path(), "x").is_empty());
+    }
+
+    #[test]
+    fn scan_nonexistent_dir() {
+        assert!(scan_skill_root(Path::new("/no/such/dir"), "x").is_empty());
+    }
+
+    #[test]
+    fn scan_skips_non_dir_entries() {
+        let td = tempfile::TempDir::new().unwrap();
+        // file (not dir) at root level — should be skipped
+        fs::write(td.path().join("not-a-dir"), "x").unwrap();
+        // subdir without SKILL.md — should be skipped
+        fs::create_dir(td.path().join("empty-sub")).unwrap();
+        assert!(scan_skill_root(td.path(), "x").is_empty());
+    }
+
+    // --- read_skill_file ---
+
+    #[test]
+    fn read_skill_file_normal() {
+        let td = tempfile::TempDir::new().unwrap();
+        let p = td.path().join("SKILL.md");
+        fs::write(&p, "hello").unwrap();
+        assert_eq!(read_skill_file(&p).unwrap(), "hello");
+    }
+
+    #[test]
+    fn read_skill_file_over_limit() {
+        let td = tempfile::TempDir::new().unwrap();
+        let p = td.path().join("BIG.md");
+        let big = vec![b'x'; (MAX_SKILL_BYTES + 1) as usize];
+        fs::write(&p, &big).unwrap();
+        assert_eq!(read_skill_file(&p).unwrap(), "");
+    }
+
+    #[test]
+    fn read_skill_file_nonexistent() {
+        assert!(read_skill_file(Path::new("/no/file")).is_err());
+    }
+
+    // --- expand_path ---
+
+    #[test]
+    fn expand_tilde_path() {
+        with_home(|home| {
+            assert_eq!(expand_path("~/foo"), home.join("foo"));
+            assert_eq!(expand_path("~"), home.to_path_buf());
+        });
+    }
+
+    #[test]
+    fn expand_absolute_unchanged() {
+        assert_eq!(expand_path("/abs/path"), PathBuf::from("/abs/path"));
+    }
+}
