@@ -1,6 +1,7 @@
 import React, { useState, useCallback } from "react";
 import Prism from "prismjs";
 import { Highlight } from "prism-react-renderer";
+import { renderMermaidSVG } from "beautiful-mermaid";
 import { Copy, Check, Play } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -125,24 +126,29 @@ export function CodeBlock({
       }
     }
     if (isMermaid) {
-      const MermaidPreview = () => {
-        const ref = React.useRef<HTMLDivElement>(null);
-        React.useEffect(() => {
-          if (!ref.current || !showPreview) return;
-          let cancelled = false;
-          import("mermaid").then((m) => {
-            if (cancelled) return;
-            const run = (m as { run?: (opts: { nodes: Node[]; suppressErrors?: boolean }) => Promise<void> }).run;
-            if (run) run({ nodes: [ref.current!], suppressErrors: true }).catch((err: Error) => setMermaidError(err.message));
-          });
-          return () => { cancelled = true; };
-        }, [showPreview]);
-        return <div ref={ref} className="mermaid mt-2 flex justify-center bg-background p-3" data-code={code}>{code}</div>;
-      };
-      return <MermaidPreview />;
+      try {
+        const svg = renderMermaidSVG(code, {
+          bg: "var(--background)",
+          fg: "var(--foreground)",
+          border: "var(--border)",
+          accent: "var(--accent)",
+          muted: "var(--foreground-secondary)",
+          surface: "var(--background-secondary)",
+          transparent: true,
+        });
+        return (
+          <div
+            className="mt-2 flex justify-center rounded-lg border border-border bg-background p-3 overflow-auto"
+            dangerouslySetInnerHTML={{ __html: svg }}
+          />
+        );
+      } catch (e) {
+        setMermaidError(e instanceof Error ? e.message : String(e));
+        return null;
+      }
     }
     return null;
-  }, [isHtml, isMermaid, code, showPreview]);
+  }, [isHtml, isMermaid, code]);
 
   return (
     <div className="my-3 overflow-hidden rounded-lg border border-border bg-background-secondary">

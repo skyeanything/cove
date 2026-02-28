@@ -1,19 +1,26 @@
 import { tool } from "ai";
 import { z } from "zod/v4";
 import { invoke } from "@tauri-apps/api/core";
+import { renderMermaidSVG, THEMES } from "beautiful-mermaid";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
+
+/** Map user-facing theme names to beautiful-mermaid built-in themes. */
+const THEME_MAP: Record<string, string> = {
+  default: "zinc-light",
+  dark: "zinc-dark",
+  forest: "nord-light",
+  neutral: "github-light",
+};
 
 /**
  * Convert an SVG string to a PNG base64 string (without the data URL prefix).
- * NOTE: Relies on browser APIs (DOMParser, canvas, Image, Blob) — only works
- * in the Tauri webview, not in headless/background contexts.
+ * Uses a data URI instead of blob URL to avoid WKWebView canvas taint.
  */
 async function svgToPngBase64(svgStr: string, scale: number): Promise<string> {
-  // Parse dimensions from SVG
   const parser = new DOMParser();
   const doc = parser.parseFromString(svgStr, "image/svg+xml");
   const svgEl = doc.querySelector("svg");
-  if (!svgEl) throw new Error("Invalid SVG output from mermaid");
+  if (!svgEl) throw new Error("Invalid SVG output from beautiful-mermaid");
 
   let width = 0;
   let height = 0;
@@ -37,28 +44,21 @@ async function svgToPngBase64(svgStr: string, scale: number): Promise<string> {
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Failed to create canvas 2d context");
 
-  // White background
   ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, canvasW, canvasH);
 
-  // Draw SVG as image
-  const svgBlob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
-  const url = URL.createObjectURL(svgBlob);
-  try {
-    const img = new Image();
-    img.width = canvasW;
-    img.height = canvasH;
-    await new Promise<void>((resolve, reject) => {
-      img.onload = () => resolve();
-      img.onerror = () => reject(new Error("Failed to load SVG as image"));
-      img.src = url;
-    });
-    ctx.drawImage(img, 0, 0, canvasW, canvasH);
-  } finally {
-    URL.revokeObjectURL(url);
-  }
+  // Data URI avoids WKWebView canvas taint (unlike blob URLs)
+  const svgDataUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgStr)}`;
+  const img = new Image();
+  img.width = canvasW;
+  img.height = canvasH;
+  await new Promise<void>((resolve, reject) => {
+    img.onload = () => resolve();
+    img.onerror = () => reject(new Error("Failed to load SVG as image"));
+    img.src = svgDataUrl;
+  });
+  ctx.drawImage(img, 0, 0, canvasW, canvasH);
 
-  // Export as PNG base64
   const dataUrl = canvas.toDataURL("image/png");
   const prefix = "data:image/png;base64,";
   if (!dataUrl.startsWith(prefix)) throw new Error("Unexpected canvas data URL format");
@@ -100,24 +100,12 @@ export const renderMermaidTool = tool({
     }
 
     try {
-      // Dynamic import mermaid
-      const mermaid = (await import("mermaid")).default;
-      mermaid.initialize({
-        startOnLoad: false,
-        securityLevel: "strict",
-        theme: theme ?? "default",
-      });
+      const themeKey = THEME_MAP[theme ?? "default"] ?? "zinc-light";
+      const colors = THEMES[themeKey];
+      const svg = renderMermaidSVG(code, { ...colors });
 
-      const renderID = `mermaid-render-${Date.now()}`;
-      const { svg } = await mermaid.render(renderID, code);
-
-      // Clean up orphaned render container from DOM
-      document.getElementById(renderID)?.remove();
-
-      // Convert SVG to PNG base64
       const pngBase64 = await svgToPngBase64(svg, resolvedScale);
 
-      // Write binary file via Tauri
       const absPath = await invoke<string>("write_binary_file", {
         args: {
           workspaceRoot,

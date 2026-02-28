@@ -26,19 +26,21 @@ function withNoWorkspace() {
   } as ReturnType<typeof mockWorkspace>);
 }
 
-// ── Mermaid mock ─────────────────────────────────────────────────────────────
+// ── beautiful-mermaid mock ──────────────────────────────────────────────────
 
-const mockInitialize = vi.fn();
-const mockRender = vi.fn();
+const mockRenderMermaidSVG = vi.fn();
 
-vi.mock("mermaid", () => ({
-  default: {
-    initialize: (...args: unknown[]) => mockInitialize(...args),
-    render: (...args: unknown[]) => mockRender(...args),
+vi.mock("beautiful-mermaid", () => ({
+  renderMermaidSVG: (...args: unknown[]) => mockRenderMermaidSVG(...args),
+  THEMES: {
+    "zinc-light": { bg: "#FFFFFF", fg: "#27272A" },
+    "zinc-dark": { bg: "#09090B", fg: "#FAFAFA" },
+    "nord-light": { bg: "#ECEFF4", fg: "#2E3440" },
+    "github-light": { bg: "#FFFFFF", fg: "#1F2328" },
   },
 }));
 
-// ── Canvas / Image / URL mocks ───────────────────────────────────────────────
+// ── Canvas / Image mocks ────────────────────────────────────────────────────
 
 const BASE64_STUB = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAA";
 const DATA_URL_STUB = `data:image/png;base64,${BASE64_STUB}`;
@@ -75,17 +77,10 @@ function setupCanvasMocks() {
       }
       set src(val: string) {
         this._src = val;
-        // Auto-fire onload on next microtask
         Promise.resolve().then(() => this.onload?.());
       }
     },
   );
-
-  vi.stubGlobal("URL", {
-    ...globalThis.URL,
-    createObjectURL: vi.fn(() => "blob:mock-url"),
-    revokeObjectURL: vi.fn(),
-  });
 
   return mockCtx;
 }
@@ -109,7 +104,7 @@ const SVG_STUB = '<svg viewBox="0 0 100 100"><rect/></svg>';
 beforeEach(() => {
   vi.clearAllMocks();
   withWorkspace("/workspace");
-  mockRender.mockResolvedValue({ svg: SVG_STUB });
+  mockRenderMermaidSVG.mockReturnValue(SVG_STUB);
   setupCanvasMocks();
 });
 
@@ -125,7 +120,7 @@ describe("renderMermaidTool – no workspace", () => {
     withNoWorkspace();
     const result = await exec({ code: "graph TD; A-->B" });
     expect(result).toContain("请先在输入框上方选择工作区目录");
-    expect(mockRender).not.toHaveBeenCalled();
+    expect(mockRenderMermaidSVG).not.toHaveBeenCalled();
   });
 });
 
@@ -196,31 +191,29 @@ describe("renderMermaidTool – successful render", () => {
     expect(result).toBe("Mermaid diagram saved to: /workspace/diagram.png");
   });
 
-  it("calls mermaid.initialize with theme config", async () => {
+  it("passes dark theme colors to renderMermaidSVG", async () => {
     setupTauriMocks({
       write_binary_file: () => "/workspace/out.png",
     });
 
     await exec({ code: "graph TD; A-->B", theme: "dark" });
 
-    expect(mockInitialize).toHaveBeenCalledWith(
-      expect.objectContaining({
-        startOnLoad: false,
-        securityLevel: "strict",
-        theme: "dark",
-      }),
+    expect(mockRenderMermaidSVG).toHaveBeenCalledWith(
+      "graph TD; A-->B",
+      expect.objectContaining({ bg: "#09090B", fg: "#FAFAFA" }),
     );
   });
 
-  it("uses default theme when not specified", async () => {
+  it("uses zinc-light theme when not specified", async () => {
     setupTauriMocks({
       write_binary_file: () => "/workspace/out.png",
     });
 
     await exec({ code: "graph TD; A-->B" });
 
-    expect(mockInitialize).toHaveBeenCalledWith(
-      expect.objectContaining({ theme: "default" }),
+    expect(mockRenderMermaidSVG).toHaveBeenCalledWith(
+      "graph TD; A-->B",
+      expect.objectContaining({ bg: "#FFFFFF", fg: "#27272A" }),
     );
   });
 });
@@ -228,8 +221,10 @@ describe("renderMermaidTool – successful render", () => {
 // ── Error handling ───────────────────────────────────────────────────────────
 
 describe("renderMermaidTool – error handling", () => {
-  it("returns error when mermaid.render throws", async () => {
-    mockRender.mockRejectedValue(new Error("Parse error in graph"));
+  it("returns error when renderMermaidSVG throws", async () => {
+    mockRenderMermaidSVG.mockImplementation(() => {
+      throw new Error("Parse error in graph");
+    });
     setupTauriMocks({
       write_binary_file: () => "/workspace/out.png",
     });
@@ -252,7 +247,9 @@ describe("renderMermaidTool – error handling", () => {
   });
 
   it("handles non-Error thrown values", async () => {
-    mockRender.mockRejectedValue("unexpected string error");
+    mockRenderMermaidSVG.mockImplementation(() => {
+      throw "unexpected string error";
+    });
     setupTauriMocks({
       write_binary_file: () => "/workspace/out.png",
     });
