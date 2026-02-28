@@ -15,18 +15,32 @@ pub fn system_temp_dir() -> &'static PathBuf {
     SYSTEM_TEMP_DIR.get_or_init(|| std::env::temp_dir())
 }
 
+/// Reject paths that are too broad for sandbox whitelisting.
+/// Must be absolute and at least 2 components deep (e.g. `/tmp/foo`, not `/`).
+fn is_safe_temp_path(path: &std::path::Path) -> bool {
+    path.is_absolute() && path.components().count() >= 3
+}
+
 /// Returns the dedicated tmp directory for officellm.
 /// Priority: `OFFICELLM_TEMP` env var → `~/.officellm/tmp` → `/tmp`.
 pub fn tmp_dir() -> PathBuf {
     if let Ok(custom) = std::env::var("OFFICELLM_TEMP") {
         if !custom.is_empty() {
             let path = PathBuf::from(&custom);
-            match std::fs::create_dir_all(&path) {
-                Ok(_) => return path,
-                Err(e) => {
-                    log::warn!(
-                        "OFFICELLM_TEMP={custom} is not usable ({e}), falling back to ~/.officellm/tmp"
-                    );
+            if !is_safe_temp_path(&path) {
+                log::warn!(
+                    "OFFICELLM_TEMP={custom} rejected (must be absolute with depth >= 3), \
+                     falling back to ~/.officellm/tmp"
+                );
+            } else {
+                match std::fs::create_dir_all(&path) {
+                    Ok(_) => return path,
+                    Err(e) => {
+                        log::warn!(
+                            "OFFICELLM_TEMP={custom} is not usable ({e}), \
+                             falling back to ~/.officellm/tmp"
+                        );
+                    }
                 }
             }
         }
@@ -129,6 +143,22 @@ mod tests {
             }
             assert_eq!(dir, custom);
             assert!(custom.exists());
+        });
+    }
+
+    #[test]
+    fn tmp_dir_rejects_overly_broad_path() {
+        with_home(|home| {
+            let prev = std::env::var_os("OFFICELLM_TEMP");
+            unsafe { std::env::set_var("OFFICELLM_TEMP", "/"); }
+            let dir = tmp_dir();
+            match prev {
+                Some(v) => unsafe { std::env::set_var("OFFICELLM_TEMP", v) },
+                None => unsafe { std::env::remove_var("OFFICELLM_TEMP") },
+            }
+            // Should fall back, not use "/"
+            assert!(dir.starts_with(home));
+            assert!(dir.ends_with(".officellm/tmp"));
         });
     }
 
