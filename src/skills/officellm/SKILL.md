@@ -13,23 +13,24 @@ officellm is a CLI tool for intelligent document manipulation. In cove, it is ac
 
 ## Full Skill & Resource Discovery
 
-officellm ships its own comprehensive skill at `~/.officellm/skills/`. This
-built-in skill is a **bootstrap** — for the full command reference, use:
+officellm ships its own comprehensive skill with ~100 commands. This
+built-in skill is a **bootstrap** — for the full command reference:
 
 1. Call the `skill` tool with `name: "OfficeLLM"` to load the complete
-   command reference (~100 commands, workflows, best practices).
-2. That skill lists available **resource guides** under `~/.officellm/skills/resources/`.
-   Use the `read` tool to load a specific guide on demand, e.g.:
-   - `~/.officellm/skills/resources/TABLE_OPERATIONS_GUIDE.md`
-   - `~/.officellm/skills/resources/SERVER_MODE_GUIDE.md`
-   - `~/.officellm/skills/resources/EXECUTE_BATCH_GUIDE.md`
-   - `~/.officellm/skills/resources/VISUAL_QA_GUIDE.md`
-3. QuickJS scripting examples: `~/.officellm/skills/quickjs-examples/*.js`
-   TypeScript definitions: `~/.officellm/skills/officellm-quickjs.d.ts`
+   command reference (workflows, best practices, all commands).
+2. The full skill lists **resource guides** and **QuickJS examples**.
+   To locate them on disk, run `doctor` first — the response includes
+   a `home` field (the OFFICELLM_HOME path). Resources are at:
+   - `<home>/skills/resources/*.md` — 27 detailed guides (tables, server
+     mode, batch operations, visual QA, etc.)
+   - `<home>/skills/quickjs-examples/*.js` — scripting examples
+   - `<home>/skills/officellm-quickjs.d.ts` — TypeScript definitions
+   Use the `read` tool to load a specific guide on demand.
 
 **Recommended workflow**:
-- Load the full `OfficeLLM` skill first to understand available commands.
-- Read specific resource guides only when you need deep guidance on a topic.
+- Run `doctor` once to get the `home` path and verify dependencies.
+- Load the full `OfficeLLM` skill to understand available commands.
+- Read specific resource guides only when you need deep guidance.
 - Do NOT guess command names — always consult the full skill first.
 
 ## Prerequisites — Dependency Check
