@@ -51,6 +51,8 @@ export function FileTreePanel() {
   const selectedPath = useFilePreviewStore((s) => s.selectedPath);
   const lastOpenedDirPath = useFilePreviewStore((s) => s.lastOpenedDirPath);
   const setSelected = useFilePreviewStore((s) => s.setSelected);
+  const pendingExpandPath = useFilePreviewStore((s) => s.pendingExpandPath);
+  const setPendingExpandPath = useFilePreviewStore((s) => s.setPendingExpandPath);
   const fileTreeShowHidden = useLayoutStore((s) => s.fileTreeShowHidden);
   const setFileTreeShowHidden = useLayoutStore((s) => s.setFileTreeShowHidden);
 
@@ -113,6 +115,20 @@ export function FileTreePanel() {
       return next;
     });
   }, [selectedPath, lastOpenedDirPath]);
+
+  // Handle breadcrumb navigation: expand ancestors of pending path
+  useEffect(() => {
+    if (!pendingExpandPath) return;
+    setExpandedDirs((prev) => {
+      const next = new Set(prev);
+      const parts = pendingExpandPath.split("/").filter(Boolean);
+      for (let i = 0; i < parts.length; i++) {
+        next.add(parts.slice(0, i + 1).join("/"));
+      }
+      return next;
+    });
+    setPendingExpandPath(null);
+  }, [pendingExpandPath, setPendingExpandPath]);
 
   // 静默刷新：批量拉取后一次性更新
   const handleRefresh = useCallback(() => {
