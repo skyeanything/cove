@@ -10,6 +10,16 @@ const MAX_OUTPUT_CHARS = 30_000;
 const HEAD_CHARS = 15_000;
 const TAIL_CHARS = 15_000;
 
+/** Track active cancel tokens so stopGeneration can cancel running commands. */
+const activeTokens = new Set<string>();
+
+/** Cancel all running bash commands. Called by chatStore.stopGeneration(). */
+export function cancelAllActiveCommands() {
+  for (const token of activeTokens) {
+    invoke("cancel_command", { token }).catch(() => {});
+  }
+}
+
 /** safe：只读/构建类，直接执行 */
 const SAFE_PREFIXES = [
   "ls ", "ls\n", "cat ", "head ", "tail ", "wc ",
@@ -62,7 +72,7 @@ export const bashTool = tool({
     timeout: z.number().optional().describe("Timeout in seconds (default 120, max 600)"),
     description: z.string().optional().describe("Short description of what this command does"),
   }),
-  execute: async ({ command, timeout }, options) => {
+  execute: async ({ command, timeout }) => {
     const activeWorkspace = useWorkspaceStore.getState().activeWorkspace;
     if (!activeWorkspace) {
       return "请先在输入框上方选择工作区目录，再使用 bash 工具。";
@@ -91,12 +101,7 @@ export const bashTool = tool({
     );
 
     const cancelToken = crypto.randomUUID();
-    const abortSignal = options?.abortSignal;
-    const onAbort = () => {
-      invoke("cancel_command", { token: cancelToken }).catch(() => {});
-    };
-    if (abortSignal?.aborted) return "[命令已被取消]";
-    abortSignal?.addEventListener("abort", onAbort, { once: true });
+    activeTokens.add(cancelToken);
 
     try {
       const result = await invoke<RunCommandResult>("run_command", {
@@ -122,7 +127,7 @@ export const bashTool = tool({
     } catch (err) {
       return `执行失败：${err instanceof Error ? err.message : String(err)}`;
     } finally {
-      abortSignal?.removeEventListener("abort", onAbort);
+      activeTokens.delete(cancelToken);
     }
   },
 });

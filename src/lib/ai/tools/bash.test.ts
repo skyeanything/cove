@@ -53,7 +53,7 @@ function withPermission(allowed: boolean) {
 }
 
 // ── Import tool after mocks ───────────────────────────────────────────────────
-import { bashTool } from "./bash";
+import { bashTool, cancelAllActiveCommands } from "./bash";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -74,17 +74,6 @@ function defaultRunResult(overrides = {}) {
     sandboxed: false,
     ...overrides,
   };
-}
-
-async function execWithOptions(
-  command: string,
-  execOpts: Partial<ExecOptions> = {},
-  inputOpts: Partial<ExecInput> = {},
-) {
-  return bashTool.execute!(
-    { command, ...inputOpts } as ExecInput,
-    execOpts as ExecOptions,
-  );
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -360,50 +349,44 @@ describe("bashTool – cancel support", () => {
     expect(result).toBe("[命令已被取消]");
   });
 
-  it("returns cancel message when abortSignal is already aborted", async () => {
-    setupTauriMocks({
-      run_command: () => defaultRunResult(),
-    });
-    const controller = new AbortController();
-    controller.abort();
-    const result = await execWithOptions("ls", { abortSignal: controller.signal });
-    expect(result).toBe("[命令已被取消]");
-  });
-
-  it("calls cancel_command when abortSignal fires", async () => {
-    const controller = new AbortController();
-    let cancelInvoked = false;
+  it("cancelAllActiveCommands invokes cancel_command for active tokens", async () => {
     let cancelledToken: string | undefined;
+    let runResolve: ((v: unknown) => void) | undefined;
 
     setupTauriMocks({
-      run_command: () => {
-        // Simulate abort during execution
-        controller.abort();
-        return defaultRunResult({ cancelled: true });
-      },
+      run_command: () => new Promise((resolve) => { runResolve = resolve; }),
       cancel_command: (payload) => {
-        cancelInvoked = true;
         cancelledToken = (payload as { token: string }).token;
         return true;
       },
     });
 
-    const result = await execWithOptions("ls", { abortSignal: controller.signal });
-    expect(result).toBe("[命令已被取消]");
-    expect(cancelInvoked).toBe(true);
+    // Start execution (will block on the promise)
+    const execPromise = exec("ls");
+    // Wait a tick for invoke to be called
+    await new Promise((r) => setTimeout(r, 0));
+    // Now cancel
+    cancelAllActiveCommands();
     expect(cancelledToken).toBeDefined();
+    // Resolve the command to let exec finish
+    runResolve!(defaultRunResult({ cancelled: true }));
+    const result = await execPromise;
+    expect(result).toBe("[命令已被取消]");
   });
 
-  it("cleans up abort listener after execution", async () => {
-    const controller = new AbortController();
-    const removeSpy = vi.spyOn(controller.signal, "removeEventListener");
-
+  it("cleans up token from active set after execution", async () => {
     setupTauriMocks({
       run_command: () => defaultRunResult(),
+      cancel_command: () => true,
     });
 
-    await execWithOptions("ls", { abortSignal: controller.signal });
-    expect(removeSpy).toHaveBeenCalledWith("abort", expect.any(Function));
-    removeSpy.mockRestore();
+    await exec("ls");
+    // After exec completes, cancelAllActiveCommands should have nothing to cancel
+    let cancelCalled = false;
+    setupTauriMocks({
+      cancel_command: () => { cancelCalled = true; return true; },
+    });
+    cancelAllActiveCommands();
+    expect(cancelCalled).toBe(false);
   });
 });
