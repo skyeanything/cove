@@ -26,6 +26,7 @@ pub struct DetectResult {
     pub available: bool,
     pub version: Option<String>,
     pub path: Option<String>,
+    pub bundled: bool,
 }
 
 /// Server 模式会话信息

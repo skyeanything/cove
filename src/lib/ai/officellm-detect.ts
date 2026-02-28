@@ -4,6 +4,7 @@ interface DetectResult {
   available: boolean;
   version: string | null;
   path: string | null;
+  bundled: boolean;
 }
 
 let cached: DetectResult | null = null;
@@ -12,10 +13,11 @@ let cached: DetectResult | null = null;
 export async function isOfficellmAvailable(): Promise<boolean> {
   if (cached !== null) return cached.available;
   try {
+    await invoke("officellm_init");
     cached = await invoke<DetectResult>("officellm_detect");
     return cached.available;
   } catch {
-    cached = { available: false, version: null, path: null };
+    cached = { available: false, version: null, path: null, bundled: false };
     return false;
   }
 }

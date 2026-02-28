@@ -4,8 +4,6 @@
 
 use std::path::PathBuf;
 
-use super::detect;
-
 /// Target triple baked in at compile time (e.g. `aarch64-apple-darwin`).
 const TARGET_TRIPLE: &str = env!("TARGET");
 
@@ -23,7 +21,7 @@ pub fn resolve_bin() -> Option<(PathBuf, bool)> {
     }
 
     // 2. External install fallback
-    let ext = detect::default_bin_path()?;
+    let ext = external_bin_path()?;
     if ext.exists() {
         return Some((ext, false));
     }
@@ -35,6 +33,27 @@ pub fn resolve_bin() -> Option<(PathBuf, bool)> {
 fn sidecar_path() -> Option<PathBuf> {
     let exe_dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
     Some(exe_dir.join(format!("officellm-{TARGET_TRIPLE}")))
+}
+
+/// Return the external install binary path (`~/.officellm/bin/officellm`).
+fn external_bin_path() -> Option<PathBuf> {
+    dirs::home_dir().map(|h| h.join(".officellm/bin/officellm"))
+}
+
+/// Return the external `OFFICELLM_HOME` directory (`~/.officellm`).
+pub fn external_home() -> Option<PathBuf> {
+    dirs::home_dir().map(|h| h.join(".officellm"))
+}
+
+/// Return the correct `OFFICELLM_HOME` for the resolved binary.
+///
+/// Bundled mode → `<app_data_dir>/officellm`, external → `~/.officellm`.
+pub fn resolve_home(is_bundled: bool, app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    if is_bundled {
+        officellm_home(app)
+    } else {
+        external_home().ok_or_else(|| "无法获取用户 home 目录".to_string())
+    }
 }
 
 /// Return the `OFFICELLM_HOME` directory for bundled mode.
