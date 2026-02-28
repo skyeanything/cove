@@ -11,6 +11,27 @@ always: false
 
 officellm is a CLI tool for intelligent document manipulation. In cove, it is accessed through dedicated Tauri commands rather than shell commands.
 
+## Full Skill & Resource Discovery
+
+officellm ships its own comprehensive skill at `~/.officellm/skills/`. This
+built-in skill is a **bootstrap** — for the full command reference, use:
+
+1. Call the `skill` tool with `name: "OfficeLLM"` to load the complete
+   command reference (~100 commands, workflows, best practices).
+2. That skill lists available **resource guides** under `~/.officellm/skills/resources/`.
+   Use the `read` tool to load a specific guide on demand, e.g.:
+   - `~/.officellm/skills/resources/TABLE_OPERATIONS_GUIDE.md`
+   - `~/.officellm/skills/resources/SERVER_MODE_GUIDE.md`
+   - `~/.officellm/skills/resources/EXECUTE_BATCH_GUIDE.md`
+   - `~/.officellm/skills/resources/VISUAL_QA_GUIDE.md`
+3. QuickJS scripting examples: `~/.officellm/skills/quickjs-examples/*.js`
+   TypeScript definitions: `~/.officellm/skills/officellm-quickjs.d.ts`
+
+**Recommended workflow**:
+- Load the full `OfficeLLM` skill first to understand available commands.
+- Read specific resource guides only when you need deep guidance on a topic.
+- Do NOT guess command names — always consult the full skill first.
+
 ## Prerequisites — Dependency Check
 
 Before performing any document operation, run the `doctor` action to verify
@@ -112,19 +133,21 @@ Open in server mode for multiple replacements:
 2. Execute an operations file with `execute -f ops.json --atomic true`
 3. Save and close
 
-## Exact Command Names (Server mode `call` and CLI mode)
+## Command Reference
 
-⚠️ Use ONLY the command names in this table. Do NOT guess or invent command names.
+⚠️ Do NOT guess command names. Load the full `OfficeLLM` skill via the `skill`
+tool for the complete command reference (~100 commands). Common commands:
 
-| Command        | Description                            | Key args                      |
-|----------------|----------------------------------------|-------------------------------|
-| `extract-text` | Extract all text from document         | (none)                        |
-| `list-styles`  | List paragraph styles in DOCX          | (none)                        |
-| `replace-text` | Find and replace text                  | `find`, `replace`             |
-| `apply-format` | Apply formatting via XPath             | `xpath`, `format`             |
-| `to-pdf`       | Convert document to PDF                | `o` (output path)             |
-| `execute`      | Run operations from a JSON file        | `f` (file path), `atomic`     |
-| `doctor`       | Check external dependency status       | (none)                        |
+| Command        | Description                            |
+|----------------|----------------------------------------|
+| `extract-text` | Extract all text from document         |
+| `replace-text` | Find and replace text                  |
+| `to-pdf`       | Convert document to PDF                |
+| `execute`      | Run operations from a JSON file        |
+| `doctor`       | Check external dependency status       |
+
+For the full list: `officellm list-commands` (via `call` action) or load
+the `OfficeLLM` skill.
 
 ## Error Handling
 
