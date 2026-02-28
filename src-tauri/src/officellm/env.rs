@@ -16,9 +16,17 @@ pub fn system_temp_dir() -> &'static PathBuf {
 }
 
 /// Reject paths that are too broad for sandbox whitelisting.
-/// Must be absolute and at least 2 components deep (e.g. `/tmp/foo`, not `/`).
+/// Must be absolute, contain no `.`/`..` segments, and after canonicalization
+/// still be at least 3 components deep (e.g. `/tmp/foo`, not `/`).
 fn is_safe_temp_path(path: &std::path::Path) -> bool {
-    path.is_absolute() && path.components().count() >= 3
+    use std::path::Component;
+    if !path.is_absolute() {
+        return false;
+    }
+    if path.components().any(|c| matches!(c, Component::ParentDir | Component::CurDir)) {
+        return false;
+    }
+    path.components().count() >= 3
 }
 
 /// Returns the dedicated tmp directory for officellm.
@@ -148,18 +156,19 @@ mod tests {
 
     #[test]
     fn tmp_dir_rejects_overly_broad_path() {
-        with_home(|home| {
-            let prev = std::env::var_os("OFFICELLM_TEMP");
-            unsafe { std::env::set_var("OFFICELLM_TEMP", "/"); }
-            let dir = tmp_dir();
-            match prev {
-                Some(v) => unsafe { std::env::set_var("OFFICELLM_TEMP", v) },
-                None => unsafe { std::env::remove_var("OFFICELLM_TEMP") },
-            }
-            // Should fall back, not use "/"
-            assert!(dir.starts_with(home));
-            assert!(dir.ends_with(".officellm/tmp"));
-        });
+        for bad in ["/", "/tmp/../.."] {
+            with_home(|home| {
+                let prev = std::env::var_os("OFFICELLM_TEMP");
+                unsafe { std::env::set_var("OFFICELLM_TEMP", bad); }
+                let dir = tmp_dir();
+                match prev {
+                    Some(v) => unsafe { std::env::set_var("OFFICELLM_TEMP", v) },
+                    None => unsafe { std::env::remove_var("OFFICELLM_TEMP") },
+                }
+                assert!(dir.starts_with(home), "{bad} should be rejected");
+                assert!(dir.ends_with(".officellm/tmp"));
+            });
+        }
     }
 
     #[test]
