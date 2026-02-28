@@ -17,11 +17,13 @@ import {
   RefreshCw,
   FolderPlus,
   Search,
+  Clipboard,
 } from "lucide-react";
 import { useLayoutStore } from "@/stores/layoutStore";
 import { useFileTreeDialogs } from "@/hooks/useFileTreeDialogs";
 import { useFileTreeDnD } from "@/hooks/useFileTreeDnD";
 import { useFileTreeSearch } from "@/hooks/useFileTreeSearch";
+import { useFileClipboard } from "@/hooks/useFileClipboard";
 import { FileTreeItem } from "./FileTreeItem";
 import { FileTreeDialogs } from "./FileTreeDialogs";
 import { FileTreeSearch } from "./FileTreeSearch";
@@ -72,6 +74,7 @@ export function FileTreePanel() {
 
   const dnd = useFileTreeDnD({ workspaceRoot });
   const search = useFileTreeSearch(rootEntries, loadedChildren);
+  const clipboard = useFileClipboard(workspaceRoot);
 
   const loadRoot = useCallback(() => {
     if (!workspaceRoot) return;
@@ -250,13 +253,26 @@ export function FileTreePanel() {
   return (
     <div
       className="file-preview-tree flex h-full min-h-0 flex-col overflow-hidden bg-background"
+      tabIndex={-1}
       onKeyDown={(e) => {
         if ((e.metaKey || e.ctrlKey) && e.key === "f") {
           e.preventDefault();
           search.openSearch();
+          return;
+        }
+        if (!selectedPath) return;
+        if ((e.metaKey || e.ctrlKey) && e.key === "c") {
+          e.preventDefault();
+          clipboard.onCopy(selectedPath);
+        } else if ((e.metaKey || e.ctrlKey) && e.key === "x") {
+          e.preventDefault();
+          clipboard.onCut(selectedPath);
+        } else if ((e.metaKey || e.ctrlKey) && e.key === "v" && clipboard.sourcePath) {
+          e.preventDefault();
+          const pasteTarget = lastOpenedDirPath ?? "";
+          void onPasteFile(pasteTarget);
         }
       }}
-      tabIndex={-1}
     >
       <div className="flex h-10 shrink-0 items-center justify-between gap-2 border-b border-border bg-background px-3">
         <span className="text-[12px] font-medium uppercase tracking-wider text-foreground-secondary">
@@ -322,10 +338,15 @@ export function FileTreePanel() {
                     expandedDirs={expandedDirs}
                     loadedChildren={loadedChildren}
                     editingPath={editingPath}
+                    clipboardSourcePath={clipboard.sourcePath}
+                    clipboardMode={clipboard.mode}
                     onToggleExpand={onToggleExpand}
                     onSelectFile={setSelected}
                     onLoadChildren={onLoadChildren}
                     onNewFolder={dialogs.onNewFolder}
+                    onCopy={clipboard.onCopy}
+                    onCut={clipboard.onCut}
+                    onPaste={clipboard.onPaste}
                     onRename={onRename}
                     onRevealInFinder={onRevealInFinder}
                     onCopyRelativePath={onCopyRelativePath}
@@ -350,6 +371,12 @@ export function FileTreePanel() {
               <FolderPlus className="size-4" strokeWidth={1.5} />
               {t("explorer.newFolder")}
             </ContextMenuItem>
+            {clipboard.sourcePath && (
+              <ContextMenuItem className="gap-2 text-[13px]" onClick={() => void clipboard.onPaste("")}>
+                <Clipboard className="size-4" strokeWidth={1.5} />
+                {t("explorer.paste")}
+              </ContextMenuItem>
+            )}
           </ContextMenuContent>
         </ContextMenu>
       </ScrollArea>
