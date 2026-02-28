@@ -1,7 +1,7 @@
 //! Core execution: spawn, poll, kill, drain for shell commands.
 
 use std::io::Read;
-use std::process::{Command, Stdio};
+use std::process::{ChildStderr, ChildStdout, Command, Stdio};
 use std::sync::mpsc;
 use std::thread;
 use std::time::Duration;
@@ -193,27 +193,84 @@ fn kill_process_group(_pid: u32) {
     // On non-Unix platforms, rely on child.kill() fallback.
 }
 
+/// Thin wrapper around a raw FD that implements Read but does NOT close on drop.
+/// The caller is responsible for closing the FD after the drain threads finish.
+#[cfg(unix)]
+struct RawPipeReader {
+    fd: libc::c_int,
+}
+
+#[cfg(unix)]
+impl Read for RawPipeReader {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        let n = unsafe {
+            libc::read(self.fd, buf.as_mut_ptr() as *mut libc::c_void, buf.len())
+        };
+        if n < 0 { Err(std::io::Error::last_os_error()) } else { Ok(n as usize) }
+    }
+}
+
+// SAFETY: the FD is only used by the single thread that owns the RawPipeReader.
+#[cfg(unix)]
+unsafe impl Send for RawPipeReader {}
+
 /// Drain stdout/stderr pipes with a timeout to avoid blocking forever.
-fn drain_pipes_with_timeout(
-    mut stdout: impl Read + Send + 'static,
-    mut stderr: impl Read + Send + 'static,
-) -> (String, String) {
-    let (tx_out, rx_out) = mpsc::channel();
-    let (tx_err, rx_err) = mpsc::channel();
+/// After the timeout, FDs are closed to force any stuck reader threads to exit,
+/// preventing thread accumulation when orphan processes hold pipe handles.
+fn drain_pipes_with_timeout(stdout: ChildStdout, stderr: ChildStderr) -> (String, String) {
+    #[cfg(unix)]
+    {
+        use std::os::unix::io::IntoRawFd;
+        let out_fd = stdout.into_raw_fd();
+        let err_fd = stderr.into_raw_fd();
 
-    thread::spawn(move || {
-        let mut buf = String::new();
-        let _ = stdout.read_to_string(&mut buf);
-        let _ = tx_out.send(buf);
-    });
+        let (tx_out, rx_out) = mpsc::channel();
+        let (tx_err, rx_err) = mpsc::channel();
 
-    thread::spawn(move || {
-        let mut buf = String::new();
-        let _ = stderr.read_to_string(&mut buf);
-        let _ = tx_err.send(buf);
-    });
+        thread::spawn(move || {
+            let mut r = RawPipeReader { fd: out_fd };
+            let mut buf = String::new();
+            let _ = r.read_to_string(&mut buf);
+            let _ = tx_out.send(buf);
+        });
+        thread::spawn(move || {
+            let mut r = RawPipeReader { fd: err_fd };
+            let mut buf = String::new();
+            let _ = r.read_to_string(&mut buf);
+            let _ = tx_err.send(buf);
+        });
 
-    let out = rx_out.recv_timeout(DRAIN_TIMEOUT).unwrap_or_default();
-    let err = rx_err.recv_timeout(DRAIN_TIMEOUT).unwrap_or_default();
-    (out, err)
+        let out = rx_out.recv_timeout(DRAIN_TIMEOUT).unwrap_or_default();
+        let err = rx_err.recv_timeout(DRAIN_TIMEOUT).unwrap_or_default();
+
+        // Close FDs to unblock threads stuck in read(). RawPipeReader has no
+        // Drop impl, so this is the sole close — no double-close risk.
+        // If the thread already finished, this harmlessly closes an EOF pipe.
+        unsafe {
+            libc::close(out_fd);
+            libc::close(err_fd);
+        }
+        (out, err)
+    }
+
+    #[cfg(not(unix))]
+    {
+        let (tx_out, rx_out) = mpsc::channel();
+        let (tx_err, rx_err) = mpsc::channel();
+        let mut so = stdout;
+        let mut se = stderr;
+        thread::spawn(move || {
+            let mut buf = String::new();
+            let _ = so.read_to_string(&mut buf);
+            let _ = tx_out.send(buf);
+        });
+        thread::spawn(move || {
+            let mut buf = String::new();
+            let _ = se.read_to_string(&mut buf);
+            let _ = tx_err.send(buf);
+        });
+        let out = rx_out.recv_timeout(DRAIN_TIMEOUT).unwrap_or_default();
+        let err = rx_err.recv_timeout(DRAIN_TIMEOUT).unwrap_or_default();
+        (out, err)
+    }
 }
