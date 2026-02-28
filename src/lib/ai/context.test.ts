@@ -37,6 +37,16 @@ describe("buildSystemPrompt", () => {
     expect(prompt).not.toContain("Workspace:");
   });
 
+  it("injects officellm hint when available", () => {
+    const prompt = buildSystemPrompt({ officellmAvailable: true });
+    expect(prompt).toContain("officellm is available");
+  });
+
+  it("omits officellm hint when not available", () => {
+    const prompt = buildSystemPrompt({ officellmAvailable: false });
+    expect(prompt).not.toContain("officellm is available");
+  });
+
   it("injects assistant system_instruction", () => {
     const assistant = makeAssistant({ system_instruction: "You are a poet." });
     const prompt = buildSystemPrompt({ assistant });

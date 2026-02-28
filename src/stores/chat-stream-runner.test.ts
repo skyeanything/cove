@@ -327,6 +327,7 @@ describe("runStreamLoop", () => {
 
       expect(buildSystemPrompt).toHaveBeenCalledWith({
         workspacePath: undefined,
+        officellmAvailable: false,
       });
     });
 

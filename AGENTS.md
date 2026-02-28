@@ -45,7 +45,7 @@ CLAUDE.md Hard Constraints
 
 Cove 中有两套独立的 officellm：内嵌（Tauri tool）和外部安装（bash CLI）。
 
-- 内置 `officellm` skill（`always: true`）是 bootstrap，始终注入 system prompt
+- 内置 `officellm` skill 是 bootstrap（默认启用，用户可关闭），提供 Tauri tool 基本指引
 - 外部 `OfficeLLM` skill 由 skill discovery 扫描发现，用户可启用/禁用
 - 两者可共存、版本独立，各自 skill 匹配各自 CLI 版本
 - 修改相关代码前 **必读** [`docs/officellm-dual-track.md`](docs/officellm-dual-track.md)

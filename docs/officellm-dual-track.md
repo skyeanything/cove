@@ -9,15 +9,15 @@ Cove 中存在两套独立的 officellm 体系：**内嵌（Bundled）** 和 **�
 | **调用方式** | `officellm` Tauri tool (IPC) | `bash` tool (`officellm` CLI) |
 | **Binary** | Sidecar，打包在 .app 内 | `~/.officellm/bin/officellm` |
 | **Home 目录** | `<app_data>/officellm/` | `~/.officellm/` |
-| **Skill 名称** | `officellm`（内置，always-on） | `OfficeLLM`（外部发现） |
+| **Skill 名称** | `officellm`（内置，默认启用） | `OfficeLLM`（外部发现） |
 | **Skill 来源** | `src/skills/officellm/SKILL.md`，Vite 静态加载 | Skill Discovery 扫描磁盘 |
-| **用户可控** | 始终注入，不可关闭 | 可启用/禁用 |
+| **用户可控** | 默认选中，可取消 | 可启用/禁用 |
 
 ## 内嵌 officellm
 
-### Skill（`officellm`，always: true）
+### Skill（`officellm`，默认启用）
 
-内置 Skill 是一个 **bootstrap**，始终注入到 system prompt 中，告诉模型：
+内置 Skill 是一个 **bootstrap**，默认启用（用户可在设置中关闭），告诉模型：
 
 1. **调用优先级** — 如果外部 `OfficeLLM` Skill 已启用，优先用 `bash` 调 CLI；否则用 Tauri tool
 2. **加载完整参考** — 通过 `skill` 工具加载 `OfficeLLM` 获取完整命令文档
@@ -75,14 +75,14 @@ Cove 中存在两套独立的 officellm 体系：**内嵌（Bundled）** 和 **�
 buildSystemPrompt()
   ├── 基础身份 + 时间 + 工作区
   ├── 工具使用规则
+  ├── officellmAvailable? → 简短提示"officellm 可用，加载 skill 获取详情"
   ├── Assistant 指令 + 用户自定义指令
-  ├── getAlwaysSkills()
-  │     └── officellm skill（always: true）← 始终注入
+  ├── getAlwaysSkills()（officellm 不在此列）
   └── "Use the skill tool to load domain-specific instructions..."
 ```
 
-之前 `officellmAvailable` 参数在 `buildSystemPrompt` 中硬编码了一段 officellm 提示，
-现已删除 — 由 always-on skill 机制统一处理。
+`officellmAvailable` 仅注入一行简短提示，告知模型 officellm tool 可用。
+完整使用指南由 `officellm` skill 提供（用户启用后通过 skill 工具加载）。
 
 ## 工具门控
 

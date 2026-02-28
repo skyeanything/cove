@@ -55,7 +55,7 @@ export async function runStreamLoop(
     const attemptResult = runAgent({
       model,
       messages: modelMessages,
-      system: buildSystemPrompt({ workspacePath }),
+      system: buildSystemPrompt({ workspacePath, officellmAvailable }),
       tools,
       abortSignal,
       maxOutputTokens: modelOption?.max_output_tokens,

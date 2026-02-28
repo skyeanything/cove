@@ -2,7 +2,7 @@
 name: officellm
 description: Bootstrap for bundled officellm — Tauri tool for document operations (DOCX/PPTX/XLSX).
 emoji: "\U0001F4C4"
-always: true
+always: false
 ---
 
 # officellm (Bundled Tauri Tool)
