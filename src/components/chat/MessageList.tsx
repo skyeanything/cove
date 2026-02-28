@@ -286,7 +286,6 @@ function EmptyState() {
           />
           <span
             className="-ml-5 -mt-1 text-3xl font-semibold leading-none"
-            style={{ fontFamily: '"Rubik", sans-serif' }}
           >
             <span style={{ color: '#54C2F6' }}>o</span>
             <span style={{ color: '#2563EB' }}>ve</span>
