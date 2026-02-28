@@ -124,7 +124,9 @@
     "docxLoading": "加载 DOCX…",
     "docxLoadError": "DOCX 解析失败",
     "docxRenderError": "DOCX 渲染失败",
-    "pageNumber": "第 {{current}} / {{total}} 页"
+    "pageNumber": "第 {{current}} / {{total}} 页",
+    "searchPlaceholder": "过滤文件\u2026",
+    "searchFiles": "搜索文件"
   },
   "common": {
     "settings": "设置"
