@@ -22,8 +22,8 @@ const FOLLOW_AT_BOTTOM_PX = 50;
  * A. `isRafScrollingRef` — set true around programmatic scrollTop writes so
  *    the scroll handler can ignore those events.
  * B. `userScrolledUpRef` — sticky flag set by wheel-up; only cleared by
- *    explicit user actions (click ↓ button, wheel back to bottom) or when
- *    a new streaming session starts.
+ *    explicit user actions (click ↓ button, any input scrolling back to
+ *    bottom) or when a new streaming session starts.
  */
 export function useAutoScroll({
   isStreaming,
@@ -40,8 +40,6 @@ export function useAutoScroll({
   const isRafScrollingRef = useRef(false);
   // Guard B: sticky flag — user explicitly scrolled up
   const userScrolledUpRef = useRef(false);
-  // Set by wheel-down, consumed by scroll handler to detect user-initiated return to bottom
-  const userScrollingDownRef = useRef(false);
 
   const [isDetached, setIsDetached] = useState(false);
 
@@ -117,22 +115,16 @@ export function useAutoScroll({
       const prevTop = lastScrollTopRef.current;
       const currTop = el.scrollTop;
       const scrolledUp = currTop < prevTop - 0.5;
+      const scrolledDown = currTop > prevTop + 0.5;
       const distanceFromBottom =
         el.scrollHeight - el.scrollTop - el.clientHeight;
-
-      // User wheeled down and scroll has now settled — check post-scroll position
-      const wasUserDown = userScrollingDownRef.current;
-      userScrollingDownRef.current = false;
 
       if (scrolledUp) {
         shouldFollowRef.current = false;
         setIsDetached(true);
-      } else if (
-        wasUserDown &&
-        userScrolledUpRef.current &&
-        distanceFromBottom <= FOLLOW_AT_BOTTOM_PX
-      ) {
-        // User manually scrolled back to bottom — clear sticky flag
+      } else if (scrolledDown && distanceFromBottom <= FOLLOW_AT_BOTTOM_PX) {
+        // User reached bottom via any input (wheel, scrollbar, keyboard, touch).
+        // Clear sticky flag so auto-follow can re-engage.
         userScrolledUpRef.current = false;
         shouldFollowRef.current = true;
         setIsDetached(false);
@@ -157,10 +149,6 @@ export function useAutoScroll({
         shouldFollowRef.current = false;
         setIsDetached(true);
         stopRaf();
-      } else if (e.deltaY > 0) {
-        // Mark that the user is scrolling down; the scroll handler will
-        // check the *post-scroll* position to decide whether to clear sticky
-        userScrollingDownRef.current = true;
       }
     };
 
