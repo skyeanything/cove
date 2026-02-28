@@ -12,32 +12,15 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import {
   Eye,
   EyeOff,
   RefreshCw,
   FolderPlus,
 } from "lucide-react";
 import { useLayoutStore } from "@/stores/layoutStore";
+import { useFileTreeDialogs } from "@/hooks/useFileTreeDialogs";
 import { FileTreeItem } from "./FileTreeItem";
+import { FileTreeDialogs } from "./FileTreeDialogs";
 import type { ListDirEntry } from "./FileTreeItem";
 
 async function listDir(
@@ -72,10 +55,14 @@ export function FileTreePanel() {
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set());
   const [loadedChildren, setLoadedChildren] = useState<Record<string, ListDirEntry[]>>({});
   const [editingPath, setEditingPath] = useState<string | null>(null);
-  const [deleteTarget, setDeleteTarget] = useState<{ path: string; name: string } | null>(null);
-  const [newFolderParentPath, setNewFolderParentPath] = useState<string | null>(null);
-  const [newFolderName, setNewFolderName] = useState("");
-  const [newFolderError, setNewFolderError] = useState<string | null>(null);
+
+  const dialogs = useFileTreeDialogs({
+    workspaceRoot,
+    selectedPath,
+    setSelected,
+    setExpandedDirs,
+    t,
+  });
 
   const loadRoot = useCallback(() => {
     if (!workspaceRoot) return;
@@ -108,7 +95,7 @@ export function FileTreePanel() {
     });
   }, [workspaceRoot, expandedDirs, fileTreeShowHidden]);
 
-  // 根据当前选中或「上次打开的目录」保持该目录及其祖先展开，便于删除/刷新后仍定位到原目录
+  // 根据当前选中或「上次打开的目录」保持该目录及其祖先展开
   useEffect(() => {
     const focusDir = selectedPath ? dirOfPath(selectedPath) : lastOpenedDirPath;
     if (!focusDir) return;
@@ -120,7 +107,7 @@ export function FileTreePanel() {
     });
   }, [selectedPath, lastOpenedDirPath]);
 
-  // 静默刷新：批量拉取后一次性更新，避免多次 setState 导致整棵树闪
+  // 静默刷新：批量拉取后一次性更新
   const handleRefresh = useCallback(() => {
     if (!workspaceRoot) return;
     const dirs = [...expandedDirs];
@@ -141,7 +128,7 @@ export function FileTreePanel() {
     });
   }, [workspaceRoot, fileTreeShowHidden, expandedDirs]);
 
-  // 实时更新文件树：create/remove/rename 时静默重拉受影响目录并一次性更新，不先清缓存避免闪烁
+  // 实时更新文件树：create/remove/rename 时静默重拉受影响目录
   useEffect(() => {
     const unlistenPromise = listen<{ path: string; kind: string }>(
       "workspace-file-changed",
@@ -196,36 +183,6 @@ export function FileTreePanel() {
     void navigator.clipboard.writeText(text);
   }, []);
 
-  const onNewFolder = useCallback((parentPath: string) => {
-    setNewFolderParentPath(parentPath);
-    setNewFolderName("");
-    setNewFolderError(null);
-  }, []);
-  const handleNewFolderConfirm = useCallback(() => {
-    const name = newFolderName.trim();
-    if (!name || !workspaceRoot || newFolderParentPath === null) return;
-    setNewFolderError(null);
-    const parentPath = newFolderParentPath;
-    invoke("create_dir", { args: { workspaceRoot, path: parentPath, name } })
-      .then(() => {
-        setNewFolderParentPath(null);
-        setNewFolderName("");
-        setNewFolderError(null);
-        if (parentPath) {
-          setExpandedDirs((prev) => new Set([...prev, parentPath]));
-        }
-      })
-      .catch((err: unknown) => {
-        const msg = typeof err === "object" && err != null && "message" in err ? String((err as { message: string }).message) : String(err);
-        const isAlreadyExists = /already exists|已存在/i.test(msg);
-        setNewFolderError(isAlreadyExists ? t("explorer.folderAlreadyExists") : msg);
-      });
-  }, [workspaceRoot, newFolderParentPath, newFolderName, t]);
-  const handleNewFolderCancel = useCallback(() => {
-    setNewFolderParentPath(null);
-    setNewFolderName("");
-    setNewFolderError(null);
-  }, []);
   const onRename = useCallback((path: string) => setEditingPath(path), []);
   const onRevealInFinder = useCallback(
     (path: string) => {
@@ -242,7 +199,6 @@ export function FileTreePanel() {
     },
     [workspaceRoot, copyToClipboard],
   );
-  const onDelete = useCallback((path: string, name: string) => setDeleteTarget({ path, name }), []);
   const onRenameSubmit = useCallback(
     (path: string, newName: string) => {
       const currentName = path.split("/").pop() ?? path;
@@ -257,13 +213,6 @@ export function FileTreePanel() {
     [workspaceRoot],
   );
   const onRenameCancel = useCallback(() => setEditingPath(null), []);
-  const handleConfirmDelete = useCallback(() => {
-    if (!deleteTarget || !workspaceRoot) return;
-    invoke("remove_entry", { args: { workspaceRoot, path: deleteTarget.path } }).finally(() => {
-      setDeleteTarget(null);
-      if (selectedPath === deleteTarget.path) setSelected(null);
-    });
-  }, [deleteTarget, workspaceRoot, selectedPath, setSelected]);
 
   if (!workspaceRoot) {
     return (
@@ -325,12 +274,12 @@ export function FileTreePanel() {
                 onToggleExpand={onToggleExpand}
                 onSelectFile={setSelected}
                 onLoadChildren={onLoadChildren}
-                onNewFolder={onNewFolder}
+                onNewFolder={dialogs.onNewFolder}
                 onRename={onRename}
                 onRevealInFinder={onRevealInFinder}
                 onCopyRelativePath={onCopyRelativePath}
                 onCopyAbsolutePath={onCopyAbsolutePath}
-                onDelete={onDelete}
+                onDelete={dialogs.onDelete}
                 onRenameSubmit={onRenameSubmit}
                 onRenameCancel={onRenameCancel}
               />
@@ -339,7 +288,7 @@ export function FileTreePanel() {
             </div>
           </ContextMenuTrigger>
           <ContextMenuContent className="w-48 rounded-lg border border-border shadow-lg">
-            <ContextMenuItem className="gap-2 text-[13px]" onClick={() => onNewFolder("")}>
+            <ContextMenuItem className="gap-2 text-[13px]" onClick={() => dialogs.onNewFolder("")}>
               <FolderPlus className="size-4" strokeWidth={1.5} />
               {t("explorer.newFolder")}
             </ContextMenuItem>
@@ -347,54 +296,19 @@ export function FileTreePanel() {
         </ContextMenu>
       </ScrollArea>
 
-      <AlertDialog open={!!deleteTarget} onOpenChange={(v) => { if (!v) setDeleteTarget(null); }}>
-        <AlertDialogContent size="sm">
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("explorer.deleteConfirmTitle")}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("explorer.deleteConfirmDescription", { name: deleteTarget?.name ?? "" })}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t("workspace.cancel")}</AlertDialogCancel>
-            <AlertDialogAction variant="destructive" onClick={handleConfirmDelete}>
-              {t("explorer.delete")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <Dialog open={newFolderParentPath !== null} onOpenChange={(open) => { if (!open) handleNewFolderCancel(); }}>
-        <DialogContent className="sm:max-w-xs rounded" hideOverlay>
-          <DialogHeader>
-            <DialogTitle>{t("explorer.newFolder")}</DialogTitle>
-          </DialogHeader>
-          <Input
-            value={newFolderName}
-            onChange={(e) => {
-              setNewFolderName(e.target.value);
-              setNewFolderError(null);
-            }}
-            placeholder={t("explorer.newFolder")}
-            className="rounded shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
-            onKeyDown={(e) => {
-              if (e.key === "Enter") handleNewFolderConfirm();
-              if (e.key === "Escape") handleNewFolderCancel();
-            }}
-          />
-          {newFolderError && (
-            <p className="text-[12px] -mt-2 -mb-2 text-destructive">{newFolderError}</p>
-          )}
-          <DialogFooter>
-            <Button variant="outline" className="rounded" onClick={handleNewFolderCancel}>
-              {t("workspace.cancel")}
-            </Button>
-            <Button variant="brand" className="rounded" onClick={handleNewFolderConfirm} disabled={!newFolderName.trim()}>
-              {t("explorer.create")}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <FileTreeDialogs
+        deleteTarget={dialogs.deleteTarget}
+        setDeleteTarget={dialogs.setDeleteTarget}
+        handleConfirmDelete={dialogs.handleConfirmDelete}
+        newFolderParentPath={dialogs.newFolderParentPath}
+        newFolderName={dialogs.newFolderName}
+        setNewFolderName={dialogs.setNewFolderName}
+        newFolderError={dialogs.newFolderError}
+        setNewFolderError={dialogs.setNewFolderError}
+        handleNewFolderConfirm={dialogs.handleNewFolderConfirm}
+        handleNewFolderCancel={dialogs.handleNewFolderCancel}
+        t={t}
+      />
     </div>
   );
 }
