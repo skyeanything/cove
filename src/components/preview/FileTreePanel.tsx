@@ -270,7 +270,7 @@ export function FileTreePanel() {
         } else if ((e.metaKey || e.ctrlKey) && e.key === "v" && clipboard.sourcePath) {
           e.preventDefault();
           const pasteTarget = lastOpenedDirPath ?? "";
-          void onPasteFile(pasteTarget);
+          void clipboard.onPaste(pasteTarget);
         }
       }}
     >
