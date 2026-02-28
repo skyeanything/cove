@@ -2,7 +2,7 @@
 name: code-interpreter
 description: Guides the agent to use the built-in JavaScript interpreter for calculations, data processing, and file operations without requiring external runtimes.
 emoji: "\U0001F4BB"
-always: true
+always: false
 requires:
   tools:
     - js_interpreter
