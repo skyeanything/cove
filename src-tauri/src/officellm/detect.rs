@@ -1,23 +1,27 @@
 //! 检测 officellm 二进制是否存在及其版本信息。
 
+use std::path::PathBuf;
 use std::process::Command;
 
 use super::types::DetectResult;
 
-/// 返回 officellm 二进制的默认路径
-pub fn default_bin_path() -> Option<std::path::PathBuf> {
-    dirs::home_dir().map(|h| h.join(".officellm/bin/officellm"))
+/// 返回已解析的 officellm 二进制路径（sidecar 优先，外部安装兜底）。
+pub fn bin_path() -> Result<PathBuf, String> {
+    super::resolve::resolve_bin()
+        .map(|(path, _)| path)
+        .ok_or_else(|| "未找到 officellm".to_string())
 }
 
-/// 检测 officellm 是否已安装、版本号、路径
+/// 检测 officellm 是否已安装、版本号、路径、是否 bundled
 pub fn detect() -> DetectResult {
-    let Some(bin) = default_bin_path() else {
-        return DetectResult { available: false, version: None, path: None };
+    let Some((bin, is_bundled)) = super::resolve::resolve_bin() else {
+        return DetectResult {
+            available: false,
+            version: None,
+            path: None,
+            bundled: false,
+        };
     };
-
-    if !bin.exists() {
-        return DetectResult { available: false, version: None, path: None };
-    }
 
     let path_str = bin.to_string_lossy().into_owned();
     let version = Command::new(&bin)
@@ -37,6 +41,7 @@ pub fn detect() -> DetectResult {
         available: true,
         version,
         path: Some(path_str),
+        bundled: is_bundled,
     }
 }
 
@@ -46,11 +51,10 @@ mod tests {
     use crate::test_util::with_home;
 
     #[test]
-    fn default_bin_path_returns_path_under_home() {
-        with_home(|home| {
-            let p = default_bin_path().unwrap();
-            assert!(p.starts_with(home));
-            assert!(p.ends_with(".officellm/bin/officellm"));
+    fn bin_path_returns_error_when_missing() {
+        with_home(|_home| {
+            let err = bin_path().unwrap_err();
+            assert!(err.contains("未找到 officellm"));
         });
     }
 
@@ -59,6 +63,7 @@ mod tests {
         with_home(|_home| {
             let r = detect();
             assert!(!r.available);
+            assert!(!r.bundled);
             assert!(r.version.is_none());
             assert!(r.path.is_none());
         });
@@ -78,6 +83,7 @@ mod tests {
 
             let r = detect();
             assert!(r.available);
+            assert!(!r.bundled);
             assert_eq!(r.version.as_deref(), Some("1.2.3"));
             assert!(r.path.is_some());
         });
@@ -91,14 +97,32 @@ mod tests {
         with_home(|home| {
             let bin = home.join(".officellm/bin/officellm");
             std::fs::create_dir_all(bin.parent().unwrap()).unwrap();
-            // Script outputs nothing
             std::fs::write(&bin, "#!/bin/sh\n").unwrap();
             std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o755))
                 .unwrap();
 
             let r = detect();
             assert!(r.available);
+            assert!(!r.bundled);
             assert!(r.version.is_none());
+        });
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn bin_path_finds_external() {
+        use std::os::unix::fs::PermissionsExt;
+
+        with_home(|home| {
+            let bin = home.join(".officellm/bin/officellm");
+            std::fs::create_dir_all(bin.parent().unwrap()).unwrap();
+            std::fs::write(&bin, "#!/bin/sh\n").unwrap();
+            std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o755))
+                .unwrap();
+
+            let result = bin_path();
+            assert!(result.is_ok());
+            assert_eq!(result.unwrap(), bin);
         });
     }
 }

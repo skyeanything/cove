@@ -10,10 +10,12 @@ describe("officellm-detect", () => {
 
   it("returns true when officellm is detected", async () => {
     setupTauriMocks({
+      officellm_init: () => undefined,
       officellm_detect: () => ({
         available: true,
         version: "1.0.0",
         path: "/usr/local/bin/officellm",
+        bundled: false,
       }),
     });
 
@@ -22,10 +24,12 @@ describe("officellm-detect", () => {
 
   it("returns false when officellm is not detected", async () => {
     setupTauriMocks({
+      officellm_init: () => undefined,
       officellm_detect: () => ({
         available: false,
         version: null,
         path: null,
+        bundled: false,
       }),
     });
 
@@ -34,7 +38,7 @@ describe("officellm-detect", () => {
 
   it("returns false when invoke throws an error", async () => {
     setupTauriMocks({
-      officellm_detect: () => {
+      officellm_init: () => {
         throw new Error("IPC failure");
       },
     });
@@ -43,11 +47,12 @@ describe("officellm-detect", () => {
   });
 
   it("caches result on subsequent calls", async () => {
-    let callCount = 0;
+    let detectCount = 0;
     setupTauriMocks({
+      officellm_init: () => undefined,
       officellm_detect: () => {
-        callCount += 1;
-        return { available: true, version: "1.0", path: "/bin" };
+        detectCount += 1;
+        return { available: true, version: "1.0", path: "/bin", bundled: false };
       },
     });
 
@@ -55,23 +60,41 @@ describe("officellm-detect", () => {
     await isOfficellmAvailable();
     await isOfficellmAvailable();
 
-    expect(callCount).toBe(1);
+    expect(detectCount).toBe(1);
   });
 
   it("clearOfficellmCache allows re-detection", async () => {
-    let callCount = 0;
+    let detectCount = 0;
     setupTauriMocks({
+      officellm_init: () => undefined,
       officellm_detect: () => {
-        callCount += 1;
-        return { available: true, version: "1.0", path: "/bin" };
+        detectCount += 1;
+        return { available: true, version: "1.0", path: "/bin", bundled: false };
       },
     });
 
     await isOfficellmAvailable();
-    expect(callCount).toBe(1);
+    expect(detectCount).toBe(1);
 
     clearOfficellmCache();
     await isOfficellmAvailable();
-    expect(callCount).toBe(2);
+    expect(detectCount).toBe(2);
+  });
+
+  it("calls officellm_init before officellm_detect", async () => {
+    const callOrder: string[] = [];
+    setupTauriMocks({
+      officellm_init: () => {
+        callOrder.push("init");
+        return undefined;
+      },
+      officellm_detect: () => {
+        callOrder.push("detect");
+        return { available: true, version: "1.0", path: "/bin", bundled: false };
+      },
+    });
+
+    await isOfficellmAvailable();
+    expect(callOrder).toEqual(["init", "detect"]);
   });
 });

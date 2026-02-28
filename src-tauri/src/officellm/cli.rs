@@ -3,7 +3,6 @@
 use std::process::Command;
 use std::time::Duration;
 
-use super::detect::default_bin_path;
 use super::types::CommandResult;
 
 /// 默认 CLI 命令超时（秒）
@@ -14,13 +13,9 @@ const DEFAULT_TIMEOUT_SECS: u64 = 120;
 /// 等价于：`officellm <cmd> --result-schema v2 --strict [--key value ...]`
 /// 解析 stdout JSON 并返回 `CommandResult`。
 pub fn call(cmd: &str, args: &[String]) -> Result<CommandResult, String> {
-    let bin = default_bin_path().ok_or("无法获取用户 home 目录")?;
-    if !bin.exists() {
-        return Err(format!(
-            "未找到 officellm，请先安装：{}\n可访问 https://github.com/nicepkg/officellm 了解详情",
-            bin.display()
-        ));
-    }
+    let bin = super::detect::bin_path()?;
+    let home = super::resolve::external_home()
+        .ok_or("无法获取用户 home 目录")?;
 
     let mut command = Command::new(&bin);
     command.arg(cmd);
@@ -30,7 +25,7 @@ pub fn call(cmd: &str, args: &[String]) -> Result<CommandResult, String> {
         command.arg(arg);
     }
 
-    super::env::apply_tmp_env(&mut command);
+    super::env::apply_env(&mut command, &home);
 
     command.stdout(std::process::Stdio::piped());
     command.stderr(std::process::Stdio::piped());
@@ -108,15 +103,6 @@ mod tests {
         with_home(|_home| {
             let err = call("test", &[]).unwrap_err();
             assert!(err.contains("未找到 officellm"));
-        });
-    }
-
-    #[test]
-    fn call_error_includes_install_hint() {
-        with_home(|_home| {
-            let err = call("test", &[]).unwrap_err();
-            assert!(err.contains(".officellm/bin/officellm"));
-            assert!(err.contains("https://github.com/nicepkg/officellm"));
         });
     }
 

@@ -7,6 +7,7 @@ interface DetectResult {
   available: boolean;
   version: string | null;
   path: string | null;
+  bundled: boolean;
 }
 
 interface CommandResult {
@@ -48,7 +49,7 @@ export const officellmTool = tool({
         case "detect": {
           const result = await invoke<DetectResult>("officellm_detect");
           if (!result.available) return "officellm is not installed.";
-          return `officellm available: version=${result.version}, path=${result.path}`;
+          return `officellm available: version=${result.version}, path=${result.path}, bundled=${result.bundled}`;
         }
 
         case "open": {

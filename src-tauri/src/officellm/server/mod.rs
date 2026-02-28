@@ -9,7 +9,6 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-use super::detect::default_bin_path;
 use super::types::{CommandResult, JsonRpcRequest, SessionInfo};
 
 mod parsing;
@@ -55,10 +54,9 @@ pub fn open(path: &str) -> Result<(), String> {
         return Err("已有活跃会话，请先调用 close() 关闭".to_string());
     }
 
-    let bin = default_bin_path().ok_or("无法获取用户 home 目录")?;
-    if !bin.exists() {
-        return Err(format!("未找到 officellm，请先安装：{}", bin.display()));
-    }
+    let bin = super::detect::bin_path()?;
+    let home = super::resolve::external_home()
+        .ok_or("无法获取用户 home 目录")?;
 
     log::info!("[officellm-server] opening: {path}");
 
@@ -67,7 +65,7 @@ pub fn open(path: &str) -> Result<(), String> {
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    super::env::apply_tmp_env(&mut cmd);
+    super::env::apply_env(&mut cmd, &home);
 
     let mut child = cmd
         .spawn()

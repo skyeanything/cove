@@ -50,18 +50,19 @@ beforeEach(() => {
 describe("officellmTool – detect", () => {
   it("returns version and path when officellm is available", async () => {
     setupTauriMocks({
-      officellm_detect: () => ({ available: true, version: "2.1.0", path: "/usr/bin/officellm" }),
+      officellm_detect: () => ({ available: true, version: "2.1.0", path: "/usr/bin/officellm", bundled: false }),
     });
 
     const result = await exec({ action: "detect" });
     expect(result).toContain("available");
     expect(result).toContain("2.1.0");
     expect(result).toContain("/usr/bin/officellm");
+    expect(result).toContain("bundled=false");
   });
 
   it("returns not-installed message when available is false", async () => {
     setupTauriMocks({
-      officellm_detect: () => ({ available: false, version: null, path: null }),
+      officellm_detect: () => ({ available: false, version: null, path: null, bundled: false }),
     });
 
     const result = await exec({ action: "detect" });
