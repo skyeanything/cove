@@ -1,6 +1,6 @@
 //! Shared TMPDIR setup for officellm subprocesses.
 
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::OnceLock;
 
@@ -97,6 +97,21 @@ pub fn apply_tmp_env(command: &mut Command) {
         .env("OFFICELLM_TEMP", &dir);
 }
 
+/// Sets `OFFICELLM_HOME` and temp-dir variables on a `Command` builder,
+/// using the given `home` directory as the source of truth.
+pub fn apply_env(command: &mut Command, home: &Path) {
+    let tmp = home.join("tmp");
+    if let Err(e) = std::fs::create_dir_all(&tmp) {
+        log::warn!("failed to create {}: {e}", tmp.display());
+    }
+    command
+        .env("OFFICELLM_HOME", home)
+        .env("TMPDIR", &tmp)
+        .env("TEMP", &tmp)
+        .env("TMP", &tmp)
+        .env("OFFICELLM_TEMP", &tmp);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -135,6 +150,32 @@ mod tests {
                 );
             }
         });
+    }
+
+    #[test]
+    fn apply_env_sets_all_vars() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let home = dir.path();
+        let mut cmd = Command::new("true");
+        apply_env(&mut cmd, home);
+
+        let envs: std::collections::HashMap<_, _> =
+            cmd.get_envs().filter_map(|(k, v)| Some((k.to_owned(), v?.to_owned()))).collect();
+
+        let expected_keys = ["OFFICELLM_HOME", "TMPDIR", "TEMP", "TMP", "OFFICELLM_TEMP"];
+        for key in expected_keys {
+            assert!(
+                envs.contains_key(std::ffi::OsStr::new(key)),
+                "missing env var: {key}"
+            );
+        }
+
+        // OFFICELLM_HOME should point to home, others to home/tmp
+        let home_val = envs.get(std::ffi::OsStr::new("OFFICELLM_HOME")).unwrap();
+        assert_eq!(PathBuf::from(home_val), home.to_path_buf());
+
+        let tmp_val = envs.get(std::ffi::OsStr::new("TMPDIR")).unwrap();
+        assert_eq!(PathBuf::from(tmp_val), home.join("tmp"));
     }
 
     #[test]
