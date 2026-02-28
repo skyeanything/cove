@@ -3,6 +3,7 @@
 pub mod cli;
 pub mod detect;
 pub mod env;
+pub mod resolve;
 pub mod server;
 pub mod types;
 

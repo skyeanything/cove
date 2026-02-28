@@ -7,3 +7,4 @@ src-tauri/gen/
 *.tsbuildinfo
 .DS_Store
 *.code-workspace
+src-tauri/binaries/officellm-*
