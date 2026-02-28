@@ -129,3 +129,66 @@ fn copy_entry_errors_when_source_not_found() {
     });
     assert!(matches!(result, Err(FsError::NotFound)));
 }
+
+// ---------------------------------------------------------------------------
+// Symlink: broken symlink at destination is detected as existing
+// ---------------------------------------------------------------------------
+
+#[cfg(unix)]
+#[test]
+fn copy_entry_errors_when_destination_is_broken_symlink() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().to_str().unwrap();
+    std::fs::write(dir.path().join("src.txt"), "hello").unwrap();
+    // Create a broken symlink (target does not exist)
+    std::os::unix::fs::symlink("/nonexistent/target", dir.path().join("dst.txt")).unwrap();
+
+    let result = copy_entry_inner(&CopyEntryArgs {
+        workspace_root: root.to_string(),
+        from_path: "src.txt".to_string(),
+        to_path: "dst.txt".to_string(),
+    });
+    assert!(matches!(result, Err(FsError::NotAllowed(_))));
+}
+
+// ---------------------------------------------------------------------------
+// Symlink: directory symlinks are followed during recursive copy
+// ---------------------------------------------------------------------------
+
+#[cfg(unix)]
+#[test]
+fn copy_entry_copies_directory_with_symlinked_subdir() {
+    let dir = tempfile::tempdir().unwrap();
+    let root = dir.path().to_str().unwrap();
+
+    // Create a real subdirectory with a file
+    std::fs::create_dir_all(dir.path().join("real_sub")).unwrap();
+    std::fs::write(dir.path().join("real_sub/data.txt"), "content").unwrap();
+
+    // Create src_dir containing a symlink to real_sub
+    std::fs::create_dir_all(dir.path().join("src_dir")).unwrap();
+    std::os::unix::fs::symlink(
+        dir.path().join("real_sub"),
+        dir.path().join("src_dir/linked_sub"),
+    )
+    .unwrap();
+    std::fs::write(dir.path().join("src_dir/top.txt"), "top").unwrap();
+
+    copy_entry_inner(&CopyEntryArgs {
+        workspace_root: root.to_string(),
+        from_path: "src_dir".to_string(),
+        to_path: "dst_dir".to_string(),
+    })
+    .unwrap();
+
+    // The symlinked subdir should be copied as a real directory
+    assert!(dir.path().join("dst_dir/linked_sub").is_dir());
+    assert_eq!(
+        std::fs::read_to_string(dir.path().join("dst_dir/linked_sub/data.txt")).unwrap(),
+        "content"
+    );
+    assert_eq!(
+        std::fs::read_to_string(dir.path().join("dst_dir/top.txt")).unwrap(),
+        "top"
+    );
+}

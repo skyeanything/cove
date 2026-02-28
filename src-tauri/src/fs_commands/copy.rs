@@ -23,7 +23,8 @@ pub(super) fn copy_entry_inner(args: &CopyEntryArgs) -> Result<String, FsError> 
     let from_abs = ensure_inside_workspace_exists(&args.workspace_root, &args.from_path)?;
     let to_abs = ensure_inside_workspace_may_not_exist(&args.workspace_root, &args.to_path)?;
 
-    if to_abs.exists() {
+    // Use symlink_metadata to detect broken symlinks too (Path::exists follows symlinks)
+    if fs::symlink_metadata(&to_abs).is_ok() {
         return Err(FsError::NotAllowed("destination already exists".into()));
     }
 
@@ -74,10 +75,11 @@ fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<(), FsError> {
     fs::create_dir_all(dst).map_err(FsError::from)?;
     for entry in fs::read_dir(src).map_err(FsError::from)? {
         let entry = entry.map_err(FsError::from)?;
-        let ty = entry.file_type().map_err(FsError::from)?;
         let src_path = entry.path();
         let dst_path = dst.join(entry.file_name());
-        if ty.is_dir() {
+        // Use fs::metadata (follows symlinks) so symlinks-to-dirs are copied as dirs
+        let meta = fs::metadata(&src_path).map_err(FsError::from)?;
+        if meta.is_dir() {
             copy_dir_recursive(&src_path, &dst_path)?;
         } else {
             fs::copy(&src_path, &dst_path).map_err(FsError::from)?;
