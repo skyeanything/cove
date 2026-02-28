@@ -52,7 +52,6 @@
     ],
     "externalBin": ["binaries/officellm"],
     "macOS": {
-      "signingIdentity": "Developer ID Application: Zhuhai Hying Security Technology Co., Ltd. (8F2QK9RWCG)",
       "entitlements": "entitlements.plist"
     }
   }

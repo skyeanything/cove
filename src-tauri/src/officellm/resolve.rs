@@ -13,11 +13,9 @@ const TARGET_TRIPLE: &str = env!("TARGET");
 /// was found next to the application executable (sidecar), and `false` when
 /// it was found at the default external install location.
 pub fn resolve_bin() -> Option<(PathBuf, bool)> {
-    // 1. Bundled sidecar: <exe_dir>/officellm-<TARGET_TRIPLE>
+    // 1. Bundled sidecar (already existence-checked inside sidecar_path)
     if let Some(path) = sidecar_path() {
-        if path.exists() {
-            return Some((path, true));
-        }
+        return Some((path, true));
     }
 
     // 2. External install fallback
@@ -30,9 +28,22 @@ pub fn resolve_bin() -> Option<(PathBuf, bool)> {
 }
 
 /// Return the expected sidecar binary path based on the current executable.
+///
+/// Tauri uses `officellm-<triple>` during development but strips the suffix
+/// to plain `officellm` when bundling into the `.app`.  Check both names.
 fn sidecar_path() -> Option<PathBuf> {
     let exe_dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
-    Some(exe_dir.join(format!("officellm-{TARGET_TRIPLE}")))
+    // Dev / unbundled: officellm-aarch64-apple-darwin
+    let with_triple = exe_dir.join(format!("officellm-{TARGET_TRIPLE}"));
+    if with_triple.exists() {
+        return Some(with_triple);
+    }
+    // Bundled .app: officellm (no suffix)
+    let plain = exe_dir.join("officellm");
+    if plain.exists() {
+        return Some(plain);
+    }
+    None
 }
 
 /// Return the external install binary path (`~/.officellm/bin/officellm`).
@@ -83,17 +94,9 @@ mod tests {
     }
 
     #[test]
-    fn sidecar_path_format() {
-        let p = sidecar_path().expect("sidecar_path should return Some");
-        let name = p.file_name().unwrap().to_string_lossy();
-        assert!(
-            name.starts_with("officellm-"),
-            "expected officellm-<triple>, got {name}"
-        );
-        assert!(
-            name.contains(TARGET_TRIPLE),
-            "expected triple {TARGET_TRIPLE} in {name}"
-        );
+    fn sidecar_path_returns_none_when_no_binary() {
+        // In the test environment neither sidecar file exists.
+        assert!(sidecar_path().is_none());
     }
 
     #[test]
