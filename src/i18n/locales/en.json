@@ -4,7 +4,8 @@
       "general": "General",
       "providers": "Providers",
       "skills": "Skills",
-      "appearance": "Appearance"
+      "appearance": "Appearance",
+      "workspaces": "Workspaces"
     },
     "general": {
       "language": "Interface Language",
@@ -262,6 +263,10 @@
     "removeDescription": "Remove {{name}} from the workspace list? This won't delete any files on disk.",
     "cancel": "Cancel",
     "remove": "Remove",
-    "removeButtonTitle": "Remove workspace"
+    "removeButtonTitle": "Remove workspace",
+    "settingsDescription": "Manage your workspace directories. The default workspace is used when no specific workspace is selected.",
+    "addWorkspace": "Add Workspace",
+    "setDefault": "Set as default",
+    "renameWorkspace": "Click to rename"
   }
 }

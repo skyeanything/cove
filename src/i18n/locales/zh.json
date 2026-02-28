@@ -4,7 +4,8 @@
       "general": "通用",
       "providers": "提供商",
       "skills": "技能",
-      "appearance": "外观"
+      "appearance": "外观",
+      "workspaces": "工作区"
     },
     "general": {
       "language": "界面语言",
@@ -262,6 +263,10 @@
     "removeDescription": "从工作目录列表中移除「{{name}}」？不会删除磁盘上的任何文件。",
     "cancel": "取消",
     "remove": "移除",
-    "removeButtonTitle": "从列表中移除"
+    "removeButtonTitle": "从列表中移除",
+    "settingsDescription": "管理工作区目录。未指定工作区时将使用默认工作区。",
+    "addWorkspace": "添加工作区",
+    "setDefault": "设为默认",
+    "renameWorkspace": "点击重命名"
   }
 }

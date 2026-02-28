@@ -2,7 +2,7 @@ import { create } from "zustand";
 import type { ProviderType } from "@/db/types";
 import { settingsRepo } from "@/db/repos/settingsRepo";
 
-type SettingsTab = "providers" | "general" | "skills" | "appearance";
+type SettingsTab = "providers" | "general" | "skills" | "appearance" | "workspaces";
 /** enter: 回车发送；modifierEnter: ⌘+Enter(Mac) / Ctrl+Enter(Win,Linux) 发送 */
 export type SendMessageShortcut = "enter" | "modifierEnter";
 
