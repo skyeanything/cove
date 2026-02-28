@@ -86,8 +86,8 @@
 | `fs_commands/` | 文件系统读写（受工作区权限控制） |
 | `fetch_commands.rs` | 网页内容抓取（绕过浏览器跨域限制） |
 | `shell_commands.rs` | Shell 命令安全执行 |
-| `officellm/` | officellm CLI / Server 进程管理 |
-| `skill_discovery.rs` | 扫描本地技能目录 |
+| `officellm/` | officellm CLI / Server 进程管理（[双轨体系](officellm-dual-track.md)） |
+| `skill_discovery/` | 扫描本地技能目录（含 bundled officellm home） |
 | `workspace_watcher.rs` | 文件系统变更监听（notify crate） |
 
 ## 数据库

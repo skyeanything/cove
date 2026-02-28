@@ -187,4 +187,5 @@ Cove 内置 8 个 AI 工具，在对话过程中模型可自动调用。工具�
 { "action": "call", "command": "addSlide", "args": { "title": "新章节" } }
 ```
 
-> **注意**：需要本地已安装 officellm 并配置好对应的 Office 环境。
+> **注意**：此工具调用的是内嵌 sidecar，与外部安装的 officellm CLI 是独立的两套体系。
+> 详见 [officellm 双轨体系](officellm-dual-track.md)。

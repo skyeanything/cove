@@ -41,6 +41,15 @@ CLAUDE.md Hard Constraints
 - 超出时在文件顶部添加 `// FILE_SIZE_EXCEPTION: <原因>`
 - `src/components/ui/` 下的 shadcn 原语文件豁免
 
+## officellm 双轨体系
+
+Cove 中有两套独立的 officellm：内嵌（Tauri tool）和外部安装（bash CLI）。
+
+- 内置 `officellm` skill 是 bootstrap（默认启用，用户可关闭），提供 Tauri tool 基本指引
+- 外部 `OfficeLLM` skill 由 skill discovery 扫描发现，用户可启用/禁用
+- 两者可共存、版本独立，各自 skill 匹配各自 CLI 版本
+- 修改相关代码前 **必读** [`docs/officellm-dual-track.md`](docs/officellm-dual-track.md)
+
 ## Code Review 强制规则
 
 - 任务是 review PR 时，必须将 review 结论写回对应 PR 讨论区，不能只在本地终端输出。

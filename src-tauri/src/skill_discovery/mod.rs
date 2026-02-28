@@ -120,10 +120,35 @@ fn read_skill_file(path: &Path) -> Result<String, std::io::Error> {
     Ok(s)
 }
 
+/// Resolve the bundled officellm skills directory (if bundled sidecar exists).
+fn bundled_officellm_skills(app: &tauri::AppHandle) -> Option<PathBuf> {
+    let (_, is_bundled) = crate::officellm::resolve::resolve_bin()?;
+    if !is_bundled {
+        return None;
+    }
+    let home = crate::officellm::resolve::officellm_home(app).ok()?;
+    let skills = home.join("skills");
+    skills.is_dir().then_some(skills)
+}
+
 /// 发现本机 skills：先扫内置默认目录，再扫用户配置的 custom_roots（支持 ~ 展开）。
 /// workspace_path 存在时额外扫描工作区下的 .claude/skills、.agents/skills。
 #[tauri::command]
 pub fn discover_external_skills(
+    app: tauri::AppHandle,
+    workspace_path: Option<String>,
+    custom_roots: Option<Vec<String>>,
+) -> Result<Vec<ExternalSkillEntry>, String> {
+    discover_skills_impl(
+        bundled_officellm_skills(&app),
+        workspace_path,
+        custom_roots,
+    )
+}
+
+/// Core discovery logic, testable without `AppHandle`.
+fn discover_skills_impl(
+    bundled_officellm_skills_root: Option<PathBuf>,
     workspace_path: Option<String>,
     custom_roots: Option<Vec<String>>,
 ) -> Result<Vec<ExternalSkillEntry>, String> {
@@ -136,6 +161,14 @@ pub fn discover_external_skills(
                 all.extend(scan_skill_root(&root, source));
             }
         }
+    }
+
+    // Bundled officellm home: scan <app_data>/officellm/skills/ as fallback
+    // for users who don't have ~/.officellm/ (bundled-only).
+    // Same source "officellm" — if DEFAULT_SKILL_ROOTS already found
+    // ~/.officellm/skills/, frontend deduplication keeps the first match.
+    if let Some(ref root) = bundled_officellm_skills_root {
+        all.extend(scan_skill_root(root, "officellm"));
     }
 
     if let Some(roots) = custom_roots {

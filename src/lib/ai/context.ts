@@ -23,7 +23,7 @@ export function buildSystemPrompt(options: {
 
   if (options.officellmAvailable) {
     parts.push(
-      "officellm is available. Use the officellm tool for document operations (DOCX/PPTX/XLSX). Workflow: detect → open(path) → call(command, args) → save → close. Load the 'officellm' skill for detailed command reference.",
+      "officellm is available. Use the officellm tool for document operations (DOCX/PPTX/XLSX). Load the 'officellm' skill for detailed usage instructions.",
     );
   }
 

@@ -106,7 +106,7 @@ fn expand_relative_unchanged() {
     assert_eq!(expand_path("relative/path"), PathBuf::from("relative/path"));
 }
 
-// --- discover_external_skills ---
+// --- discover_skills_impl ---
 
 #[test]
 fn discover_scans_default_roots() {
@@ -116,7 +116,7 @@ fn discover_scans_default_roots() {
         // Create a skill in ~/.cove/skills/cove-skill/SKILL.md
         write_md(&home.join(".cove/skills/cove-skill"), "cove skill");
 
-        let result = discover_external_skills(None, None).unwrap();
+        let result = discover_skills_impl(None, None, None).unwrap();
         assert!(result.len() >= 2);
 
         let claude = result.iter().find(|e| e.name == "my-skill");
@@ -136,7 +136,8 @@ fn discover_scans_custom_roots() {
         let custom = td.path().join("my-custom-skills");
         write_md(&custom.join("extra"), "custom content");
 
-        let result = discover_external_skills(
+        let result = discover_skills_impl(
+            None,
             None,
             Some(vec![custom.to_string_lossy().into_owned()]),
         )
@@ -157,7 +158,8 @@ fn discover_scans_workspace_path() {
         write_md(&ws.join(".claude/skills/ws-skill"), "ws claude");
         write_md(&ws.join(".agents/skills/agent-skill"), "ws agent");
 
-        let result = discover_external_skills(
+        let result = discover_skills_impl(
+            None,
             Some(ws.to_string_lossy().into_owned()),
             None,
         )
@@ -177,7 +179,7 @@ fn discover_scans_workspace_path() {
 fn discover_skips_empty_workspace_path() {
     with_home(|_| {
         // Empty string workspace_path should be filtered out
-        let result = discover_external_skills(Some(String::new()), None).unwrap();
+        let result = discover_skills_impl(None, Some(String::new()), None).unwrap();
         // Should still succeed (just scanning default roots, which are empty in tempdir)
         assert!(result.is_empty());
     });
@@ -186,7 +188,8 @@ fn discover_skips_empty_workspace_path() {
 #[test]
 fn discover_skips_nonexistent_custom_root() {
     with_home(|_| {
-        let result = discover_external_skills(
+        let result = discover_skills_impl(
+            None,
             None,
             Some(vec!["/no/such/path".into()]),
         )
@@ -197,12 +200,34 @@ fn discover_skips_nonexistent_custom_root() {
 }
 
 #[test]
+fn discover_scans_bundled_officellm_skills() {
+    with_home(|_| {
+        let td = tempfile::TempDir::new().unwrap();
+        let bundled_skills = td.path().join("officellm-skills");
+        write_md(&bundled_skills.join("OfficeLLM"), "bundled officellm skill");
+
+        let result = discover_skills_impl(
+            Some(bundled_skills),
+            None,
+            None,
+        )
+        .unwrap();
+
+        let entry = result.iter().find(|e| e.name == "OfficeLLM");
+        assert!(entry.is_some(), "should find bundled officellm skill");
+        assert_eq!(entry.unwrap().source, "officellm");
+        assert_eq!(entry.unwrap().content, "bundled officellm skill");
+    });
+}
+
+#[test]
 fn discover_custom_roots_with_tilde() {
     with_home(|home| {
         let custom_dir = home.join("my-skills");
         write_md(&custom_dir.join("tilde-skill"), "tilde content");
 
-        let result = discover_external_skills(
+        let result = discover_skills_impl(
+            None,
             None,
             Some(vec!["~/my-skills".into()]),
         )
