@@ -101,7 +101,9 @@ pub fn apply_tmp_env(command: &mut Command) {
 /// using the given `home` directory as the source of truth.
 pub fn apply_env(command: &mut Command, home: &Path) {
     let tmp = home.join("tmp");
-    let _ = std::fs::create_dir_all(&tmp);
+    if let Err(e) = std::fs::create_dir_all(&tmp) {
+        log::warn!("failed to create {}: {e}", tmp.display());
+    }
     command
         .env("OFFICELLM_HOME", home)
         .env("TMPDIR", &tmp)

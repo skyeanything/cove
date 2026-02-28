@@ -11,7 +11,7 @@ const MARKER: &str = "config.json";
 /// If `home/config.json` already exists the call is a no-op (idempotent).
 /// Otherwise it spawns `bin init` with `OFFICELLM_HOME=home`, checks the
 /// exit status, and verifies the marker file was created.
-pub fn ensure_initialized(bin: &Path, home: &Path) -> Result<(), String> {
+pub(crate) fn ensure_initialized(bin: &Path, home: &Path) -> Result<(), String> {
     let marker = home.join(MARKER);
     if marker.exists() {
         return Ok(());
