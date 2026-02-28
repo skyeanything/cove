@@ -1,5 +1,6 @@
+// FILE_SIZE_EXCEPTION: Core chat store requires inline compression integration across 3 methods
 import { create } from "zustand";
-import type { Message } from "@/db/types";
+import type { Message, Provider } from "@/db/types";
 import { messageRepo } from "@/db/repos/messageRepo";
 import { attachmentRepo } from "@/db/repos/attachmentRepo";
 import type { Attachment } from "@/db/types";
@@ -7,7 +8,9 @@ import { providerRepo } from "@/db/repos/providerRepo";
 import { settingsRepo } from "@/db/repos/settingsRepo";
 import { useDataStore } from "./dataStore";
 import { getModelOption } from "@/lib/ai/model-service";
+import { getModel } from "@/lib/ai/provider-factory";
 import { toModelMessages } from "@/lib/ai/agent";
+import { maybeCompressContext } from "./chat-compression-bridge";
 import { createAgentRunMetrics, reportAgentRunMetrics } from "@/lib/ai/agent-metrics";
 import { generateConversationTitleFromUserQuestion } from "@/lib/ai/generate-title";
 import { conversationRepo } from "@/db/repos/conversationRepo";
@@ -30,6 +33,27 @@ const STREAM_RESET = {
   abortController: null,
 } as const;
 
+/** Try to compress context if needed; returns { messages, summaryUpTo } */
+async function tryCompress(
+  msgs: Message[], convId: string, provider: Provider, modelId: string,
+  setFn: (s: Partial<ChatState>) => void, getFn: () => ChatState,
+): Promise<{ messages: Message[]; summaryUpTo?: string }> {
+  if (getFn().isCompressing) return { messages: msgs };
+  setFn({ isCompressing: true, compressionNotice: null });
+  try {
+    const opt = getModelOption(provider, modelId);
+    const ctxWin = opt?.context_window ?? 128_000;
+    const result = await maybeCompressContext(msgs, convId, ctxWin, getModel(provider, modelId));
+    if (result.compressed) {
+      setFn({ messages: result.messages, compressionNotice: "compressed", summaryUpTo: result.summaryUpTo ?? null });
+      return { messages: result.messages, summaryUpTo: result.summaryUpTo };
+    }
+  } finally {
+    setFn({ isCompressing: false });
+  }
+  return { messages: msgs };
+}
+
 interface ChatState {
   messages: Message[];
   attachmentsByMessage: Record<string, Attachment[]>;
@@ -41,6 +65,10 @@ interface ChatState {
   streamingParts: MessagePart[];
   abortController: AbortController | null;
   error: string | null;
+  isCompressing: boolean;
+  compressionNotice: string | null;
+  /** Persisted summary_up_to from the conversation — messages before this are covered by summary */
+  summaryUpTo: string | null;
   modelId: string | null;
   providerId: string | null;
   providerType: string | null;
@@ -70,12 +98,18 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   streamingParts: [],
   abortController: null,
   error: null,
+  isCompressing: false,
+  compressionNotice: null,
+  summaryUpTo: null,
   modelId: null,
   providerId: null,
   providerType: null,
 
   async loadMessages(conversationId: string) {
-    const messages = await messageRepo.getByConversation(conversationId);
+    const [messages, conversation] = await Promise.all([
+      messageRepo.getByConversation(conversationId),
+      conversationRepo.getById(conversationId),
+    ]);
     const attachmentsByMessage: Record<string, Attachment[]> = {};
     await Promise.all(
       messages.map(async (message) => {
@@ -83,7 +117,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         if (attachments.length > 0) attachmentsByMessage[message.id] = attachments;
       }),
     );
-    set({ messages, attachmentsByMessage, draftAttachments: [], error: null });
+    set({ messages, attachmentsByMessage, draftAttachments: [], error: null, summaryUpTo: conversation?.summary_up_to ?? null });
     await useWorkspaceStore.getState().loadFromConversation(conversationId);
   },
 
@@ -181,7 +215,10 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     try {
       const modelOption = getModelOption(provider, modelId);
       const modelSupportsPdfNative = modelOption?.pdf_native === true;
-      const modelMessages = toModelMessages(updatedMessages);
+      const compressed = await tryCompress(updatedMessages, conversationId, provider, modelId, set, get);
+      updatedMessages = compressed.messages;
+
+      const modelMessages = toModelMessages(updatedMessages, { summaryUpTo: compressed.summaryUpTo ?? get().summaryUpTo ?? undefined });
       const fetchBlock = await getFetchBlockForText(trimmedContent);
 
       if (draftAttachments.length > 0) {
@@ -295,8 +332,10 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     const runMetrics = createAgentRunMetrics({ action: "regenerate", conversationId, modelId });
 
     try {
-      const modelMessages = toModelMessages(remaining);
-      const lastUserContent = remaining[remaining.length - 1]?.role === "user" ? (remaining[remaining.length - 1]!.content ?? "") : "";
+      const compressed = await tryCompress(remaining, conversationId, provider, modelId, set, get);
+      const modelMessages = toModelMessages(compressed.messages, { summaryUpTo: compressed.summaryUpTo ?? get().summaryUpTo ?? undefined });
+      const last = compressed.messages[compressed.messages.length - 1];
+      const lastUserContent = last?.role === "user" ? (last.content ?? "") : "";
       injectFetchBlockIntoLastUserMessage(modelMessages, await getFetchBlockForText(lastUserContent));
 
       const { streamResult, finalError } = await runStreamLoop(
@@ -331,6 +370,14 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     const msg = messages[msgIndex]!;
     const conversationId = msg.conversation_id;
 
+    // If editing a message covered by summary, invalidate the summary
+    const conversation = await conversationRepo.getById(conversationId);
+    if (conversation?.summary_up_to && msg.created_at <= conversation.summary_up_to) {
+      await messageRepo.deleteSummaryMessage(conversationId);
+      await conversationRepo.update(conversationId, { summary_up_to: null });
+      set({ summaryUpTo: null });
+    }
+
     await messageRepo.deleteAfter(conversationId, msg.created_at);
     const remaining = messages.slice(0, msgIndex);
     const remainingIds = new Set(remaining.map((m) => m.id));
@@ -341,7 +388,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       id: crypto.randomUUID(), conversation_id: conversationId, role: "user", content: newContent,
     };
     await messageRepo.create(userMsg);
-    const updatedMessages = [...remaining, { ...userMsg, created_at: new Date().toISOString() }];
+    let updatedMessages = [...remaining, { ...userMsg, created_at: new Date().toISOString() }];
     set({ messages: updatedMessages, error: null });
 
     const { modelId, providerId, providerType } = get();
@@ -356,7 +403,9 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     const runMetrics = createAgentRunMetrics({ action: "edit_resend", conversationId, modelId });
 
     try {
-      const modelMessages = toModelMessages(updatedMessages);
+      const compressed = await tryCompress(updatedMessages, conversationId, provider, modelId, set, get);
+      updatedMessages = compressed.messages;
+      const modelMessages = toModelMessages(updatedMessages, { summaryUpTo: compressed.summaryUpTo ?? get().summaryUpTo ?? undefined });
       injectFetchBlockIntoLastUserMessage(modelMessages, await getFetchBlockForText(newContent));
 
       const { streamResult, finalError } = await runStreamLoop(
@@ -389,6 +438,6 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   },
 
   reset() {
-    set({ messages: [], attachmentsByMessage: {}, draftAttachments: [], error: null, ...STREAM_RESET });
+    set({ messages: [], attachmentsByMessage: {}, draftAttachments: [], error: null, isCompressing: false, compressionNotice: null, summaryUpTo: null, ...STREAM_RESET });
   },
 }));

@@ -104,6 +104,7 @@ export interface Conversation {
   temperature_override?: number;
   provider_type?: string;
   workspace_path?: string;
+  summary_up_to?: string | null;
   created_at: string;
   updated_at: string;
 }

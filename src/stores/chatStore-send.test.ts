@@ -15,7 +15,7 @@ vi.mock("@/db/repos/attachmentRepo", () => ({
   attachmentRepo: { getByMessage: vi.fn().mockResolvedValue([]), create: vi.fn().mockResolvedValue(undefined) },
 }));
 vi.mock("@/db/repos/conversationRepo", () => ({
-  conversationRepo: { create: vi.fn().mockResolvedValue(undefined), update: vi.fn().mockResolvedValue(undefined) },
+  conversationRepo: { create: vi.fn().mockResolvedValue(undefined), update: vi.fn().mockResolvedValue(undefined), getById: vi.fn().mockResolvedValue(undefined) },
 }));
 vi.mock("@/db/repos/providerRepo", () => ({
   providerRepo: { getAll: vi.fn().mockResolvedValue([]) },

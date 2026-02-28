@@ -102,6 +102,29 @@ export const messageRepo = {
     }
   },
 
+  /** Get the context summary message for a conversation (parent_id = "__context_summary__") */
+  async getSummaryMessage(conversationId: string): Promise<Message | undefined> {
+    const db = await getDb();
+    const rows: Message[] = await db.select(
+      "SELECT * FROM messages WHERE conversation_id = $1 AND parent_id = $2 LIMIT 1",
+      [conversationId, "__context_summary__"],
+    );
+    return rows[0];
+  },
+
+  /** Delete the context summary message and its FTS entry */
+  async deleteSummaryMessage(conversationId: string): Promise<void> {
+    const db = await getDb();
+    await db.execute(
+      "DELETE FROM message_fts WHERE message_id IN (SELECT id FROM messages WHERE conversation_id = $1 AND parent_id = $2)",
+      [conversationId, "__context_summary__"],
+    );
+    await db.execute(
+      "DELETE FROM messages WHERE conversation_id = $1 AND parent_id = $2",
+      [conversationId, "__context_summary__"],
+    );
+  },
+
   async insertFts(
     db: Awaited<ReturnType<typeof getDb>>,
     conversationId: string,

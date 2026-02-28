@@ -1,3 +1,4 @@
+// FILE_SIZE_EXCEPTION: Added context compression state and notice display
 import {
   Paperclip,
   Globe,
@@ -17,6 +18,7 @@ import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useSkillsStore } from "@/stores/skillsStore";
 import { getModelOption } from "@/lib/ai/model-service";
+import { estimateNextTurnTokens } from "@/lib/ai/context-compression";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { listSkills } from "@/lib/ai/skills/loader";
 import { WorkspacePopover } from "./WorkspacePopover";
@@ -71,12 +73,10 @@ export function ChatInput({
     onModelSelectorOpenChange ?? setModelSelectorOpenLocal;
   const messages = useChatStore((s) => s.messages);
   const error = useChatStore((s) => s.error);
+  const isCompressing = useChatStore((s) => s.isCompressing);
   const sendMessageShortcut = useSettingsStore((s) => s.sendMessageShortcut);
 
-  const sessionTokens = messages.reduce(
-    (sum, m) => sum + (m.tokens_input ?? 0) + (m.tokens_output ?? 0),
-    0,
-  );
+  const sessionTokens = estimateNextTurnTokens(messages, message.length);
   const contextLimit = useMemo(() => {
     if (!modelId || !providerId) return 0;
     const provider = providers.find((p) => p.id === providerId);
@@ -240,8 +240,13 @@ export function ChatInput({
   return (
     <div className="shrink-0 px-4 pb-3 pt-1">
       <div className="mx-auto max-w-[896px]">
-        {/* Error message */}
-        {(error || attachError) && (
+        {/* Error / compression notice */}
+        {isCompressing && (
+          <div className="mb-2 rounded-lg bg-accent/20 border border-accent/30 px-3 py-2 text-[13px] font-medium text-accent">
+            {t("chat.contextCompressing")}
+          </div>
+        )}
+        {(error || attachError) && !isCompressing && (
           <div className="mb-2 rounded-lg bg-destructive/10 px-3 py-2 text-[13px] text-destructive">
             {error ?? attachError}
           </div>

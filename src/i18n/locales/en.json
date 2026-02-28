@@ -56,7 +56,10 @@
     "timeDusk": "evening",
     "timeEvening": "evening",
     "timeNight": "night",
-    "send": "Send"
+    "send": "Send",
+    "contextCompressed": "Context Summary — {{count}} messages compressed",
+    "contextCompressing": "Compressing context...",
+    "summaryLabel": "Context Summary"
   },
   "sidebar": {
     "pinned": "Pinned",

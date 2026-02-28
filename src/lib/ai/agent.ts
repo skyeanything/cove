@@ -138,13 +138,36 @@ function reconstructFromParts(partsJson: string, reasoning?: string | null): Mod
   }
 }
 
+export interface ToModelMessagesOptions {
+  /** Timestamp: skip non-summary messages with created_at <= this value */
+  summaryUpTo?: string;
+}
+
 /**
  * Convert DB messages to AI SDK ModelMessage format.
+ * When options.summaryUpTo is set, summary messages (parent_id = "__context_summary__")
+ * are injected as the first system message, and older messages are skipped.
  */
-export function toModelMessages(dbMessages: Message[]): ModelMessage[] {
+export function toModelMessages(
+  dbMessages: Message[],
+  options?: ToModelMessagesOptions,
+): ModelMessage[] {
   const result: ModelMessage[] = [];
+  const summaryUpTo = options?.summaryUpTo;
+  let summaryMessage: ModelMessage | null = null;
 
   for (const msg of dbMessages) {
+    // Summary message → collect for injection at position 0
+    if (msg.parent_id === "__context_summary__") {
+      summaryMessage = { role: "system", content: msg.content ?? "" };
+      continue;
+    }
+
+    // Skip messages covered by the summary
+    if (summaryUpTo && msg.created_at <= summaryUpTo) {
+      continue;
+    }
+
     if (msg.role === "user") {
       result.push({
         role: "user",
@@ -168,6 +191,11 @@ export function toModelMessages(dbMessages: Message[]): ModelMessage[] {
         content: msg.content ?? "",
       });
     }
+  }
+
+  // Always inject summary as the first message
+  if (summaryMessage) {
+    result.unshift(summaryMessage);
   }
 
   return result;

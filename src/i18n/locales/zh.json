@@ -56,7 +56,10 @@
     "timeDusk": "傍晚",
     "timeEvening": "晚上",
     "timeNight": "夜里",
-    "send": "发送"
+    "send": "发送",
+    "contextCompressed": "上下文摘要 — {{count}} 条消息已压缩",
+    "contextCompressing": "正在压缩上下文...",
+    "summaryLabel": "上下文摘要"
   },
   "sidebar": {
     "pinned": "置顶",
