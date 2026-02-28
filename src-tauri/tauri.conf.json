@@ -49,6 +49,10 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "macOS": {
+      "signingIdentity": "Developer ID Application: Zhuhai Hying Security Technology Co., Ltd. (8F2QK9RWCG)",
+      "entitlements": "entitlements.plist"
+    }
   }
 }
