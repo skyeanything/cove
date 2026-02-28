@@ -1,6 +1,5 @@
 # Cove — AI 桌面聊天客户端
 
-> 基于 Tauri 2 + React 19 + Vercel AI SDK 6 构建的桌面 AI 聊天客户端，对标 [ChatWise](https://chatwise.app)，设计风格参考 Linear / Raycast。
 
 ## ✨ 特性
 
