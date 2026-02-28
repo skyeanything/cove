@@ -14,15 +14,21 @@ pnpm run build
 pnpm test
 ```
 
-3. Rust 静态检查（在 src-tauri/ 目录下）
+3. 测试覆盖率检查
+```bash
+pnpm test:coverage
+```
+> 详细要求见 `.agent/workflows/test-quality.md`
+
+4. Rust 静态检查（在 src-tauri/ 目录下）
 ```bash
 cd src-tauri && cargo check
 ```
 
-4. 文件大小校验
+5. 文件大小校验
 ```bash
 python3 scripts/check-file-size.py
 ```
 
 > **提示**：步骤 1 包含 `tsc -b` 类型检查，无需单独运行 `tsc`。
-> 步骤 3 仅做静态检查，无需编译完整 Tauri 应用。
+> 步骤 4 仅做静态检查，无需编译完整 Tauri 应用。

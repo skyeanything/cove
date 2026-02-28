@@ -8,8 +8,9 @@
 2. **`.agent/workflows/agent-defaults.md`** — Agent 默认行为（KISS、Review 角色、PR Review 输出规则）
 3. **`.agent/workflows/issue-decomposition.md`** — Issue 拆分规范（Epic 分解、子 Issue 粒度、模板）
 4. **`.agent/workflows/build-and-test.md`** — 构建与测试命令（提交前必须通过）
-5. **`.agent/workflows/submit-pr.md`** — PR 提交规范与流程
-6. **`CLAUDE.md`** — 项目设计规范、技术栈、代码约定（Hard Constraints）
+5. **`.agent/workflows/test-quality.md`** — 测试质量约束（覆盖率、组件测试、文档覆盖度）
+6. **`.agent/workflows/submit-pr.md`** — PR 提交规范与流程
+7. **`CLAUDE.md`** — 项目设计规范、技术栈、代码约定（Hard Constraints）
 
 ## 优先级
 
@@ -26,6 +27,7 @@ CLAUDE.md Hard Constraints
 | 开始新 Issue | `./scripts/start-worktree.sh <type> <id> <desc>` |
 | 前端构建+类型检查 | `pnpm run build` |
 | 运行测试 | `pnpm test` |
+| 测试覆盖率检查 | `pnpm test:coverage` |
 | Rust 静态检查 | `cd src-tauri && cargo check` |
 | 文件大小校验 | `python3 scripts/check-file-size.py` |
 | 创建 PR | `gh pr create --title "type: desc" --body "..."` |
