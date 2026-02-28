@@ -124,7 +124,9 @@
     "docxLoading": "Loading DOCX…",
     "docxLoadError": "Failed to parse DOCX",
     "docxRenderError": "Failed to render DOCX",
-    "pageNumber": "Page {{current}} / {{total}}"
+    "pageNumber": "Page {{current}} / {{total}}",
+    "searchPlaceholder": "Filter files\u2026",
+    "searchFiles": "Search files"
   },
   "common": {
     "settings": "Settings"

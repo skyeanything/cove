@@ -16,12 +16,15 @@ import {
   EyeOff,
   RefreshCw,
   FolderPlus,
+  Search,
 } from "lucide-react";
 import { useLayoutStore } from "@/stores/layoutStore";
 import { useFileTreeDialogs } from "@/hooks/useFileTreeDialogs";
 import { useFileTreeDnD } from "@/hooks/useFileTreeDnD";
+import { useFileTreeSearch } from "@/hooks/useFileTreeSearch";
 import { FileTreeItem } from "./FileTreeItem";
 import { FileTreeDialogs } from "./FileTreeDialogs";
+import { FileTreeSearch } from "./FileTreeSearch";
 import type { ListDirEntry } from "./FileTreeItem";
 
 async function listDir(
@@ -66,6 +69,7 @@ export function FileTreePanel() {
   });
 
   const dnd = useFileTreeDnD({ workspaceRoot });
+  const search = useFileTreeSearch(rootEntries, loadedChildren);
 
   const loadRoot = useCallback(() => {
     if (!workspaceRoot) return;
@@ -228,12 +232,29 @@ export function FileTreePanel() {
   }
 
   return (
-    <div className="file-preview-tree flex h-full min-h-0 flex-col overflow-hidden bg-background">
+    <div
+      className="file-preview-tree flex h-full min-h-0 flex-col overflow-hidden bg-background"
+      onKeyDown={(e) => {
+        if ((e.metaKey || e.ctrlKey) && e.key === "f") {
+          e.preventDefault();
+          search.openSearch();
+        }
+      }}
+      tabIndex={-1}
+    >
       <div className="flex h-10 shrink-0 items-center justify-between gap-2 border-b border-border bg-background px-3">
         <span className="text-[12px] font-medium uppercase tracking-wider text-foreground-secondary">
           {t("preview.explorer")}
         </span>
         <div className="flex items-center gap-0.5">
+          <button
+            type="button"
+            onClick={search.openSearch}
+            className="rounded p-1.5 text-muted-foreground hover:bg-background-tertiary hover:text-foreground"
+            title={t("preview.searchFiles")}
+          >
+            <Search className="size-3.5" strokeWidth={1.5} />
+          </button>
           <button
             type="button"
             onClick={() => setFileTreeShowHidden(!fileTreeShowHidden)}
@@ -256,6 +277,13 @@ export function FileTreePanel() {
           </button>
         </div>
       </div>
+      <FileTreeSearch
+        searchOpen={search.searchOpen}
+        searchQuery={search.searchQuery}
+        setSearchQuery={search.setSearchQuery}
+        closeSearch={search.closeSearch}
+        matchCount={search.matchCount}
+      />
       <ScrollArea className="min-h-0 flex-1">
         <ContextMenu>
           <ContextMenuTrigger asChild>
@@ -264,40 +292,40 @@ export function FileTreePanel() {
               onDragOver={dnd.onRootDragOver}
               onDrop={dnd.onRootDrop}
             >
-              {rootEntries === null ? (
+              {search.filteredRootEntries === null ? (
                 <div className="py-2 text-center text-[13px] text-muted-foreground">{t("preview.loading")}</div>
-              ) : rootEntries.length === 0 ? (
+              ) : search.filteredRootEntries.length === 0 ? (
                 <div className="py-2 text-center text-[13px] text-muted-foreground">{t("preview.emptyDir")}</div>
               ) : (
-                rootEntries.map((entry) => (
-              <FileTreeItem
-                key={entry.path}
-                entry={entry}
-                workspaceRoot={workspaceRoot}
-                selectedPath={selectedPath}
-                expandedDirs={expandedDirs}
-                loadedChildren={loadedChildren}
-                editingPath={editingPath}
-                onToggleExpand={onToggleExpand}
-                onSelectFile={setSelected}
-                onLoadChildren={onLoadChildren}
-                onNewFolder={dialogs.onNewFolder}
-                onRename={onRename}
-                onRevealInFinder={onRevealInFinder}
-                onCopyRelativePath={onCopyRelativePath}
-                onCopyAbsolutePath={onCopyAbsolutePath}
-                onDelete={dialogs.onDelete}
-                onRenameSubmit={onRenameSubmit}
-                onRenameCancel={onRenameCancel}
-                draggedPath={dnd.draggedPath}
-                dropTargetPath={dnd.dropTargetPath}
-                onDnDStart={dnd.onDragStart}
-                onDnDEnd={dnd.onDragEnd}
-                onDnDOver={dnd.onDragOver}
-                onDnDLeave={dnd.onDragLeave}
-                onDnDDrop={dnd.onDrop}
-              />
-            ))
+                search.filteredRootEntries.map((entry) => (
+                  <FileTreeItem
+                    key={entry.path}
+                    entry={entry}
+                    workspaceRoot={workspaceRoot}
+                    selectedPath={selectedPath}
+                    expandedDirs={expandedDirs}
+                    loadedChildren={loadedChildren}
+                    editingPath={editingPath}
+                    onToggleExpand={onToggleExpand}
+                    onSelectFile={setSelected}
+                    onLoadChildren={onLoadChildren}
+                    onNewFolder={dialogs.onNewFolder}
+                    onRename={onRename}
+                    onRevealInFinder={onRevealInFinder}
+                    onCopyRelativePath={onCopyRelativePath}
+                    onCopyAbsolutePath={onCopyAbsolutePath}
+                    onDelete={dialogs.onDelete}
+                    onRenameSubmit={onRenameSubmit}
+                    onRenameCancel={onRenameCancel}
+                    draggedPath={dnd.draggedPath}
+                    dropTargetPath={dnd.dropTargetPath}
+                    onDnDStart={dnd.onDragStart}
+                    onDnDEnd={dnd.onDragEnd}
+                    onDnDOver={dnd.onDragOver}
+                    onDnDLeave={dnd.onDragLeave}
+                    onDnDDrop={dnd.onDrop}
+                  />
+                ))
               )}
             </div>
           </ContextMenuTrigger>
