@@ -60,8 +60,7 @@
   /* Typography */
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "SF Mono", "Cascadia Code", "Fira Code", ui-monospace, monospace;
-  /* 文件预览区（目录树 + 代码）使用 Rubik */
-  --font-preview: "Rubik", var(--font-sans);
+  --font-preview: var(--font-sans);
 
   /* Radii */
   --radius-sm: 6px;
@@ -243,7 +242,7 @@ body {
   color: var(--color-success) !important;
 }
 
-/* ===== 文件预览：目录树与代码区使用 Rubik，代码主题加深 ===== */
+/* ===== 文件预览：目录树与代码区，代码主题加深 ===== */
 .file-preview-tree {
   font-family: var(--font-preview);
 }
