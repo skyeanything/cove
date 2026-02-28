@@ -74,6 +74,24 @@ pub fn officellm_status() -> Result<Option<SessionInfo>, String> {
     server::status()
 }
 
+/// 诊断外部依赖状态（强制 CLI 模式），并在 data 中注入 home 路径
+#[tauri::command]
+pub async fn officellm_doctor(app: tauri::AppHandle) -> Result<CommandResult, String> {
+    let home = compute_home(&app)?;
+    let home_str = home.to_string_lossy().to_string();
+    let mut result = tauri::async_runtime::spawn_blocking(move || {
+        cli::call("doctor", &[], &home)
+    })
+    .await
+    .map_err(|e| format!("后台线程错误: {e}"))??;
+
+    // 注入 home 路径到 data 对象
+    if let serde_json::Value::Object(ref mut map) = result.data {
+        map.insert("home".into(), serde_json::Value::String(home_str));
+    }
+    Ok(result)
+}
+
 /// 首次使用时初始化 officellm home 目录
 #[tauri::command]
 pub async fn officellm_init(app: tauri::AppHandle) -> Result<(), String> {

@@ -25,10 +25,10 @@ interface SessionInfo {
 
 export const officellmTool = tool({
   description:
-    "Operate on Office documents (DOCX/PPTX/XLSX) via officellm. Actions: detect (check if installed), open (start session for a document), call (execute a command on the open document), save (save the document), close (end session), status (query session info).",
+    "Operate on Office documents (DOCX/PPTX/XLSX) via officellm. Actions: detect (check if installed), doctor (check external dependency status — libreoffice, pdftoppm, quarto), open (start session for a document), call (execute a command on the open document), save (save the document), close (end session), status (query session info).",
   inputSchema: z.object({
     action: z
-      .enum(["detect", "open", "call", "save", "close", "status"])
+      .enum(["detect", "doctor", "open", "call", "save", "close", "status"])
       .describe("The officellm action to perform"),
     path: z
       .string()
@@ -50,6 +50,14 @@ export const officellmTool = tool({
           const result = await invoke<DetectResult>("officellm_detect");
           if (!result.available) return "officellm is not installed.";
           return `officellm available: version=${result.version}, path=${result.path}, bundled=${result.bundled}`;
+        }
+
+        case "doctor": {
+          const result = await invoke<CommandResult>("officellm_doctor");
+          if (result.status === "error") {
+            return `Error running doctor: ${result.error ?? "unknown"}`;
+          }
+          return JSON.stringify(result.data);
         }
 
         case "open": {
