@@ -50,6 +50,7 @@ interface RunCommandResult {
   stderr: string;
   exitCode: number;
   timedOut: boolean;
+  cancelled: boolean;
   sandboxed: boolean;
 }
 
@@ -61,7 +62,7 @@ export const bashTool = tool({
     timeout: z.number().optional().describe("Timeout in seconds (default 120, max 600)"),
     description: z.string().optional().describe("Short description of what this command does"),
   }),
-  execute: async ({ command, timeout }) => {
+  execute: async ({ command, timeout }, options) => {
     const activeWorkspace = useWorkspaceStore.getState().activeWorkspace;
     if (!activeWorkspace) {
       return "请先在输入框上方选择工作区目录，再使用 bash 工具。";
@@ -89,6 +90,14 @@ export const bashTool = tool({
       MAX_TIMEOUT_MS,
     );
 
+    const cancelToken = crypto.randomUUID();
+    const abortSignal = options?.abortSignal;
+    const onAbort = () => {
+      invoke("cancel_command", { token: cancelToken }).catch(() => {});
+    };
+    if (abortSignal?.aborted) return "[命令已被取消]";
+    abortSignal?.addEventListener("abort", onAbort, { once: true });
+
     try {
       const result = await invoke<RunCommandResult>("run_command", {
         args: {
@@ -96,8 +105,10 @@ export const bashTool = tool({
           command,
           workdir: undefined,
           timeoutMs,
+          cancelToken,
         },
       });
+      if (result.cancelled) return "[命令已被取消]";
       const out = result.stdout + (result.stderr ? `\n[stderr]\n${result.stderr}` : "");
       const truncated = truncateOutput(out);
       const header = [
@@ -110,6 +121,8 @@ export const bashTool = tool({
       return header ? `${header}\n\n${truncated}` : truncated;
     } catch (err) {
       return `执行失败：${err instanceof Error ? err.message : String(err)}`;
+    } finally {
+      abortSignal?.removeEventListener("abort", onAbort);
     }
   },
 });
