@@ -21,6 +21,7 @@ import { LAST_MODEL_KEY } from "./chat-retry-utils";
 import { runStreamLoop } from "./chat-stream-runner";
 import { invoke } from "@tauri-apps/api/core";
 import type { ToolCallInfo, DraftAttachment, MessagePart } from "./chat-types";
+import { cancelAllActiveCommands } from "@/lib/ai/tools/bash";
 
 export type { ToolCallInfo, DraftAttachment, MessagePart };
 
@@ -434,6 +435,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   },
 
   stopGeneration() {
+    cancelAllActiveCommands();
     get().abortController?.abort();
   },
 

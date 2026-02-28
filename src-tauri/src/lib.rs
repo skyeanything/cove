@@ -57,6 +57,7 @@ pub fn run() {
 
   tauri::Builder::default()
     .manage(Arc::new(workspace_watcher::WatcherState::new()))
+    .manage(Arc::new(shell_commands::CancelRegistry::new()))
     .plugin(
       tauri_plugin_sql::Builder::default()
         .add_migrations("sqlite:office-chat.db", migrations)
@@ -114,6 +115,7 @@ pub fn run() {
       fs_commands::reveal_in_finder,
       workspace_watcher::watch_workspace_command,
       shell_commands::run_command,
+      shell_commands::cancel_command,
       sandbox::check_sandbox_supported,
       sandbox::get_sandbox_policy,
       sandbox::set_sandbox_policy,

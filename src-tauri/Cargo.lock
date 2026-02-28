@@ -110,6 +110,7 @@ dependencies = [
  "dirs",
  "docx-lite",
  "html2md",
+ "libc",
  "log",
  "notify",
  "pdf-extract",

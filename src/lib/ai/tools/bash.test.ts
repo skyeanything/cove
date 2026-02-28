@@ -53,7 +53,7 @@ function withPermission(allowed: boolean) {
 }
 
 // ── Import tool after mocks ───────────────────────────────────────────────────
-import { bashTool } from "./bash";
+import { bashTool, cancelAllActiveCommands } from "./bash";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -70,6 +70,7 @@ function defaultRunResult(overrides = {}) {
     stderr: "",
     exitCode: 0,
     timedOut: false,
+    cancelled: false,
     sandboxed: false,
     ...overrides,
   };
@@ -320,5 +321,72 @@ describe("bashTool – invoke error handling", () => {
     const result = await exec("ls");
     expect(result).toContain("执行失败");
     expect(result).toContain("string error");
+  });
+});
+
+describe("bashTool – cancel support", () => {
+  it("passes cancelToken in invoke args", async () => {
+    let capturedArgs: Record<string, unknown> | undefined;
+    setupTauriMocks({
+      run_command: (payload) => {
+        capturedArgs = payload as Record<string, unknown>;
+        return defaultRunResult();
+      },
+    });
+
+    await exec("ls");
+    const args = capturedArgs?.args as { cancelToken?: string } | undefined;
+    expect(args?.cancelToken).toBeDefined();
+    expect(typeof args?.cancelToken).toBe("string");
+    expect(args!.cancelToken!.length).toBeGreaterThan(0);
+  });
+
+  it("returns cancel message when result.cancelled is true", async () => {
+    setupTauriMocks({
+      run_command: () => defaultRunResult({ cancelled: true }),
+    });
+    const result = await exec("ls");
+    expect(result).toBe("[命令已被取消]");
+  });
+
+  it("cancelAllActiveCommands invokes cancel_command for active tokens", async () => {
+    let cancelledToken: string | undefined;
+    let runResolve: ((v: unknown) => void) | undefined;
+
+    setupTauriMocks({
+      run_command: () => new Promise((resolve) => { runResolve = resolve; }),
+      cancel_command: (payload) => {
+        cancelledToken = (payload as { token: string }).token;
+        return true;
+      },
+    });
+
+    // Start execution (will block on the promise)
+    const execPromise = exec("ls");
+    // Wait a tick for invoke to be called
+    await new Promise((r) => setTimeout(r, 0));
+    // Now cancel
+    cancelAllActiveCommands();
+    expect(cancelledToken).toBeDefined();
+    // Resolve the command to let exec finish
+    runResolve!(defaultRunResult({ cancelled: true }));
+    const result = await execPromise;
+    expect(result).toBe("[命令已被取消]");
+  });
+
+  it("cleans up token from active set after execution", async () => {
+    setupTauriMocks({
+      run_command: () => defaultRunResult(),
+      cancel_command: () => true,
+    });
+
+    await exec("ls");
+    // After exec completes, cancelAllActiveCommands should have nothing to cancel
+    let cancelCalled = false;
+    setupTauriMocks({
+      cancel_command: () => { cancelCalled = true; return true; },
+    });
+    cancelAllActiveCommands();
+    expect(cancelCalled).toBe(false);
   });
 });

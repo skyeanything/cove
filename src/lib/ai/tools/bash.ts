@@ -10,6 +10,16 @@ const MAX_OUTPUT_CHARS = 30_000;
 const HEAD_CHARS = 15_000;
 const TAIL_CHARS = 15_000;
 
+/** Track active cancel tokens so stopGeneration can cancel running commands. */
+const activeTokens = new Set<string>();
+
+/** Cancel all running bash commands. Called by chatStore.stopGeneration(). */
+export function cancelAllActiveCommands() {
+  for (const token of activeTokens) {
+    invoke("cancel_command", { token }).catch(() => {});
+  }
+}
+
 /** safe：只读/构建类，直接执行 */
 const SAFE_PREFIXES = [
   "ls ", "ls\n", "cat ", "head ", "tail ", "wc ",
@@ -50,6 +60,7 @@ interface RunCommandResult {
   stderr: string;
   exitCode: number;
   timedOut: boolean;
+  cancelled: boolean;
   sandboxed: boolean;
 }
 
@@ -89,6 +100,9 @@ export const bashTool = tool({
       MAX_TIMEOUT_MS,
     );
 
+    const cancelToken = crypto.randomUUID();
+    activeTokens.add(cancelToken);
+
     try {
       const result = await invoke<RunCommandResult>("run_command", {
         args: {
@@ -96,8 +110,10 @@ export const bashTool = tool({
           command,
           workdir: undefined,
           timeoutMs,
+          cancelToken,
         },
       });
+      if (result.cancelled) return "[命令已被取消]";
       const out = result.stdout + (result.stderr ? `\n[stderr]\n${result.stderr}` : "");
       const truncated = truncateOutput(out);
       const header = [
@@ -110,6 +126,8 @@ export const bashTool = tool({
       return header ? `${header}\n\n${truncated}` : truncated;
     } catch (err) {
       return `执行失败：${err instanceof Error ? err.message : String(err)}`;
+    } finally {
+      activeTokens.delete(cancelToken);
     }
   },
 });
