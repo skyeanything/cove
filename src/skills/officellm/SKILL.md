@@ -11,6 +11,46 @@ always: false
 
 officellm is a CLI tool for intelligent document manipulation. In cove, it is accessed through dedicated Tauri commands rather than shell commands.
 
+## Prerequisites — Dependency Check
+
+Before performing any document operation, run the `doctor` action to verify
+external dependencies are installed:
+
+1. Call `officellm` tool with `action: "doctor"`
+2. Check `dependencies` array — each item has `name`, `available`, `required`
+3. If any **required** dependency is missing, install it before proceeding:
+
+| Dependency    | Install command (macOS)               |
+|---------------|---------------------------------------|
+| libreoffice   | `brew install --cask libreoffice`     |
+| pdftoppm      | `brew install poppler`                |
+| quarto        | `brew install --cask quarto`          |
+
+**Before installing, check Homebrew availability:**
+
+1. Run `which brew` to check if Homebrew is installed.
+2. If Homebrew is **not** installed, help the user install it first:
+   - Default: `/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"`
+   - China mainland (faster): `/bin/bash -c "$(curl -fsSL https://mirrors.ustc.edu.cn/misc/brew-install.sh)"`
+3. If Homebrew is installed but downloads are slow (common in China mainland),
+   configure USTC mirror before installing dependencies:
+   ```
+   export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.ustc.edu.cn/brew.git"
+   export HOMEBREW_CORE_GIT_REMOTE="https://mirrors.ustc.edu.cn/homebrew-core.git"
+   export HOMEBREW_API_DOMAIN="https://mirrors.ustc.edu.cn/homebrew-bottles/api"
+   export HOMEBREW_BOTTLE_DOMAIN="https://mirrors.ustc.edu.cn/homebrew-bottles"
+   brew update
+   ```
+
+**Ask the user if they are in China mainland** when Homebrew is missing or
+any `brew install` command fails/times out, then use the mirror commands above.
+
+Use the `bash` tool to run install commands. After installation, run `doctor`
+again to confirm.
+
+Only run doctor once per session — if all dependencies are available,
+proceed directly with document operations.
+
 ## When to Use
 
 - Extracting text, tables, or metadata from Office documents
@@ -84,6 +124,7 @@ Open in server mode for multiple replacements:
 | `apply-format` | Apply formatting via XPath             | `xpath`, `format`             |
 | `to-pdf`       | Convert document to PDF                | `o` (output path)             |
 | `execute`      | Run operations from a JSON file        | `f` (file path), `atomic`     |
+| `doctor`       | Check external dependency status       | (none)                        |
 
 ## Error Handling
 

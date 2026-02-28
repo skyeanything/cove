@@ -70,6 +70,57 @@ describe("officellmTool – detect", () => {
   });
 });
 
+// ── doctor ────────────────────────────────────────────────────────────────────
+
+describe("officellmTool – doctor", () => {
+  it("returns JSON stringified data on success", async () => {
+    const data = {
+      visual_pipeline_ready: true,
+      dependencies: [
+        { name: "libreoffice", available: true, required: true, path: "/usr/bin/libreoffice" },
+        { name: "pdftoppm", available: true, required: true, path: "/usr/bin/pdftoppm" },
+        { name: "quarto", available: false, required: false },
+      ],
+    };
+    setupTauriMocks({
+      officellm_doctor: () => ({ status: "success", data, error: null, metrics: null }),
+    });
+
+    const result = await exec({ action: "doctor" });
+    expect(result).toBe(JSON.stringify(data));
+  });
+
+  it("returns error message when doctor status is error", async () => {
+    setupTauriMocks({
+      officellm_doctor: () => ({
+        status: "error",
+        data: null,
+        error: "officellm binary not found",
+        metrics: null,
+      }),
+    });
+
+    const result = await exec({ action: "doctor" });
+    expect(result).toContain("Error running doctor");
+    expect(result).toContain("officellm binary not found");
+  });
+
+  it("returns 'unknown' when error field is null", async () => {
+    setupTauriMocks({
+      officellm_doctor: () => ({
+        status: "error",
+        data: null,
+        error: null,
+        metrics: null,
+      }),
+    });
+
+    const result = await exec({ action: "doctor" });
+    expect(result).toContain("Error running doctor");
+    expect(result).toContain("unknown");
+  });
+});
+
 // ── open ──────────────────────────────────────────────────────────────────────
 
 describe("officellmTool – open", () => {

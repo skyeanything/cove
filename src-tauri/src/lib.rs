@@ -135,6 +135,7 @@ pub fn run() {
       officellm::officellm_save,
       officellm::officellm_close,
       officellm::officellm_status,
+      officellm::officellm_doctor,
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

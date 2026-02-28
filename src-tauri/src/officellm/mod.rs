@@ -74,6 +74,15 @@ pub fn officellm_status() -> Result<Option<SessionInfo>, String> {
     server::status()
 }
 
+/// 诊断外部依赖状态（强制 CLI 模式）
+#[tauri::command]
+pub async fn officellm_doctor(app: tauri::AppHandle) -> Result<CommandResult, String> {
+    let home = compute_home(&app)?;
+    tauri::async_runtime::spawn_blocking(move || cli::call("doctor", &[], &home))
+        .await
+        .map_err(|e| format!("后台线程错误: {e}"))?
+}
+
 /// 首次使用时初始化 officellm home 目录
 #[tauri::command]
 pub async fn officellm_init(app: tauri::AppHandle) -> Result<(), String> {
