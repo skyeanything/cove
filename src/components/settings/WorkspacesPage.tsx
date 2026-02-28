@@ -162,7 +162,11 @@ export function WorkspacesPage() {
   const handleAdd = useCallback(async () => {
     const selected = await open({ directory: true, multiple: false });
     if (typeof selected === "string") {
-      await add(selected);
+      try {
+        await add(selected);
+      } catch (err) {
+        console.error("Failed to add workspace:", err);
+      }
     }
   }, [add]);
 

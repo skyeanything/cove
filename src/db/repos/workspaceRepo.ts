@@ -45,8 +45,10 @@ export const workspaceRepo = {
 
   async setDefault(id: string): Promise<void> {
     const db = await getDb();
-    // First unset all defaults, then set the new one
-    await db.execute("UPDATE workspaces SET is_default = 0 WHERE is_default = 1");
-    await db.execute("UPDATE workspaces SET is_default = 1 WHERE id = $1", [id]);
+    // Atomic: unset old default + set new default in a single statement
+    await db.execute(
+      "UPDATE workspaces SET is_default = CASE WHEN id = $1 THEN 1 ELSE 0 END WHERE is_default = 1 OR id = $1",
+      [id],
+    );
   },
 };
