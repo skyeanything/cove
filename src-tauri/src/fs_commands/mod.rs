@@ -1,5 +1,6 @@
 //! 文件系统 Tauri 命令：限定在工作区内，供前端 read/write/edit 工具调用。
 
+mod copy;
 mod detection;
 mod list;
 mod office;
@@ -10,6 +11,8 @@ mod write;
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
+mod tests_copy;
+#[cfg(test)]
 mod tests_detection;
 #[cfg(test)]
 mod tests_list;
@@ -18,6 +21,7 @@ mod tests_read;
 #[cfg(test)]
 mod tests_validation;
 
+pub use copy::*;
 pub use list::*;
 pub use office::*;
 pub use read::*;

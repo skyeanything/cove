@@ -112,6 +112,7 @@ pub fn run() {
       fs_commands::create_dir,
       fs_commands::move_file,
       fs_commands::remove_entry,
+      fs_commands::copy_entry,
       fs_commands::reveal_in_finder,
       workspace_watcher::watch_workspace_command,
       shell_commands::run_command,
