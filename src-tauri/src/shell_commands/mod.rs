@@ -253,7 +253,6 @@ mod tests {
                 let root = dir.path().canonicalize().unwrap();
                 let token = cancel::CancelToken::new();
                 let token_clone = token.clone();
-                // Cancel after 200ms
                 std::thread::spawn(move || {
                     std::thread::sleep(std::time::Duration::from_millis(200));
                     token_clone.cancel();
@@ -268,6 +267,31 @@ mod tests {
                 assert!(r.cancelled);
                 assert!(!r.timed_out);
                 assert_eq!(r.exit_code, -1);
+            });
+        }
+
+        /// Regression: orphan process holding pipe FD must not block execute().
+        /// drain_pipes_with_timeout closes FDs after 3s, so total time < 7s.
+        #[test]
+        fn orphan_holding_pipe_does_not_block_drain() {
+            with_home(|_| {
+                let dir = tempfile::tempdir().unwrap();
+                let root = dir.path().canonicalize().unwrap();
+                let start = std::time::Instant::now();
+                // Orphan `sleep 300` inherits pipe FD, keeping it open after
+                // the parent shell exits. execute() must still return promptly.
+                let r = run(RunCommandArgs {
+                    workspace_root: root.to_str().unwrap().to_string(),
+                    command: "echo ok; (sleep 300 &)".into(),
+                    workdir: None,
+                    timeout_ms: Some(10_000),
+                    cancel_token: None,
+                }).unwrap();
+                let elapsed = start.elapsed();
+                assert_eq!(r.exit_code, 0);
+                assert!(!r.timed_out);
+                // Must return well before the 10s timeout — drain closes FDs after 3s.
+                assert!(elapsed.as_secs() < 7, "took {:?}, expected < 7s", elapsed);
             });
         }
     }
