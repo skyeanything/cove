@@ -26,12 +26,15 @@ interface FilePreviewState {
   contentCache: Record<string, CachedContent>;
   /** 当前预览错误（如文件已被删除） */
   previewError: PreviewErrorKind;
+  /** Set by breadcrumb click — tells FileTreePanel to expand ancestors + scroll */
+  pendingExpandPath: string | null;
 
   setWorkspaceRoot: (root: string | null) => void;
   setSelected: (path: string | null) => void;
   setContent: (path: string, content: CachedContent) => void;
   invalidate: (path: string) => void;
   setPreviewError: (err: PreviewErrorKind) => void;
+  setPendingExpandPath: (path: string | null) => void;
   clear: () => void;
 }
 
@@ -41,9 +44,10 @@ export const useFilePreviewStore = create<FilePreviewState>()((set) => ({
   lastOpenedDirPath: null,
   contentCache: {},
   previewError: null,
+  pendingExpandPath: null,
 
   setWorkspaceRoot: (root) =>
-    set({ workspaceRoot: root, selectedPath: null, lastOpenedDirPath: null, contentCache: {}, previewError: null }),
+    set({ workspaceRoot: root, selectedPath: null, lastOpenedDirPath: null, contentCache: {}, previewError: null, pendingExpandPath: null }),
 
   setSelected: (path) =>
     set((s) => ({
@@ -66,6 +70,8 @@ export const useFilePreviewStore = create<FilePreviewState>()((set) => ({
 
   setPreviewError: (err) => set({ previewError: err }),
 
+  setPendingExpandPath: (path) => set({ pendingExpandPath: path }),
+
   clear: () =>
-    set({ selectedPath: null, lastOpenedDirPath: null, contentCache: {}, previewError: null }),
+    set({ selectedPath: null, lastOpenedDirPath: null, contentCache: {}, previewError: null, pendingExpandPath: null }),
 }));

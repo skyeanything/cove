@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDown, ExternalLink } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { useTranslation } from "react-i18next";
+import { BreadcrumbNav } from "./BreadcrumbNav";
 
 export interface OfficeAppInfo {
   id: string;
@@ -96,8 +97,8 @@ export function PreviewFileHeader({
 
   return (
     <div className="flex h-10 shrink-0 items-center justify-between gap-2 border-b border-border bg-background px-3">
-      <div className="file-preview-header-path min-w-0 truncate text-[13px] text-foreground-secondary" title={path}>
-        {path}
+      <div className="file-preview-header-path min-w-0 text-[13px]">
+        <BreadcrumbNav path={path} />
       </div>
       <div className="relative flex shrink-0 items-center gap-1" ref={dropdownRef}>
         {matchingApps.length > 0 && matchingApps[0] ? (
