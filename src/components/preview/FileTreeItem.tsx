@@ -47,6 +47,13 @@ export function FileTreeItem({
   onDelete,
   onRenameSubmit,
   onRenameCancel,
+  draggedPath,
+  dropTargetPath,
+  onDnDStart,
+  onDnDEnd,
+  onDnDOver,
+  onDnDLeave,
+  onDnDDrop,
 }: {
   entry: ListDirEntry;
   workspaceRoot: string;
@@ -65,12 +72,21 @@ export function FileTreeItem({
   onDelete: (path: string, name: string) => void;
   onRenameSubmit: (path: string, newName: string) => void;
   onRenameCancel: () => void;
+  draggedPath?: string | null;
+  dropTargetPath?: string | null;
+  onDnDStart?: (e: React.DragEvent, path: string) => void;
+  onDnDEnd?: () => void;
+  onDnDOver?: (e: React.DragEvent, path: string, isDir: boolean) => void;
+  onDnDLeave?: (e: React.DragEvent, path: string) => void;
+  onDnDDrop?: (e: React.DragEvent, path: string) => void;
 }) {
   const { t } = useTranslation();
   const isDir = entry.isDir;
   const path = entry.path;
   const isSelected = selectedPath === path;
   const isExpanded = expandedDirs.has(path);
+  const isDragged = draggedPath === path;
+  const isDropTarget = dropTargetPath === path && isDir;
   const children = loadedChildren[path];
   const isEditing = editingPath === path;
   const inputRef = useRef<HTMLInputElement>(null);
@@ -175,9 +191,17 @@ export function FileTreeItem({
           <button
             type="button"
             onClick={handleClick}
+            draggable
+            onDragStart={(e) => onDnDStart?.(e, path)}
+            onDragEnd={onDnDEnd}
+            onDragOver={(e) => onDnDOver?.(e, path, isDir)}
+            onDragLeave={(e) => onDnDLeave?.(e, path)}
+            onDrop={(e) => { if (isDir) onDnDDrop?.(e, path); }}
             className={cn(
               "relative flex w-full items-center gap-1.5 rounded-[2px] mx-1 px-2 py-1 text-left text-[13px]",
               isSelected ? "font-medium text-foreground" : "text-foreground-secondary hover:bg-background-tertiary hover:text-foreground",
+              isDragged && "opacity-40",
+              isDropTarget && "ring-1 ring-accent/50 bg-accent/5",
             )}
           >
             {rowContent}
@@ -239,6 +263,13 @@ export function FileTreeItem({
               onDelete={onDelete}
               onRenameSubmit={onRenameSubmit}
               onRenameCancel={onRenameCancel}
+              draggedPath={draggedPath}
+              dropTargetPath={dropTargetPath}
+              onDnDStart={onDnDStart}
+              onDnDEnd={onDnDEnd}
+              onDnDOver={onDnDOver}
+              onDnDLeave={onDnDLeave}
+              onDnDDrop={onDnDDrop}
             />
           ))}
         </div>
