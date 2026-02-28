@@ -26,14 +26,7 @@ pub fn run() {
   // 覆盖 TMPDIR，防止 macOS sandbox 阻断 /var/folders/...
   // 子进程（含沙箱内 bash）会继承此环境变量
   // 安全：set_var 在单线程初始化阶段调用，无竞态风险
-  {
-    let tmp_dir = officellm::env::tmp_dir();
-    unsafe {
-      std::env::set_var("TMPDIR", &tmp_dir);
-      std::env::set_var("TEMP", &tmp_dir);
-      std::env::set_var("TMP", &tmp_dir);
-    }
-  }
+  unsafe { officellm::env::apply_process_env(); }
 
   let migrations = vec![
     Migration {

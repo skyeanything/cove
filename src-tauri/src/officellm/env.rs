@@ -2,15 +2,88 @@
 
 use std::path::PathBuf;
 use std::process::Command;
+use std::sync::OnceLock;
 
-/// Returns the dedicated tmp directory for officellm (`~/.officellm/tmp`),
-/// creating it if needed. Falls back to `/tmp`.
+/// The system temp directory captured *before* we override TMPDIR.
+/// On macOS this is typically `/var/folders/<user>/T/`.
+static SYSTEM_TEMP_DIR: OnceLock<PathBuf> = OnceLock::new();
+
+/// Returns the original system temp directory (before TMPDIR override).
+/// Some runtimes (e.g. .NET) use `confstr(_CS_DARWIN_USER_TEMP_DIR)` or
+/// `NSTemporaryDirectory()` which resolve to this path regardless of TMPDIR.
+pub fn system_temp_dir() -> &'static PathBuf {
+    SYSTEM_TEMP_DIR.get_or_init(|| std::env::temp_dir())
+}
+
+/// Reject paths that are too broad for sandbox whitelisting.
+/// Must be absolute, contain no `.`/`..` segments, and after canonicalization
+/// still be at least 3 components deep (e.g. `/tmp/foo`, not `/`).
+fn is_safe_temp_path(path: &std::path::Path) -> bool {
+    use std::path::Component;
+    if !path.is_absolute() {
+        return false;
+    }
+    if path.components().any(|c| matches!(c, Component::ParentDir | Component::CurDir)) {
+        return false;
+    }
+    path.components().count() >= 3
+}
+
+/// Returns the dedicated tmp directory for officellm.
+/// Priority: `OFFICELLM_TEMP` env var → `~/.officellm/tmp` → `/tmp`.
 pub fn tmp_dir() -> PathBuf {
+    if let Ok(custom) = std::env::var("OFFICELLM_TEMP") {
+        if !custom.is_empty() {
+            let path = PathBuf::from(&custom);
+            if !is_safe_temp_path(&path) {
+                log::warn!(
+                    "OFFICELLM_TEMP={custom} rejected (must be absolute with depth >= 3), \
+                     falling back to ~/.officellm/tmp"
+                );
+            } else {
+                match std::fs::create_dir_all(&path) {
+                    Ok(_) => return path,
+                    Err(e) => {
+                        log::warn!(
+                            "OFFICELLM_TEMP={custom} is not usable ({e}), \
+                             falling back to ~/.officellm/tmp"
+                        );
+                    }
+                }
+            }
+        }
+    }
     let dir = dirs::home_dir()
         .map(|h| h.join(".officellm/tmp"))
         .unwrap_or_else(|| PathBuf::from("/tmp"));
     let _ = std::fs::create_dir_all(&dir);
     dir
+}
+
+/// Sets TMPDIR / TEMP / TMP as process-wide env vars.
+/// Call only during single-threaded init (no race risk).
+pub unsafe fn apply_process_env() {
+    // Capture original system temp dir before overriding TMPDIR
+    let _ = system_temp_dir();
+    let dir = tmp_dir();
+    std::env::set_var("TMPDIR", &dir);
+    std::env::set_var("TEMP", &dir);
+    std::env::set_var("TMP", &dir);
+}
+
+/// Returns paths that must be writable in the sandbox for temp access.
+/// Includes both the officellm tmp dir and the original system temp dir
+/// (with canonical form for macOS `/var` → `/private/var` symlink).
+pub fn sandbox_temp_whitelist() -> Vec<String> {
+    let mut paths = vec![tmp_dir().to_string_lossy().into_owned()];
+    let sys = system_temp_dir();
+    paths.push(sys.to_string_lossy().into_owned());
+    if let Ok(canon) = sys.canonicalize() {
+        if canon != *sys {
+            paths.push(canon.to_string_lossy().into_owned());
+        }
+    }
+    paths
 }
 
 /// Sets TMPDIR / TEMP / TMP environment variables on a `Command` builder
@@ -61,6 +134,56 @@ mod tests {
                     "missing env var: {key}"
                 );
             }
+        });
+    }
+
+    #[test]
+    fn tmp_dir_respects_officellm_temp() {
+        with_home(|home| {
+            let custom = home.join("my-custom-tmp");
+            let prev = std::env::var_os("OFFICELLM_TEMP");
+            unsafe { std::env::set_var("OFFICELLM_TEMP", &custom); }
+            let dir = tmp_dir();
+            // restore
+            match prev {
+                Some(v) => unsafe { std::env::set_var("OFFICELLM_TEMP", v) },
+                None => unsafe { std::env::remove_var("OFFICELLM_TEMP") },
+            }
+            assert_eq!(dir, custom);
+            assert!(custom.exists());
+        });
+    }
+
+    #[test]
+    fn tmp_dir_rejects_overly_broad_path() {
+        for bad in ["/", "/tmp/../.."] {
+            with_home(|home| {
+                let prev = std::env::var_os("OFFICELLM_TEMP");
+                unsafe { std::env::set_var("OFFICELLM_TEMP", bad); }
+                let dir = tmp_dir();
+                match prev {
+                    Some(v) => unsafe { std::env::set_var("OFFICELLM_TEMP", v) },
+                    None => unsafe { std::env::remove_var("OFFICELLM_TEMP") },
+                }
+                assert!(dir.starts_with(home), "{bad} should be rejected");
+                assert!(dir.ends_with(".officellm/tmp"));
+            });
+        }
+    }
+
+    #[test]
+    fn tmp_dir_fallback_on_invalid_officellm_temp() {
+        with_home(|home| {
+            let prev = std::env::var_os("OFFICELLM_TEMP");
+            unsafe { std::env::set_var("OFFICELLM_TEMP", "/proc/nonexistent/dir"); }
+            let dir = tmp_dir();
+            // restore
+            match prev {
+                Some(v) => unsafe { std::env::set_var("OFFICELLM_TEMP", v) },
+                None => unsafe { std::env::remove_var("OFFICELLM_TEMP") },
+            }
+            assert!(dir.starts_with(home));
+            assert!(dir.ends_with(".officellm/tmp"));
         });
     }
 }
