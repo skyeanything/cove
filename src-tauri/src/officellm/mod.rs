@@ -3,6 +3,7 @@
 pub mod cli;
 pub mod detect;
 pub mod env;
+pub mod init;
 pub mod resolve;
 pub mod server;
 pub mod types;
@@ -62,4 +63,17 @@ pub async fn officellm_close() -> Result<(), String> {
 #[tauri::command]
 pub fn officellm_status() -> Result<Option<SessionInfo>, String> {
     server::status()
+}
+
+/// 首次使用时初始化 officellm home 目录
+#[tauri::command]
+pub async fn officellm_init(app: tauri::AppHandle) -> Result<(), String> {
+    let (bin, _) = resolve::resolve_bin()
+        .ok_or("officellm binary not found")?;
+    let home = resolve::officellm_home(&app)?;
+    tauri::async_runtime::spawn_blocking(move || {
+        init::ensure_initialized(&bin, &home)
+    })
+    .await
+    .map_err(|e| format!("后台线程错误: {e}"))?
 }

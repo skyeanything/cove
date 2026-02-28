@@ -129,6 +129,7 @@ pub fn run() {
       docx_commands::qmd_to_pdf,
       docx_commands::pptx_to_pdf,
       officellm::officellm_detect,
+      officellm::officellm_init,
       officellm::officellm_call,
       officellm::officellm_open,
       officellm::officellm_save,
