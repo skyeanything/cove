@@ -40,6 +40,8 @@ export function useAutoScroll({
   const isRafScrollingRef = useRef(false);
   // Guard B: sticky flag — user explicitly scrolled up
   const userScrolledUpRef = useRef(false);
+  // Set by wheel-down, consumed by scroll handler to detect user-initiated return to bottom
+  const userScrollingDownRef = useRef(false);
 
   const [isDetached, setIsDetached] = useState(false);
 
@@ -118,14 +120,27 @@ export function useAutoScroll({
       const distanceFromBottom =
         el.scrollHeight - el.scrollTop - el.clientHeight;
 
+      // User wheeled down and scroll has now settled — check post-scroll position
+      const wasUserDown = userScrollingDownRef.current;
+      userScrollingDownRef.current = false;
+
       if (scrolledUp) {
         shouldFollowRef.current = false;
         setIsDetached(true);
       } else if (
+        wasUserDown &&
+        userScrolledUpRef.current &&
+        distanceFromBottom <= FOLLOW_AT_BOTTOM_PX
+      ) {
+        // User manually scrolled back to bottom — clear sticky flag
+        userScrolledUpRef.current = false;
+        shouldFollowRef.current = true;
+        setIsDetached(false);
+        startRaf(el);
+      } else if (
         !userScrolledUpRef.current &&
         distanceFromBottom <= FOLLOW_AT_BOTTOM_PX
       ) {
-        // Only re-enable if user hasn't explicitly scrolled up
         shouldFollowRef.current = true;
         setIsDetached(false);
         startRaf(el);
@@ -143,15 +158,9 @@ export function useAutoScroll({
         setIsDetached(true);
         stopRaf();
       } else if (e.deltaY > 0) {
-        // User scrolling down — check if they've reached the bottom
-        const distFromBottom =
-          el.scrollHeight - el.scrollTop - el.clientHeight;
-        if (distFromBottom <= FOLLOW_AT_BOTTOM_PX) {
-          userScrolledUpRef.current = false;
-          shouldFollowRef.current = true;
-          setIsDetached(false);
-          if (isStreaming) startRaf(el);
-        }
+        // Mark that the user is scrolling down; the scroll handler will
+        // check the *post-scroll* position to decide whether to clear sticky
+        userScrollingDownRef.current = true;
       }
     };
 

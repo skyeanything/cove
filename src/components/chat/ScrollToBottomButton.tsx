@@ -14,6 +14,8 @@ export function ScrollToBottomButton({
       type="button"
       onClick={onClick}
       aria-label="Scroll to bottom"
+      aria-hidden={!visible}
+      tabIndex={visible ? 0 : -1}
       className="absolute bottom-2 left-1/2 z-10 flex size-8 -translate-x-1/2 cursor-pointer items-center justify-center rounded-full border border-border bg-background shadow-md transition-all duration-150 hover:bg-background-tertiary"
       style={{
         opacity: visible ? 1 : 0,
