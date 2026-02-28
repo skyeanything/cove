@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { useLayoutStore } from "@/stores/layoutStore";
 import { useFileTreeDialogs } from "@/hooks/useFileTreeDialogs";
+import { useFileTreeDnD } from "@/hooks/useFileTreeDnD";
 import { FileTreeItem } from "./FileTreeItem";
 import { FileTreeDialogs } from "./FileTreeDialogs";
 import type { ListDirEntry } from "./FileTreeItem";
@@ -63,6 +64,8 @@ export function FileTreePanel() {
     setExpandedDirs,
     t,
   });
+
+  const dnd = useFileTreeDnD({ workspaceRoot });
 
   const loadRoot = useCallback(() => {
     if (!workspaceRoot) return;
@@ -256,7 +259,11 @@ export function FileTreePanel() {
       <ScrollArea className="min-h-0 flex-1">
         <ContextMenu>
           <ContextMenuTrigger asChild>
-            <div className="min-h-full px-3 pt-3 pb-2">
+            <div
+              className="min-h-full px-3 pt-3 pb-2"
+              onDragOver={dnd.onRootDragOver}
+              onDrop={dnd.onRootDrop}
+            >
               {rootEntries === null ? (
                 <div className="py-2 text-center text-[13px] text-muted-foreground">{t("preview.loading")}</div>
               ) : rootEntries.length === 0 ? (
@@ -282,6 +289,13 @@ export function FileTreePanel() {
                 onDelete={dialogs.onDelete}
                 onRenameSubmit={onRenameSubmit}
                 onRenameCancel={onRenameCancel}
+                draggedPath={dnd.draggedPath}
+                dropTargetPath={dnd.dropTargetPath}
+                onDnDStart={dnd.onDragStart}
+                onDnDEnd={dnd.onDragEnd}
+                onDnDOver={dnd.onDragOver}
+                onDnDLeave={dnd.onDragLeave}
+                onDnDDrop={dnd.onDrop}
               />
             ))
               )}
