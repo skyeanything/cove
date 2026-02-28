@@ -31,6 +31,10 @@ interface WorkspaceState {
   remove: (workspaceId: string) => Promise<void>;
   /** Load active workspace when switching conversations */
   loadFromConversation: (conversationId: string) => Promise<void>;
+  /** Rename a workspace */
+  rename: (id: string, name: string) => Promise<void>;
+  /** Set a workspace as the default */
+  setDefault: (id: string) => Promise<void>;
   /** Check if a target path is inside the active workspace */
   containsPath: (target: string) => boolean;
 }
@@ -117,6 +121,25 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     }
 
     await get().reload();
+  },
+
+  async rename(id, name) {
+    await workspaceRepo.updateName(id, name);
+    set((s) => ({
+      workspaces: s.workspaces.map((w) => (w.id === id ? { ...w, name } : w)),
+      activeWorkspace:
+        s.activeWorkspace?.id === id ? { ...s.activeWorkspace, name } : s.activeWorkspace,
+    }));
+  },
+
+  async setDefault(id) {
+    await workspaceRepo.setDefault(id);
+    set((s) => ({
+      workspaces: s.workspaces.map((w) => ({
+        ...w,
+        is_default: w.id === id ? 1 : 0,
+      })) as Workspace[],
+    }));
   },
 
   async loadFromConversation(conversationId: string) {

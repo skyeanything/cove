@@ -37,4 +37,18 @@ export const workspaceRepo = {
     const db = await getDb();
     await db.execute("DELETE FROM workspaces WHERE id = $1", [id]);
   },
+
+  async updateName(id: string, name: string): Promise<void> {
+    const db = await getDb();
+    await db.execute("UPDATE workspaces SET name = $1 WHERE id = $2", [name, id]);
+  },
+
+  async setDefault(id: string): Promise<void> {
+    const db = await getDb();
+    // Atomic: unset old default + set new default in a single statement
+    await db.execute(
+      "UPDATE workspaces SET is_default = CASE WHEN id = $1 THEN 1 ELSE 0 END WHERE is_default = 1 OR id = $1",
+      [id],
+    );
+  },
 };
