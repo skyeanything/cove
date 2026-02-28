@@ -18,21 +18,12 @@ import {
   ActionButton,
   COPY_FEEDBACK_MS,
 } from "./AssistantMessage";
+import { useAutoScroll } from "@/hooks/useAutoScroll";
+import { ScrollToBottomButton } from "./ScrollToBottomButton";
 
 const EMPTY_ATTACHMENTS: Attachment[] = [];
 
 export function MessageList() {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const autoScrollRafRef = useRef<number | null>(null);
-  const autoScrollLastTsRef = useRef<number | null>(null);
-  /** 是否跟随到底：仅在有新内容且用户未主动上滑时为 true，避免加载/切会话时强制贴底 */
-  const shouldAutoFollowRef = useRef(false);
-  const lastScrollTopRef = useRef(0);
-  /** 记录上一次 isStreaming 状态，用于检测「刚开始流式」时机 */
-  const prevIsStreamingRef = useRef(false);
-
-  /** 距离底部小于等于此值视为「在底部」，恢复跟随（用户手动滑回底部时） */
-  const FOLLOW_AT_BOTTOM_PX = 50;
   const messages = useChatStore((s) => s.messages);
   const isStreaming = useChatStore((s) => s.isStreaming);
   const streamingContent = useChatStore((s) => s.streamingContent);
@@ -40,134 +31,39 @@ export function MessageList() {
   const streamingToolCalls = useChatStore((s) => s.streamingToolCalls);
   const streamingParts = useChatStore((s) => s.streamingParts);
 
-  // 不做缓冲/平滑：event 到达即渲染
   const hasOrderedStreamingParts = streamingParts.length > 0;
   const renderedContent = streamingContent;
   const renderedReasoning = streamingReasoning;
   const renderedParts = hasOrderedStreamingParts ? streamingParts : undefined;
 
-  const stopAutoScroll = useCallback(() => {
-    if (autoScrollRafRef.current != null) {
-      cancelAnimationFrame(autoScrollRafRef.current);
-      autoScrollRafRef.current = null;
-    }
-    autoScrollLastTsRef.current = null;
-  }, []);
-
-  const startAutoScroll = useCallback((viewport: HTMLElement) => {
-    if (autoScrollRafRef.current != null) return;
-
-    const step = (now: number) => {
-      if (!shouldAutoFollowRef.current) {
-        autoScrollRafRef.current = null;
-        autoScrollLastTsRef.current = null;
-        return;
-      }
-      const targetTop = viewport.scrollHeight - viewport.clientHeight;
-      const distance = targetTop - viewport.scrollTop;
-
-      // 距离很小时直接贴底，避免末端抖动
-      if (distance <= 0.8) {
-        viewport.scrollTop = targetTop;
-        autoScrollRafRef.current = null;
-        autoScrollLastTsRef.current = null;
-        return;
-      }
-
-      const prevTs = autoScrollLastTsRef.current ?? now;
-      const dt = Math.min(40, Math.max(8, now - prevTs));
-      autoScrollLastTsRef.current = now;
-
-      // 时间归一化缓动：更柔和，并且对不同帧率表现一致
-      const easing = 1 - Math.exp((-dt / 16) * 0.12);
-      const stepPx = Math.min(14, Math.max(0.25, distance * easing));
-      viewport.scrollTop += stepPx;
-      autoScrollRafRef.current = requestAnimationFrame(step);
-    };
-
-    autoScrollRafRef.current = requestAnimationFrame(step);
-  }, []);
-
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-
-    const updateFollowState = () => {
-      const prevTop = lastScrollTopRef.current;
-      const currTop = el.scrollTop;
-      const scrolledUp = currTop < prevTop - 0.5;
-      const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-      // 用 else if：用户正在上滑时，不被「仍在底部附近」条件覆盖
-      if (scrolledUp) {
-        shouldAutoFollowRef.current = false;
-      } else if (distanceFromBottom <= FOLLOW_AT_BOTTOM_PX) {
-        shouldAutoFollowRef.current = true;
-        // 用户滑回底部时立即重启 RAF，不必等下一个 streaming token
-        startAutoScroll(el);
-      }
-      lastScrollTopRef.current = currTop;
-      if (!shouldAutoFollowRef.current) stopAutoScroll();
-    };
-
-    const onWheel = (e: WheelEvent) => {
-      if (e.deltaY < 0) {
-        shouldAutoFollowRef.current = false;
-        stopAutoScroll();
-      }
-    };
-
-    lastScrollTopRef.current = el.scrollTop;
-    updateFollowState();
-    el.addEventListener("scroll", updateFollowState, { passive: true });
-    el.addEventListener("wheel", onWheel, { passive: true, capture: true });
-    return () => {
-      el.removeEventListener("scroll", updateFollowState);
-      el.removeEventListener("wheel", onWheel, { capture: true });
-      stopAutoScroll();
-    };
-  }, [stopAutoScroll, startAutoScroll]);
-
-  // 仅在流式输出时自动滚动。关键：只在「刚开始流式」那一刻判断是否启用跟随，
-  // 后续内容更新不再重置用户意愿——这样用户上滑后不会被自动拉回底部。
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    if (!isStreaming) {
-      prevIsStreamingRef.current = false;
-      return;
-    }
-    // 流式刚启动（false → true）：若用户在底部则启用跟随
-    if (!prevIsStreamingRef.current) {
-      const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight;
-      if (distanceFromBottom <= FOLLOW_AT_BOTTOM_PX) {
-        shouldAutoFollowRef.current = true;
-      }
-      prevIsStreamingRef.current = true;
-    }
-    if (!shouldAutoFollowRef.current) return;
-    startAutoScroll(el);
-  }, [isStreaming, messages, renderedContent, renderedReasoning, streamingToolCalls, renderedParts, startAutoScroll]);
+  const { scrollRef, isDetached, scrollToBottom } = useAutoScroll({
+    isStreaming,
+    contentDeps: [messages, renderedContent, renderedReasoning, streamingToolCalls, renderedParts],
+  });
 
   if (messages.length === 0 && !isStreaming) {
     return <EmptyState />;
   }
 
   return (
-    <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto">
-      <div className="mx-auto w-full max-w-[896px] px-4 py-6">
-        {messages.map((msg) => (
-          <MessageBubble key={msg.id} message={msg} />
-        ))}
-        {isStreaming && (
-          <AssistantMessage
-            content={renderedContent}
-            reasoning={renderedReasoning}
-            toolCalls={streamingToolCalls}
-            parts={renderedParts}
-            isStreaming
-          />
-        )}
+    <div className="relative min-h-0 flex-1">
+      <div ref={scrollRef} className="absolute inset-0 overflow-y-auto">
+        <div className="mx-auto w-full max-w-[896px] px-4 py-6">
+          {messages.map((msg) => (
+            <MessageBubble key={msg.id} message={msg} />
+          ))}
+          {isStreaming && (
+            <AssistantMessage
+              content={renderedContent}
+              reasoning={renderedReasoning}
+              toolCalls={streamingToolCalls}
+              parts={renderedParts}
+              isStreaming
+            />
+          )}
+        </div>
       </div>
+      <ScrollToBottomButton visible={isDetached} onClick={scrollToBottom} />
     </div>
   );
 }
