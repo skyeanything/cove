@@ -45,6 +45,17 @@ pub fn external_home() -> Option<PathBuf> {
     dirs::home_dir().map(|h| h.join(".officellm"))
 }
 
+/// Return the correct `OFFICELLM_HOME` for the resolved binary.
+///
+/// Bundled mode → `<app_data_dir>/officellm`, external → `~/.officellm`.
+pub fn resolve_home(is_bundled: bool, app: &tauri::AppHandle) -> Result<PathBuf, String> {
+    if is_bundled {
+        officellm_home(app)
+    } else {
+        external_home().ok_or_else(|| "无法获取用户 home 目录".to_string())
+    }
+}
+
 /// Return the `OFFICELLM_HOME` directory for bundled mode.
 ///
 /// Path: `<app_data_dir>/officellm`. The directory is created if it does not

@@ -41,7 +41,7 @@ fn js_err(msg: &str) -> rquickjs::Error {
 }
 
 #[tauri::command]
-pub fn run_js(args: RunJsArgs) -> Result<JsExecutionResult, String> {
+pub fn run_js(app: tauri::AppHandle, args: RunJsArgs) -> Result<JsExecutionResult, String> {
     let timeout_ms = args.timeout_ms.unwrap_or(DEFAULT_TIMEOUT_MS).min(60_000);
     let start = Instant::now();
 
@@ -64,6 +64,11 @@ pub fn run_js(args: RunJsArgs) -> Result<JsExecutionResult, String> {
     let workspace_root = args.workspace_root.clone();
     let code = args.code.clone();
 
+    // Compute officellm home directory (bundled vs external)
+    let officellm_home = crate::officellm::resolve::resolve_bin()
+        .map(|(_, is_bundled)| crate::officellm::resolve::resolve_home(is_bundled, &app))
+        .transpose()?;
+
     ctx.with(|ctx| {
         let globals = ctx.globals();
         let buf: Rc<RefCell<Vec<String>>> = Rc::new(RefCell::new(Vec::new()));
@@ -79,7 +84,7 @@ pub fn run_js(args: RunJsArgs) -> Result<JsExecutionResult, String> {
 
         // --- workspace ---
         let ws = rquickjs::Object::new(ctx.clone()).map_err(|e| format!("{e}"))?;
-        register_workspace_fns(&ctx, &ws, &workspace_root)?;
+        register_workspace_fns(&ctx, &ws, &workspace_root, officellm_home.as_deref())?;
         globals.set("workspace", ws).map_err(|e| format!("{e}"))?;
 
         // --- eval ---
@@ -150,6 +155,7 @@ fn register_workspace_fns<'js>(
     ctx: &rquickjs::Ctx<'js>,
     ws: &rquickjs::Object<'js>,
     workspace_root: &str,
+    officellm_home: Option<&std::path::Path>,
 ) -> Result<(), String> {
     let wr = workspace_root.to_string();
     let read_fn = Function::new(ctx.clone(), move |path: String| -> rquickjs::Result<String> {
@@ -204,6 +210,7 @@ fn register_workspace_fns<'js>(
     ws.set("listDir", list_fn).map_err(|e| format!("{e}"))?;
 
     let wr4 = workspace_root.to_string();
+    let ollm_home = officellm_home.map(|p| p.to_path_buf());
     let officellm_fn = Function::new(
         ctx.clone(),
         move |cmd: String, mut args: HashMap<String, String>| -> rquickjs::Result<String> {
@@ -224,10 +231,13 @@ fn register_workspace_fns<'js>(
                 }
             }
 
+            let home = ollm_home.as_deref()
+                .ok_or_else(|| js_err("officellm 未安装"))?;
+
             let result: Result<serde_json::Value, String> = match cmd.as_str() {
                 "open" => {
                     let path = args.get("path").ok_or_else(|| "open 需要 path 参数".to_string()).map_err(|e| js_err(&e))?;
-                    crate::officellm::server::open(path)
+                    crate::officellm::server::open(path, home)
                         .map(|_| serde_json::json!({"status":"success"}))
                 }
                 "close" => {
@@ -248,7 +258,7 @@ fn register_workspace_fns<'js>(
                         crate::officellm::server::call(&cmd, &cli_args)
                             .map(|r| serde_json::to_value(&r).unwrap_or(serde_json::Value::Null))
                     } else {
-                        crate::officellm::cli::call(&cmd, &cli_args)
+                        crate::officellm::cli::call(&cmd, &cli_args, home)
                             .map(|r| serde_json::to_value(&r).unwrap_or(serde_json::Value::Null))
                     };
                     r

@@ -1,5 +1,6 @@
 //! CLI 模式：spawn officellm 进程，传 --result-schema v2 --strict，解析 JSON 返回。
 
+use std::path::Path;
 use std::process::Command;
 use std::time::Duration;
 
@@ -10,12 +11,11 @@ const DEFAULT_TIMEOUT_SECS: u64 = 120;
 
 /// CLI 模式执行 officellm 命令。
 ///
+/// `home` 应由调用方根据 bundled/external 模式通过 `resolve::resolve_home()` 计算。
 /// 等价于：`officellm <cmd> --result-schema v2 --strict [--key value ...]`
 /// 解析 stdout JSON 并返回 `CommandResult`。
-pub fn call(cmd: &str, args: &[String]) -> Result<CommandResult, String> {
+pub fn call(cmd: &str, args: &[String], home: &Path) -> Result<CommandResult, String> {
     let bin = super::detect::bin_path()?;
-    let home = super::resolve::external_home()
-        .ok_or("无法获取用户 home 目录")?;
 
     let mut command = Command::new(&bin);
     command.arg(cmd);
@@ -25,7 +25,7 @@ pub fn call(cmd: &str, args: &[String]) -> Result<CommandResult, String> {
         command.arg(arg);
     }
 
-    super::env::apply_env(&mut command, &home);
+    super::env::apply_env(&mut command, home);
 
     command.stdout(std::process::Stdio::piped());
     command.stderr(std::process::Stdio::piped());
@@ -100,9 +100,12 @@ mod tests {
 
     #[test]
     fn call_errors_when_binary_not_found() {
-        with_home(|_home| {
-            let err = call("test", &[]).unwrap_err();
-            assert!(err.contains("未找到 officellm"));
+        with_home(|home| {
+            let err = call("test", &[], home).unwrap_err();
+            assert!(
+                err.contains("未找到 officellm"),
+                "expected '未找到 officellm' in error, got: {err}"
+            );
         });
     }
 

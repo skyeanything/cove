@@ -10,6 +10,12 @@ pub mod types;
 
 use types::{CommandResult, DetectResult, SessionInfo};
 
+/// Compute the correct `OFFICELLM_HOME` for the current binary resolution.
+fn compute_home(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    let (_, is_bundled) = resolve::resolve_bin().ok_or("未找到 officellm")?;
+    resolve::resolve_home(is_bundled, app)
+}
+
 // ── Tauri 命令 ──────────────────────────────────────────────────────────────
 
 /// 检测 officellm 是否已安装
@@ -21,14 +27,16 @@ pub fn officellm_detect() -> DetectResult {
 /// 执行 officellm 命令：有活跃 session 时走 Server 模式，否则走 CLI 模式
 #[tauri::command]
 pub async fn officellm_call(
+    app: tauri::AppHandle,
     cmd: String,
     args: Vec<String>,
 ) -> Result<CommandResult, String> {
+    let home = compute_home(&app)?;
     tauri::async_runtime::spawn_blocking(move || {
         if server::has_session() {
             server::call(&cmd, &args)
         } else {
-            cli::call(&cmd, &args)
+            cli::call(&cmd, &args, &home)
         }
     })
     .await
@@ -37,8 +45,9 @@ pub async fn officellm_call(
 
 /// Server 模式：打开文档
 #[tauri::command]
-pub async fn officellm_open(path: String) -> Result<(), String> {
-    tauri::async_runtime::spawn_blocking(move || server::open(&path))
+pub async fn officellm_open(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    let home = compute_home(&app)?;
+    tauri::async_runtime::spawn_blocking(move || server::open(&path, &home))
         .await
         .map_err(|e| format!("后台线程错误: {e}"))?
 }

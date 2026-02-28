@@ -47,16 +47,16 @@ fn drain_stderr(child: &mut Child) -> String {
     msg
 }
 
-/// 打开文档并启动 Server 会话
-pub fn open(path: &str) -> Result<(), String> {
+/// 打开文档并启动 Server 会话。
+///
+/// `home` 应由调用方根据 bundled/external 模式通过 `resolve::resolve_home()` 计算。
+pub fn open(path: &str, home: &std::path::Path) -> Result<(), String> {
     let mut guard = SESSION.lock().map_err(|e| format!("锁获取失败: {e}"))?;
     if guard.is_some() {
         return Err("已有活跃会话，请先调用 close() 关闭".to_string());
     }
 
     let bin = super::detect::bin_path()?;
-    let home = super::resolve::external_home()
-        .ok_or("无法获取用户 home 目录")?;
 
     log::info!("[officellm-server] opening: {path}");
 
@@ -65,7 +65,7 @@ pub fn open(path: &str) -> Result<(), String> {
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    super::env::apply_env(&mut cmd, &home);
+    super::env::apply_env(&mut cmd, home);
 
     let mut child = cmd
         .spawn()
