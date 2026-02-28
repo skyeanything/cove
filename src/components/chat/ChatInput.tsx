@@ -242,7 +242,7 @@ export function ChatInput({
       <div className="mx-auto max-w-[896px]">
         {/* Error / compression notice */}
         {isCompressing && (
-          <div className="mb-2 rounded-lg bg-accent/10 px-3 py-2 text-[13px] text-accent">
+          <div className="mb-2 rounded-lg bg-accent/20 border border-accent/30 px-3 py-2 text-[13px] font-medium text-accent">
             {t("chat.contextCompressing")}
           </div>
         )}

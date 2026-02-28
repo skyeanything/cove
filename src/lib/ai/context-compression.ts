@@ -7,8 +7,8 @@ import compressionPromptTemplate from "@/prompts/context-compression.md?raw";
 const DEFAULT_THRESHOLD = 0.75;
 /** Ratio of context window to keep as recent messages */
 const DEFAULT_KEEP_RATIO = 0.4;
-/** Minimum number of messages before compression is considered */
-const MIN_MESSAGES_FOR_COMPRESSION = 6;
+/** Minimum number of messages before compression is considered (2 complete turns) */
+const MIN_MESSAGES_FOR_COMPRESSION = 4;
 /** Max output tokens for the summary generation */
 const SUMMARY_MAX_TOKENS = 2048;
 
@@ -21,19 +21,28 @@ export function estimateNextTurnTokens(
   messages: Message[],
   newUserChars: number,
 ): number {
-  const lastAssistant = [...messages]
-    .reverse()
-    .find((m) => m.role === "assistant");
+  // After compression, messages contain a summary — tokens_input on kept
+  // assistant messages is stale (pre-compression value), so skip the
+  // precise path and use chars-based fallback instead.
+  const hasSummary = messages.some(
+    (m) => m.parent_id === "__context_summary__",
+  );
 
-  if (
-    lastAssistant?.tokens_input != null &&
-    lastAssistant.tokens_input > 0
-  ) {
-    return (
-      lastAssistant.tokens_input +
-      (lastAssistant.tokens_output ?? 0) +
-      Math.ceil(newUserChars / 4)
-    );
+  if (!hasSummary) {
+    const lastAssistant = [...messages]
+      .reverse()
+      .find((m) => m.role === "assistant");
+
+    if (
+      lastAssistant?.tokens_input != null &&
+      lastAssistant.tokens_input > 0
+    ) {
+      return (
+        lastAssistant.tokens_input +
+        (lastAssistant.tokens_output ?? 0) +
+        Math.ceil(newUserChars / 4)
+      );
+    }
   }
 
   // Fallback: rough estimate from all message content
@@ -52,9 +61,18 @@ export function shouldCompress(
   contextWindow: number,
   threshold: number = DEFAULT_THRESHOLD,
 ): boolean {
-  if (messages.length < MIN_MESSAGES_FOR_COMPRESSION) return false;
+  if (messages.length < MIN_MESSAGES_FOR_COMPRESSION) {
+    console.debug(
+      `[context-compression] Skipped: only ${messages.length} messages (min ${MIN_MESSAGES_FOR_COMPRESSION})`,
+    );
+    return false;
+  }
   const estimated = estimateNextTurnTokens(messages, 0);
-  return estimated >= contextWindow * threshold;
+  const limit = contextWindow * threshold;
+  console.debug(
+    `[context-compression] estimated=${estimated}, limit=${Math.round(limit)}, trigger=${estimated >= limit}`,
+  );
+  return estimated >= limit;
 }
 
 /**

@@ -59,13 +59,25 @@ describe("estimateNextTurnTokens", () => {
     const result = estimateNextTurnTokens(msgs, 50);
     expect(result).toBe(14);
   });
+
+  it("uses chars-based fallback when summary message is present", () => {
+    const msgs: Message[] = [
+      makeMessage({ role: "system", content: "Summary text here", parent_id: "__context_summary__" }),
+      makeMessage({ role: "user", content: "a".repeat(200) }),
+      makeMessage({ role: "assistant", content: "b".repeat(400), tokens_input: 50000, tokens_output: 10000 }),
+    ];
+    // With summary present, tokens_input is stale → use chars fallback
+    // (17 + 200 + 400 + 0) / 4 = 155 (not 50000+10000=60000)
+    const result = estimateNextTurnTokens(msgs, 0);
+    expect(result).toBeLessThan(1000);
+  });
 });
 
 // ---------- shouldCompress ----------
 
 describe("shouldCompress", () => {
-  it("returns false when fewer than 6 messages", () => {
-    const msgs = Array.from({ length: 5 }, () =>
+  it("returns false when fewer than 4 messages", () => {
+    const msgs = Array.from({ length: 3 }, () =>
       makeMessage({ content: "x".repeat(10000), tokens_input: 50000, tokens_output: 10000 }),
     );
     expect(shouldCompress(msgs, 100_000)).toBe(false);
