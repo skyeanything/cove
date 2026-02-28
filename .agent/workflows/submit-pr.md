@@ -11,22 +11,32 @@ This workflow guides the process of submitting a PR for the cove project.
 pnpm run build && pnpm test
 ```
 
-3. Rust 静态检查
+3. 测试质量校验
+```bash
+pnpm test:coverage
+```
+确认以下事项（详见 `.agent/workflows/test-quality.md`）：
+- [ ] 覆盖率阈值全部通过
+- [ ] 新增/修改的源文件有对应测试文件
+- [ ] 新组件（含交互逻辑）有 `.test.tsx`
+- [ ] 跨 3+ 文件的功能有文档更新
+
+4. Rust 静态检查
 ```bash
 cd src-tauri && cargo check
 ```
 
-4. 文件大小校验
+5. 文件大小校验
 ```bash
 python3 scripts/check-file-size.py
 ```
 
-5. 推送分支
+6. 推送分支
 ```bash
 git push origin <current_branch>
 ```
 
-6. 使用 gh cli 创建 PR
+7. 使用 gh cli 创建 PR
 ```bash
 gh pr create --title "type: description" --body "Description of changes"
 ```
