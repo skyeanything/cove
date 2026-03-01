@@ -30,12 +30,12 @@ export function ToolsPage() {
       const tools = getAgentTools(enabledSkills, { officellm });
       setActiveToolIds(new Set(Object.keys(tools)));
 
-      // Build description map from active tools + static AGENT_TOOLS fallback
+      // Build description map: active tool → AGENT_TOOLS → ToolInfo fallback
       const descs: Record<string, string> = {};
       for (const info of ALL_TOOL_INFOS) {
         const activeTool = tools[info.id];
         const staticTool = (AGENT_TOOLS as Record<string, { description?: string }>)[info.id];
-        const raw = activeTool?.description ?? staticTool?.description;
+        const raw = activeTool?.description ?? staticTool?.description ?? info.description;
         descs[info.id] = firstSentence(raw);
       }
       setDescriptions(descs);
@@ -50,7 +50,7 @@ export function ToolsPage() {
   if (loading) {
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-        {t("skills.scanning")}
+        {t("tools.loading")}
       </div>
     );
   }
