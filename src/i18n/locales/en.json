@@ -186,10 +186,7 @@
     }
   },
   "tools": {
-    "title": "Tools",
-    "tooltipEnabled": "Tools ({{count}} enabled)",
-    "hint": "Toggle which tools the agent can use",
-    "unavailable": "unavailable"
+    "title": "Tools"
   },
   "tool": {
     "pending": "Pending",

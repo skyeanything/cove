@@ -14,7 +14,6 @@ vi.mock("@/lib/ai/context", () => ({ buildSystemPrompt: vi.fn().mockReturnValue(
 vi.mock("@/lib/ai/officellm-detect", () => ({ isOfficellmAvailable: vi.fn().mockResolvedValue(false) }));
 vi.mock("@/lib/ai/tools", () => ({ getAgentTools: vi.fn().mockReturnValue({}) }));
 vi.mock("./skillsStore", () => ({ getEnabledSkillNames: vi.fn().mockResolvedValue([]) }));
-vi.mock("./toolsStore", () => ({ getDisabledToolIds: vi.fn().mockResolvedValue([]) }));
 vi.mock("./chat-retry-utils", () => ({
   isRateLimitErrorMessage: vi.fn().mockReturnValue(false),
   backoffDelayMs: vi.fn().mockReturnValue(100),
@@ -33,7 +32,6 @@ import { buildSystemPrompt } from "@/lib/ai/context";
 import { isOfficellmAvailable } from "@/lib/ai/officellm-detect";
 import { getAgentTools } from "@/lib/ai/tools";
 import { getEnabledSkillNames } from "./skillsStore";
-import { getDisabledToolIds } from "./toolsStore";
 import { isRateLimitErrorMessage, backoffDelayMs, sleep } from "./chat-retry-utils";
 import { runStreamLoop } from "./chat-stream-runner";
 import type { StreamRunOptions, StreamRunCallbacks } from "./chat-stream-runner";
@@ -83,7 +81,7 @@ function makeCallbacks(overrides: Partial<StreamRunCallbacks> = {}): StreamRunCa
 
 describe("runStreamLoop", () => {
   describe("successful run", () => {
-    it("calls getModel, getModelOption, getEnabledSkillNames, isOfficellmAvailable, getDisabledToolIds, getAgentTools", async () => {
+    it("calls getModel, getModelOption, getEnabledSkillNames, isOfficellmAvailable, getAgentTools", async () => {
       const result = makeStreamResult();
       vi.mocked(getModel).mockReturnValue("model" as never);
       vi.mocked(getModelOption).mockReturnValue({ max_output_tokens: 4096 });
@@ -96,7 +94,6 @@ describe("runStreamLoop", () => {
       expect(getModelOption).toHaveBeenCalled();
       expect(getEnabledSkillNames).toHaveBeenCalled();
       expect(isOfficellmAvailable).toHaveBeenCalled();
-      expect(getDisabledToolIds).toHaveBeenCalled();
       expect(getAgentTools).toHaveBeenCalled();
     });
 
