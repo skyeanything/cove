@@ -74,7 +74,8 @@ export function ChatInput({
     for (const m of listSkills()) {
       if (!seen.has(m.name)) { seen.add(m.name); metas.push(m); }
     }
-    for (const { skill } of externalSkills) {
+    for (const { skill, source } of externalSkills) {
+      if (source === "office-bundled") continue;
       if (!seen.has(skill.meta.name)) { seen.add(skill.meta.name); metas.push(skill.meta); }
     }
     return metas;
@@ -110,7 +111,7 @@ export function ChatInput({
     const seen = new Set<string>();
     const names: string[] = [];
     for (const m of listSkills()) { if (!seen.has(m.name)) { seen.add(m.name); names.push(m.name); } }
-    for (const { skill } of externalSkills) { if (!seen.has(skill.meta.name)) { seen.add(skill.meta.name); names.push(skill.meta.name); } }
+    for (const { skill, source } of externalSkills) { if (source === "office-bundled") continue; if (!seen.has(skill.meta.name)) { seen.add(skill.meta.name); names.push(skill.meta.name); } }
     return names.sort((a, b) => a.localeCompare(b));
   }, [externalSkills]);
   const showSlashCommands = message.startsWith("/");

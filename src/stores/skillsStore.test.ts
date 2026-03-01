@@ -275,6 +275,50 @@ describe("skillsStore — saveSkill", () => {
   });
 });
 
+describe("skillsStore — loadExternalSkills auto-enables office-bundled", () => {
+  it("auto-enables office-bundled skill names missing from enabledSkillNames", async () => {
+    vi.mocked(settingsRepo.get).mockResolvedValue(null);
+    const bundledSkill = makeSkill("officellm-bundled");
+    vi.mocked(parseSkillFromRaw).mockReturnValue(bundledSkill);
+    vi.mocked(invoke).mockResolvedValue([
+      { source: "office-bundled", name: "OfficeLLM", path: "/bundled/path", content: "bundled" },
+    ]);
+    useSkillsStore.setState({ enabledSkillNames: ["existing-skill"] });
+
+    await useSkillsStore.getState().loadExternalSkills();
+
+    const state = useSkillsStore.getState();
+    expect(state.enabledSkillNames).toContain("officellm-bundled");
+    expect(state.enabledSkillNames).toContain("existing-skill");
+    expect(settingsRepo.set).toHaveBeenCalledWith(
+      "enabledSkillNames",
+      expect.stringContaining("officellm-bundled"),
+    );
+  });
+
+  it("does not duplicate already-enabled office-bundled skills", async () => {
+    vi.mocked(settingsRepo.get).mockResolvedValue(null);
+    const bundledSkill = makeSkill("already-enabled");
+    vi.mocked(parseSkillFromRaw).mockReturnValue(bundledSkill);
+    vi.mocked(invoke).mockResolvedValue([
+      { source: "office-bundled", name: "OfficeLLM", path: "/bundled/path", content: "bundled" },
+    ]);
+    useSkillsStore.setState({ enabledSkillNames: ["already-enabled"] });
+
+    await useSkillsStore.getState().loadExternalSkills();
+
+    const state = useSkillsStore.getState();
+    const count = state.enabledSkillNames.filter((n) => n === "already-enabled").length;
+    expect(count).toBe(1);
+    // settingsRepo.set should NOT have been called for enabledSkillNames
+    // (only get was called for skillDirPaths)
+    expect(settingsRepo.set).not.toHaveBeenCalledWith(
+      "enabledSkillNames",
+      expect.any(String),
+    );
+  });
+});
+
 describe("skillsStore — deleteSkill", () => {
   beforeEach(() => {
     vi.mocked(settingsRepo.get).mockResolvedValue(null);

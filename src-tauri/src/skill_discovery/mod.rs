@@ -165,10 +165,10 @@ fn discover_skills_impl(
 
     // Bundled officellm home: scan <app_data>/officellm/skills/ as fallback
     // for users who don't have ~/.officellm/ (bundled-only).
-    // Same source "office" — if DEFAULT_SKILL_ROOTS already found
-    // ~/.officellm/skills/, frontend deduplication keeps the first match.
+    // Source "office-bundled" distinguishes from user-installed "office" so
+    // the frontend can hide bundled skills from UI while keeping them active.
     if let Some(ref root) = bundled_officellm_skills_root {
-        all.extend(scan_skill_root(root, "office"));
+        all.extend(scan_skill_root(root, "office-bundled"));
     }
 
     if let Some(roots) = custom_roots {

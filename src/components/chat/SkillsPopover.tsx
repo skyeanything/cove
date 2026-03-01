@@ -29,11 +29,13 @@ function useMergedSkills(): { meta: SkillMeta; source?: string }[] {
   const externalSkills = useSkillsStore((s) => s.externalSkills);
 
   const all: { meta: SkillMeta; source: string; dedup: number }[] = [
-    ...externalSkills.map(({ skill, source }) => ({
-      meta: skill.meta,
-      source,
-      dedup: sourcePriority(source),
-    })),
+    ...externalSkills
+      .filter(({ source }) => source !== "office-bundled")
+      .map(({ skill, source }) => ({
+        meta: skill.meta,
+        source,
+        dedup: sourcePriority(source),
+      })),
     ...bundled.map((m) => ({ meta: m, source: "app", dedup: sourcePriority("app") })),
   ];
 

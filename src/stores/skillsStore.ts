@@ -113,6 +113,20 @@ export const useSkillsStore = create<SkillsState>()((set, get) => ({
         folderName: e.name,
       }));
       set({ externalSkills: withSource, loaded: true, scanError: null });
+
+      // Auto-enable bundled officellm skills (hidden from UI, users can't toggle)
+      const bundledNames = withSource
+        .filter((e) => e.source === "office-bundled")
+        .map((e) => e.skill.meta.name);
+      if (bundledNames.length > 0) {
+        const enabled = get().enabledSkillNames;
+        const missing = bundledNames.filter((n) => !enabled.includes(n));
+        if (missing.length > 0) {
+          const next = [...enabled, ...missing];
+          await setEnabledSkillNames(next);
+          set({ enabledSkillNames: next });
+        }
+      }
     } catch (e) {
       set({ externalSkills: [], loaded: true, scanError: String(e) });
     } finally {
