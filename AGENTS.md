@@ -10,7 +10,8 @@
 4. **`.agent/workflows/build-and-test.md`** — 构建与测试命令（提交前必须通过）
 5. **`.agent/workflows/test-quality.md`** — 测试质量约束（覆盖率、组件测试、文档覆盖度）
 6. **`.agent/workflows/submit-pr.md`** — PR 提交规范与流程
-7. **`CLAUDE.md`** — 项目设计规范、技术栈、代码约定（Hard Constraints）
+7. **`.agent/workflows/skill-maintenance.md`** — 内置 Skill 文档同步规则（功能变更时更新 user-manual/feedback）
+8. **`CLAUDE.md`** — 项目设计规范、技术栈、代码约定（Hard Constraints）
 
 ## 优先级
 
