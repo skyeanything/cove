@@ -9,9 +9,10 @@
 3. **`.agent/workflows/issue-decomposition.md`** — Issue 拆分规范（Epic 分解、子 Issue 粒度、模板）
 4. **`.agent/workflows/build-and-test.md`** — 构建与测试命令（提交前必须通过）
 5. **`.agent/workflows/test-quality.md`** — 测试质量约束（覆盖率、组件测试、文档覆盖度）
-6. **`.agent/workflows/submit-pr.md`** — PR 提交规范与流程
-7. **`.agent/workflows/skill-maintenance.md`** — 内置 Skill 文档同步规则（功能变更时更新 user-manual/feedback）
-8. **`CLAUDE.md`** — 项目设计规范、技术栈、代码约定（Hard Constraints）
+6. **`.agent/workflows/release-workflow.md`** — 双轨发版规则（Feature / Hotfix 并行）
+7. **`.agent/workflows/submit-pr.md`** — PR 提交规范与流程
+8. **`.agent/workflows/skill-maintenance.md`** — 内置 Skill 文档同步规则（功能变更时更新 user-manual/feedback）
+9. **`CLAUDE.md`** — 项目设计规范、技术栈、代码约定（Hard Constraints）
 
 ## 优先级
 
@@ -26,6 +27,9 @@ CLAUDE.md Hard Constraints
 | 任务 | 命令 |
 |------|------|
 | 开始新 Issue | `./scripts/start-worktree.sh <type> <id> <desc>` |
+| Hotfix worktree | `./scripts/start-worktree.sh fix <id> <desc> --base release/x.y` |
+| 同步版本号 | `./scripts/bump-version.sh <major> <minor> <patch>` |
+| 发版前检查 | `./scripts/pre-release-check.sh` |
 | 前端构建+类型检查 | `pnpm run build` |
 | 运行测试 | `pnpm test` |
 | 测试覆盖率检查 | `pnpm test:coverage` |
