@@ -35,7 +35,7 @@ You have a **built-in QuickJS JavaScript interpreter** available via the `js_int
 | `workspace.readFile(path)` | Read a file (relative to workspace root) |
 | `workspace.writeFile(path, content)` | Write a file |
 | `workspace.listDir(path)` | List directory contents |
-| `workspace.officellm(cmd, args)` | Call office CLI or Server mode (returns JSON string → use `JSON.parse()`) |
+| `workspace.officellm(cmd, args)` | Call office document CLI or Server mode (returns JSON string → use `JSON.parse()`). Note: the JS API name remains `officellm` for backward compatibility. |
 | `Math.*`, `JSON.*`, `Date`, `RegExp`, `Map`, `Set` | Standard JS built-ins |
 
 **Not available**: `fetch`, `require`, `import`, `process`, `fs`, `XMLHttpRequest`.
