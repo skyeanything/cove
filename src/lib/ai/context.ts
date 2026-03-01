@@ -1,7 +1,8 @@
 import type { Assistant } from "@/db/types";
+import soulPrompt from "@/prompts/SOUL.md?raw";
 import { getAlwaysSkills } from "./skills/loader";
 
-/** 极简系统提示词：最小必要信息 + 四工具规则 + 技能摘要，保留 assistant/custom 注入 */
+/** System prompt: SOUL.md identity + context + assistant/custom injections + skills */
 export function buildSystemPrompt(options: {
   assistant?: Assistant;
   customInstructions?: string;
@@ -10,16 +11,11 @@ export function buildSystemPrompt(options: {
 }): string {
   const parts: string[] = [];
 
-  parts.push("You are a helpful coding assistant.");
+  parts.push(soulPrompt);
   parts.push(`Time: ${new Date().toISOString()}`);
   if (options.workspacePath) {
     parts.push(`Workspace: ${options.workspacePath}`);
   }
-
-  // 四工具使用规则（极简）
-  parts.push(
-    "Tools: read (files in workspace); write/edit only after reading; cove_interpreter for JavaScript/QuickJS (built-in, prefer over bash for computation); bash for system commands, grep, curl; dangerous bash requires user approval.",
-  );
 
   if (options.officeAvailable) {
     parts.push(

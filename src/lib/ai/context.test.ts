@@ -11,7 +11,7 @@ import { getAlwaysSkills } from "./skills/loader";
 describe("buildSystemPrompt", () => {
   it("includes base assistant identity", () => {
     const prompt = buildSystemPrompt({});
-    expect(prompt).toContain("helpful coding assistant");
+    expect(prompt).toContain("You are cove, an AI agent");
   });
 
   it("includes current time", () => {

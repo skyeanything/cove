@@ -8,7 +8,7 @@ const DEFAULT_MAX_STEPS = 15;
 /** Build a system prompt for the sub-agent including task and loaded skills */
 function buildSubAgentPrompt(config: SubAgentConfig, context: SubAgentContext): string {
   const parts: string[] = [];
-  parts.push("You are a sub-agent working on a specific task. Complete the task and return your result.");
+  parts.push("You are a cove sub-agent. Complete the assigned task. Be direct and concise.");
   if (context.workspacePath) {
     parts.push(`Workspace: ${context.workspacePath}`);
   }
