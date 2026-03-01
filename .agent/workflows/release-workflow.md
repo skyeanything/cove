@@ -46,17 +46,15 @@ main ──●──●──●──●──────────●──
 - **Do not** modify version numbers directly. Use `scripts/bump-version.sh`.
 - **Do not** tag releases. Only humans tag.
 - **Do not** merge into `main` or `release/*`. Only PRs merged by humans.
-- Before any release, run the full readiness check via the `dev-workflow` skill.
+- Before any release, run the full readiness check via `scripts/pre-release-check.sh`.
 - Production builds **must** be code-signed and notarized (see #161). Do not distribute unsigned builds.
 
 ## Release Readiness
 
-When the user asks to prepare a release, activate the `dev-workflow` skill and follow its 5-phase check process:
+When the user asks to prepare a release, follow this 5-phase check process:
 
-1. Automated checks (pre-release-check.sh)
+1. Automated checks (`scripts/pre-release-check.sh`)
 2. Changelog generation
 3. Documentation review
 4. Test review
 5. Summary report
-
-See `src/skills/dev-workflow/SKILL.md` for the full procedure.
