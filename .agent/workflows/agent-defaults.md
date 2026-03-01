@@ -6,10 +6,7 @@ description: Agent 默认行为规则（方案与审查）
 
 ## 1. 方案制定与实现：KISS
 
-- 默认遵循 **KISS (Keep It Simple and Stupid)**。
-- 优先最小可行改动（smallest viable change）。
-- 避免过度设计、过早抽象和不必要的层级。
-- 在满足需求、可测试、可维护的前提下，选择最简单方案。
+See [kiss.md](kiss.md) for the full principle. In short: smallest viable change, no premature abstraction, no speculative generality.
 
 ## 2. 默认 Review 角色
 
