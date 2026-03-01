@@ -86,15 +86,15 @@ function setupCanvasMocks() {
 }
 
 // ── Import tool after mocks ──────────────────────────────────────────────────
-import { renderMermaidTool } from "./render-mermaid";
+import { diagramTool } from "./diagram";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
-type ExecInput = Parameters<NonNullable<typeof renderMermaidTool.execute>>[0];
-type ExecOptions = Parameters<NonNullable<typeof renderMermaidTool.execute>>[1];
+type ExecInput = Parameters<NonNullable<typeof diagramTool.execute>>[0];
+type ExecOptions = Parameters<NonNullable<typeof diagramTool.execute>>[1];
 
 async function exec(input: ExecInput) {
-  return renderMermaidTool.execute!(input, {} as ExecOptions);
+  return diagramTool.execute!(input, {} as ExecOptions);
 }
 
 const SVG_STUB = '<svg viewBox="0 0 100 100"><rect/></svg>';
@@ -115,7 +115,7 @@ afterEach(() => {
 
 // ── No workspace ─────────────────────────────────────────────────────────────
 
-describe("renderMermaidTool – no workspace", () => {
+describe("diagramTool – no workspace", () => {
   it("returns error when no workspace is active", async () => {
     withNoWorkspace();
     const result = await exec({ code: "graph TD; A-->B" });
@@ -126,7 +126,7 @@ describe("renderMermaidTool – no workspace", () => {
 
 // ── Filename normalization ───────────────────────────────────────────────────
 
-describe("renderMermaidTool – filename normalization", () => {
+describe("diagramTool – filename normalization", () => {
   function setupWriteMock() {
     let capturedPath = "";
     setupTauriMocks({
@@ -142,7 +142,7 @@ describe("renderMermaidTool – filename normalization", () => {
   it("generates timestamped filename when omitted", async () => {
     const getPath = setupWriteMock();
     await exec({ code: "graph TD; A-->B" });
-    expect(getPath()).toMatch(/^mermaid-\d+\.png$/);
+    expect(getPath()).toMatch(/^diagram-\d+\.png$/);
   });
 
   it("uses provided .png filename as-is", async () => {
@@ -172,7 +172,7 @@ describe("renderMermaidTool – filename normalization", () => {
 
 // ── Successful render ────────────────────────────────────────────────────────
 
-describe("renderMermaidTool – successful render", () => {
+describe("diagramTool – successful render", () => {
   it("writes file and returns success message", async () => {
     let capturedArgs: Record<string, unknown> = {};
     setupTauriMocks({
@@ -188,7 +188,7 @@ describe("renderMermaidTool – successful render", () => {
     expect(capturedArgs.path).toBe("diagram.png");
     expect(typeof capturedArgs.contentBase64).toBe("string");
     expect((capturedArgs.contentBase64 as string).length).toBeGreaterThan(0);
-    expect(result).toBe("Mermaid diagram saved to: /workspace/diagram.png");
+    expect(result).toBe("Diagram saved to: /workspace/diagram.png");
   });
 
   it("passes dark theme colors to renderMermaidSVG", async () => {
@@ -220,7 +220,7 @@ describe("renderMermaidTool – successful render", () => {
 
 // ── Error handling ───────────────────────────────────────────────────────────
 
-describe("renderMermaidTool – error handling", () => {
+describe("diagramTool – error handling", () => {
   it("returns error when renderMermaidSVG throws", async () => {
     mockRenderMermaidSVG.mockImplementation(() => {
       throw new Error("Parse error in graph");
@@ -230,7 +230,7 @@ describe("renderMermaidTool – error handling", () => {
     });
 
     const result = await exec({ code: "invalid mermaid" });
-    expect(result).toContain("render_mermaid failed:");
+    expect(result).toContain("diagram failed:");
     expect(result).toContain("Parse error in graph");
   });
 
@@ -242,7 +242,7 @@ describe("renderMermaidTool – error handling", () => {
     });
 
     const result = await exec({ code: "graph TD; A-->B" });
-    expect(result).toContain("render_mermaid failed:");
+    expect(result).toContain("diagram failed:");
     expect(result).toContain("disk full");
   });
 
@@ -255,7 +255,7 @@ describe("renderMermaidTool – error handling", () => {
     });
 
     const result = await exec({ code: "graph TD; A-->B" });
-    expect(result).toContain("render_mermaid failed:");
+    expect(result).toContain("diagram failed:");
     expect(result).toContain("unexpected string error");
   });
 });

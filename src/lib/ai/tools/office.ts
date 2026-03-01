@@ -23,13 +23,13 @@ interface SessionInfo {
   uptimeSecs: number;
 }
 
-export const officellmTool = tool({
+export const officeTool = tool({
   description:
     "Operate on Office documents (DOCX/PPTX/XLSX) via officellm. Actions: detect (check if installed), doctor (check external dependency status — libreoffice, pdftoppm, quarto), open (start session for a document), call (execute a command on the open document), save (save the document), close (end session), status (query session info).",
   inputSchema: z.object({
     action: z
       .enum(["detect", "doctor", "open", "call", "save", "close", "status"])
-      .describe("The officellm action to perform"),
+      .describe("The office action to perform"),
     path: z
       .string()
       .optional()
@@ -48,8 +48,8 @@ export const officellmTool = tool({
       switch (action) {
         case "detect": {
           const result = await invoke<DetectResult>("officellm_detect");
-          if (!result.available) return "officellm is not installed.";
-          return `officellm available: version=${result.version}, path=${result.path}, bundled=${result.bundled}`;
+          if (!result.available) return "Office tool is not installed.";
+          return `Office tool available: version=${result.version}, path=${result.path}, bundled=${result.bundled}`;
         }
 
         case "doctor": {
@@ -100,12 +100,12 @@ export const officellmTool = tool({
 
         case "status": {
           const info = await invoke<SessionInfo | null>("officellm_status");
-          if (!info) return "No active officellm session.";
+          if (!info) return "No active office session.";
           return `Active session: document=${info.documentPath}, pid=${info.pid}, uptime=${info.uptimeSecs}s`;
         }
       }
     } catch (err) {
-      return `officellm error: ${err instanceof Error ? err.message : String(err)}`;
+      return `Office tool error: ${err instanceof Error ? err.message : String(err)}`;
     }
   },
 });

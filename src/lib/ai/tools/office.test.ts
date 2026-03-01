@@ -27,15 +27,15 @@ function withNoWorkspace() {
 }
 
 // ── Import tool after mocks ───────────────────────────────────────────────────
-import { officellmTool } from "./officellm";
+import { officeTool } from "./office";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-type ExecInput = Parameters<NonNullable<typeof officellmTool.execute>>[0];
-type ExecOptions = Parameters<NonNullable<typeof officellmTool.execute>>[1];
+type ExecInput = Parameters<NonNullable<typeof officeTool.execute>>[0];
+type ExecOptions = Parameters<NonNullable<typeof officeTool.execute>>[1];
 
 async function exec(input: ExecInput) {
-  return officellmTool.execute!(input, {} as ExecOptions);
+  return officeTool.execute!(input, {} as ExecOptions);
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -47,8 +47,8 @@ beforeEach(() => {
 
 // ── detect ────────────────────────────────────────────────────────────────────
 
-describe("officellmTool – detect", () => {
-  it("returns version and path when officellm is available", async () => {
+describe("officeTool – detect", () => {
+  it("returns version and path when office tool is available", async () => {
     setupTauriMocks({
       officellm_detect: () => ({ available: true, version: "2.1.0", path: "/usr/bin/officellm", bundled: false }),
     });
@@ -72,7 +72,7 @@ describe("officellmTool – detect", () => {
 
 // ── doctor ────────────────────────────────────────────────────────────────────
 
-describe("officellmTool – doctor", () => {
+describe("officeTool – doctor", () => {
   it("returns JSON stringified data on success", async () => {
     const data = {
       visual_pipeline_ready: true,
@@ -123,7 +123,7 @@ describe("officellmTool – doctor", () => {
 
 // ── open ──────────────────────────────────────────────────────────────────────
 
-describe("officellmTool – open", () => {
+describe("officeTool – open", () => {
   it("returns error when path is not provided", async () => {
     setupTauriMocks({ officellm_open: () => undefined });
     const result = await exec({ action: "open" });
@@ -176,7 +176,7 @@ describe("officellmTool – open", () => {
 
 // ── call ──────────────────────────────────────────────────────────────────────
 
-describe("officellmTool – call", () => {
+describe("officeTool – call", () => {
   it("returns error when command is not provided", async () => {
     setupTauriMocks({ officellm_call: () => ({ status: "success", data: null, error: null, metrics: null }) });
     const result = await exec({ action: "call" });
@@ -230,7 +230,7 @@ describe("officellmTool – call", () => {
 
 // ── save ──────────────────────────────────────────────────────────────────────
 
-describe("officellmTool – save", () => {
+describe("officeTool – save", () => {
   it("returns 'Document saved.' when no path is provided", async () => {
     setupTauriMocks({
       officellm_save: () => ({ status: "success", data: null, error: null, metrics: null }),
@@ -267,7 +267,7 @@ describe("officellmTool – save", () => {
 
 // ── close ─────────────────────────────────────────────────────────────────────
 
-describe("officellmTool – close", () => {
+describe("officeTool – close", () => {
   it("returns 'Session closed.' on success", async () => {
     setupTauriMocks({
       officellm_close: () => undefined,
@@ -280,14 +280,14 @@ describe("officellmTool – close", () => {
 
 // ── status ────────────────────────────────────────────────────────────────────
 
-describe("officellmTool – status", () => {
+describe("officeTool – status", () => {
   it("returns no-session message when invoke returns null", async () => {
     setupTauriMocks({
       officellm_status: () => null,
     });
 
     const result = await exec({ action: "status" });
-    expect(result).toContain("No active officellm session");
+    expect(result).toContain("No active office session");
   });
 
   it("returns session info when active session exists", async () => {
@@ -308,8 +308,8 @@ describe("officellmTool – status", () => {
 
 // ── error handling ────────────────────────────────────────────────────────────
 
-describe("officellmTool – invoke error handling", () => {
-  it("catches Error thrown by invoke and returns officellm error message", async () => {
+describe("officeTool – invoke error handling", () => {
+  it("catches Error thrown by invoke and returns error message", async () => {
     setupTauriMocks({
       officellm_detect: () => {
         throw new Error("IPC channel closed");
@@ -317,7 +317,7 @@ describe("officellmTool – invoke error handling", () => {
     });
 
     const result = await exec({ action: "detect" });
-    expect(result).toContain("officellm error");
+    expect(result).toContain("Office tool error");
     expect(result).toContain("IPC channel closed");
   });
 
@@ -329,7 +329,7 @@ describe("officellmTool – invoke error handling", () => {
     });
 
     const result = await exec({ action: "close" });
-    expect(result).toContain("officellm error");
+    expect(result).toContain("Office tool error");
     expect(result).toContain("unexpected failure");
   });
 });

@@ -37,14 +37,14 @@ describe("buildSystemPrompt", () => {
     expect(prompt).not.toContain("Workspace:");
   });
 
-  it("injects officellm hint when available", () => {
-    const prompt = buildSystemPrompt({ officellmAvailable: true });
-    expect(prompt).toContain("officellm is available");
+  it("injects office hint when available", () => {
+    const prompt = buildSystemPrompt({ officeAvailable: true });
+    expect(prompt).toContain("office tool is available");
   });
 
-  it("omits officellm hint when not available", () => {
-    const prompt = buildSystemPrompt({ officellmAvailable: false });
-    expect(prompt).not.toContain("officellm is available");
+  it("omits office hint when not available", () => {
+    const prompt = buildSystemPrompt({ officeAvailable: false });
+    expect(prompt).not.toContain("office tool is available");
   });
 
   it("injects assistant system_instruction", () => {
@@ -73,5 +73,10 @@ describe("buildSystemPrompt", () => {
   it("includes skill tool hint", () => {
     const prompt = buildSystemPrompt({});
     expect(prompt).toContain("skill tool");
+  });
+
+  it("includes spawn_agent tool hint", () => {
+    const prompt = buildSystemPrompt({});
+    expect(prompt).toContain("spawn_agent");
   });
 });

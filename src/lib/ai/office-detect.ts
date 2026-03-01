@@ -9,8 +9,8 @@ interface DetectResult {
 
 let cached: DetectResult | null = null;
 
-/** 检测 officellm 是否可用（结果在进程生命周期内缓存） */
-export async function isOfficellmAvailable(): Promise<boolean> {
+/** 检测 office sidecar 是否可用（结果在进程生命周期内缓存） */
+export async function isOfficeAvailable(): Promise<boolean> {
   if (cached !== null) return cached.available;
   try {
     await invoke("officellm_init");
@@ -23,6 +23,6 @@ export async function isOfficellmAvailable(): Promise<boolean> {
 }
 
 /** 清除缓存（设置页安装后可调用） */
-export function clearOfficellmCache(): void {
+export function clearOfficeCache(): void {
   cached = null;
 }

@@ -6,7 +6,7 @@ export function buildSystemPrompt(options: {
   assistant?: Assistant;
   customInstructions?: string;
   workspacePath?: string;
-  officellmAvailable?: boolean;
+  officeAvailable?: boolean;
 }): string {
   const parts: string[] = [];
 
@@ -21,9 +21,9 @@ export function buildSystemPrompt(options: {
     "Tools: read (files in workspace); write/edit only after reading; js_interpreter for JavaScript/QuickJS (built-in, prefer over bash for computation); bash for system commands, grep, curl; dangerous bash requires user approval.",
   );
 
-  if (options.officellmAvailable) {
+  if (options.officeAvailable) {
     parts.push(
-      "officellm is available. Use the officellm tool for document operations (DOCX/PPTX/XLSX). Load the 'officellm' skill for detailed usage instructions.",
+      "The office tool is available. Use the office tool for document operations (DOCX/PPTX/XLSX). Load the 'office' skill for detailed usage instructions.",
     );
   }
 
@@ -39,6 +39,7 @@ export function buildSystemPrompt(options: {
     parts.push(skill.content);
   }
   parts.push("Use the skill tool to load domain-specific instructions when a task matches an available skill in that tool.");
+  parts.push("Use the spawn_agent tool to delegate independent subtasks to a sub-agent when the task can be completed without real-time user interaction.");
 
   return parts.join("\n\n");
 }

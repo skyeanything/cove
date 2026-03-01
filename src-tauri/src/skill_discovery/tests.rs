@@ -215,7 +215,7 @@ fn discover_scans_bundled_officellm_skills() {
 
         let entry = result.iter().find(|e| e.name == "OfficeLLM");
         assert!(entry.is_some(), "should find bundled officellm skill");
-        assert_eq!(entry.unwrap().source, "officellm");
+        assert_eq!(entry.unwrap().source, "office");
         assert_eq!(entry.unwrap().content, "bundled officellm skill");
     });
 }

@@ -1,8 +1,8 @@
 ---
-name: code-interpreter
-description: Guides the agent to use the built-in JavaScript interpreter for calculations, data processing, and file operations without requiring external runtimes.
-emoji: "\U0001F4BB"
-always: false
+name: cove
+description: "Cove core capabilities: built-in JavaScript interpreter, file operations, and core tool usage guide."
+emoji: "🏠"
+always: true
 requires:
   tools:
     - js_interpreter
@@ -35,7 +35,7 @@ You have a **built-in QuickJS JavaScript interpreter** available via the `js_int
 | `workspace.readFile(path)` | Read a file (relative to workspace root) |
 | `workspace.writeFile(path, content)` | Write a file |
 | `workspace.listDir(path)` | List directory contents |
-| `workspace.officellm(cmd, args)` | Call officellm CLI or Server mode (returns JSON string → use `JSON.parse()`) |
+| `workspace.officellm(cmd, args)` | Call office CLI or Server mode (returns JSON string → use `JSON.parse()`) |
 | `Math.*`, `JSON.*`, `Date`, `RegExp`, `Map`, `Set` | Standard JS built-ins |
 
 **Not available**: `fetch`, `require`, `import`, `process`, `fs`, `XMLHttpRequest`.
@@ -68,7 +68,7 @@ workspace.officellm("close", {});                          // close session
 - **Memory**: 64 MB  |  **Timeout**: 30s default (max 60s via `timeout` param)
 - **No network**  |  **File scope**: active workspace only
 
-## officellm Example
+## Example
 
 ```javascript
 // Extract text from a Word document

@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { ALL_TOOL_INFOS, type ToolInfo } from "@/lib/ai/tools/tool-meta";
-import { AGENT_TOOLS, getAgentTools } from "@/lib/ai/tools/index";
-import { isOfficellmAvailable } from "@/lib/ai/officellm-detect";
+import { getAgentTools } from "@/lib/ai/tools/index";
+import { isOfficeAvailable } from "@/lib/ai/office-detect";
 import { getEnabledSkillNames } from "@/stores/skillsStore";
 
 /** Extract the first sentence from a tool description (before the first period+space or newline). */
@@ -21,21 +21,22 @@ export function ToolsPage() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [enabledSkills, officellm] = await Promise.all([
+      const [enabledSkills, office] = await Promise.all([
         getEnabledSkillNames(),
-        isOfficellmAvailable(),
+        isOfficeAvailable(),
       ]);
       if (cancelled) return;
 
-      const tools = getAgentTools(enabledSkills, { officellm });
+      const tools = getAgentTools(enabledSkills, {
+        runtimeAvailability: { office },
+      });
       setActiveToolIds(new Set(Object.keys(tools)));
 
-      // Build description map: active tool → AGENT_TOOLS → ToolInfo fallback
+      // Build description map from ToolInfo + active tool fallback
       const descs: Record<string, string> = {};
       for (const info of ALL_TOOL_INFOS) {
         const activeTool = tools[info.id];
-        const staticTool = (AGENT_TOOLS as Record<string, { description?: string }>)[info.id];
-        const raw = activeTool?.description ?? staticTool?.description ?? info.description;
+        const raw = activeTool?.description ?? info.description;
         descs[info.id] = firstSentence(raw);
       }
       setDescriptions(descs);
@@ -44,8 +45,8 @@ export function ToolsPage() {
     return () => { cancelled = true; };
   }, []);
 
-  const core = ALL_TOOL_INFOS.filter((i) => i.category === "core");
-  const extension = ALL_TOOL_INFOS.filter((i) => i.category === "extension");
+  const builtIn = ALL_TOOL_INFOS.filter((i) => i.category === "built-in");
+  const skillBundled = ALL_TOOL_INFOS.filter((i) => i.category === "skill-bundled");
 
   if (loading) {
     return (
@@ -57,8 +58,8 @@ export function ToolsPage() {
 
   return (
     <div className="flex flex-1 flex-col overflow-auto">
-      <ToolGroup label="Core" tools={core} activeIds={activeToolIds} descriptions={descriptions} />
-      <ToolGroup label="Extension" tools={extension} activeIds={activeToolIds} descriptions={descriptions} />
+      <ToolGroup label="Built-in" tools={builtIn} activeIds={activeToolIds} descriptions={descriptions} />
+      <ToolGroup label="Skill Tools" tools={skillBundled} activeIds={activeToolIds} descriptions={descriptions} />
     </div>
   );
 }

@@ -1,14 +1,14 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, beforeEach } from "vitest";
 import { setupTauriMocks } from "@/test-utils";
-import { isOfficellmAvailable, clearOfficellmCache } from "./officellm-detect";
+import { isOfficeAvailable, clearOfficeCache } from "./office-detect";
 
-describe("officellm-detect", () => {
+describe("office-detect", () => {
   beforeEach(() => {
-    clearOfficellmCache();
+    clearOfficeCache();
   });
 
-  it("returns true when officellm is detected", async () => {
+  it("returns true when office sidecar is detected", async () => {
     setupTauriMocks({
       officellm_init: () => undefined,
       officellm_detect: () => ({
@@ -19,10 +19,10 @@ describe("officellm-detect", () => {
       }),
     });
 
-    expect(await isOfficellmAvailable()).toBe(true);
+    expect(await isOfficeAvailable()).toBe(true);
   });
 
-  it("returns false when officellm is not detected", async () => {
+  it("returns false when office sidecar is not detected", async () => {
     setupTauriMocks({
       officellm_init: () => undefined,
       officellm_detect: () => ({
@@ -33,7 +33,7 @@ describe("officellm-detect", () => {
       }),
     });
 
-    expect(await isOfficellmAvailable()).toBe(false);
+    expect(await isOfficeAvailable()).toBe(false);
   });
 
   it("returns false when invoke throws an error", async () => {
@@ -43,7 +43,7 @@ describe("officellm-detect", () => {
       },
     });
 
-    expect(await isOfficellmAvailable()).toBe(false);
+    expect(await isOfficeAvailable()).toBe(false);
   });
 
   it("caches result on subsequent calls", async () => {
@@ -56,14 +56,14 @@ describe("officellm-detect", () => {
       },
     });
 
-    await isOfficellmAvailable();
-    await isOfficellmAvailable();
-    await isOfficellmAvailable();
+    await isOfficeAvailable();
+    await isOfficeAvailable();
+    await isOfficeAvailable();
 
     expect(detectCount).toBe(1);
   });
 
-  it("clearOfficellmCache allows re-detection", async () => {
+  it("clearOfficeCache allows re-detection", async () => {
     let detectCount = 0;
     setupTauriMocks({
       officellm_init: () => undefined,
@@ -73,11 +73,11 @@ describe("officellm-detect", () => {
       },
     });
 
-    await isOfficellmAvailable();
+    await isOfficeAvailable();
     expect(detectCount).toBe(1);
 
-    clearOfficellmCache();
-    await isOfficellmAvailable();
+    clearOfficeCache();
+    await isOfficeAvailable();
     expect(detectCount).toBe(2);
   });
 
@@ -94,7 +94,7 @@ describe("officellm-detect", () => {
       },
     });
 
-    await isOfficellmAvailable();
+    await isOfficeAvailable();
     expect(callOrder).toEqual(["init", "detect"]);
   });
 });
