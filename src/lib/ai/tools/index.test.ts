@@ -8,7 +8,7 @@ vi.mock("./edit", () => ({ editTool: { _id: "edit" } }));
 vi.mock("./bash", () => ({ bashTool: { _id: "bash" } }));
 vi.mock("./fetch-url", () => ({ fetchUrlTool: { _id: "fetch_url" } }));
 vi.mock("./office", () => ({ officeTool: { _id: "office" } }));
-vi.mock("./jsInterpreter", () => ({ jsInterpreterTool: { _id: "js_interpreter" } }));
+vi.mock("./jsInterpreter", () => ({ jsInterpreterTool: { _id: "cove_interpreter" } }));
 vi.mock("./diagram", () => ({ diagramTool: { _id: "diagram" } }));
 vi.mock("./write-skill", () => ({ writeSkillTool: { _id: "write_skill" } }));
 vi.mock("./skill", () => ({
@@ -38,23 +38,14 @@ describe("getAgentTools", () => {
         "skill_resource",
       ]),
     );
+    // cove_interpreter is now built-in, should always appear
+    expect(keys).toContain("cove_interpreter");
     // skill-bundled tools should not appear without their skill enabled
-    expect(keys).not.toContain("js_interpreter");
     expect(keys).not.toContain("write_skill");
     expect(keys).not.toContain("office");
     expect(keys).not.toContain("diagram");
     // spawn_agent should not appear without subAgentContext
     expect(keys).not.toContain("spawn_agent");
-  });
-
-  it("includes js_interpreter when cove skill is enabled", () => {
-    const tools = getAgentTools(["cove"]);
-    expect(Object.keys(tools)).toContain("js_interpreter");
-  });
-
-  it("does not include js_interpreter without cove skill", () => {
-    const tools = getAgentTools(["some-other-skill"]);
-    expect(Object.keys(tools)).not.toContain("js_interpreter");
   });
 
   it("includes write_skill when skill-creator is enabled", () => {
@@ -93,11 +84,11 @@ describe("getAgentTools", () => {
   });
 
   it("includes all skill-bundled tools when all conditions met", () => {
-    const tools = getAgentTools(["cove", "skill-creator", "office"], {
+    const tools = getAgentTools(["skill-creator", "office"], {
       runtimeAvailability: { office: true },
     });
     const keys = Object.keys(tools);
-    expect(keys).toContain("js_interpreter");
+    expect(keys).toContain("cove_interpreter");
     expect(keys).toContain("write_skill");
     expect(keys).toContain("office");
     expect(keys).toContain("diagram");

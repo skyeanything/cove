@@ -41,13 +41,13 @@ describe("createSpawnAgentTool", () => {
     const ctx = makeContext();
     const tool = createSpawnAgentTool(ctx);
     const result = await tool.execute!(
-      { task: "Fix the bug", tools: ["read", "edit"], skills: ["cove"] },
+      { task: "Fix the bug", tools: ["read", "edit"], skills: ["cove-core"] },
       { toolCallId: "tc1", messages: [], abortSignal: new AbortController().signal },
     );
 
     expect(result).toBe("Done!");
     expect(mockRunSubAgent).toHaveBeenCalledWith(
-      { task: "Fix the bug", toolIds: ["read", "edit"], skillNames: ["cove"] },
+      { task: "Fix the bug", toolIds: ["read", "edit"], skillNames: ["cove-core"] },
       ctx,
     );
   });

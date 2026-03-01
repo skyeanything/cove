@@ -25,7 +25,7 @@ const TOOL_IMPLS: Record<string, AnyTool> = {
   edit: editTool,
   bash: bashTool,
   fetch_url: fetchUrlTool,
-  js_interpreter: jsInterpreterTool,
+  cove_interpreter: jsInterpreterTool,
   write_skill: writeSkillTool,
   office: officeTool,
   diagram: diagramTool,

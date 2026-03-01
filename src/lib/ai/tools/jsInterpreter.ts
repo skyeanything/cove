@@ -31,7 +31,7 @@ export const jsInterpreterTool = tool({
   execute: async ({ code, timeout }) => {
     const activeWorkspace = useWorkspaceStore.getState().activeWorkspace;
     if (!activeWorkspace) {
-      return "请先在输入框上方选择工作区目录，再使用 js_interpreter 工具。";
+      return "请先在输入框上方选择工作区目录，再使用 cove_interpreter 工具。";
     }
     const workspaceRoot = activeWorkspace.path;
     const timeoutMs = Math.min((timeout ?? 30) * 1000, 60_000);

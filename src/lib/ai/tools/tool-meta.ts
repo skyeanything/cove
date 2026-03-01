@@ -21,7 +21,7 @@ export const ALL_TOOL_INFOS: ToolInfo[] = [
   { id: "skill", name: "Load Skill", description: "Load a skill's instructions into the conversation.", category: "built-in", userVisible: false },
   { id: "skill_resource", name: "Skill Resource", description: "Load a specific resource guide from an enabled skill.", category: "built-in", userVisible: false },
   { id: "spawn_agent", name: "Spawn Agent", description: "Run a sub-agent for independent subtask execution.", category: "built-in", userVisible: false },
-  { id: "js_interpreter", name: "JavaScript Interpreter", description: "Run JavaScript code in a sandboxed interpreter.", category: "skill-bundled", skillName: "cove", userVisible: true },
+  { id: "cove_interpreter", name: "Cove Interpreter", description: "Run JavaScript code in a sandboxed interpreter.", category: "built-in", userVisible: true },
   { id: "write_skill", name: "Create Skill", description: "Save a skill to the user's Cove skill directory.", category: "skill-bundled", skillName: "skill-creator", userVisible: false },
   { id: "office", name: "Office", description: "Interact with office documents via OfficeLLM.", category: "skill-bundled", skillName: "office", runtimeCheck: "office", userVisible: true },
   { id: "diagram", name: "Diagram", description: "Render diagrams to images.", category: "skill-bundled", skillName: "office", runtimeCheck: "office", userVisible: true },

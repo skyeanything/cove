@@ -1,18 +1,15 @@
 ---
-name: cove
+name: cove-core
 description: "Cove core capabilities: built-in JavaScript interpreter, file operations, and core tool usage guide."
 emoji: "🏠"
 always: true
-requires:
-  tools:
-    - js_interpreter
 ---
 
-You have a **built-in QuickJS JavaScript interpreter** available via the `js_interpreter` tool. You CAN execute JavaScript code directly — no external runtime or installation required.
+You have a **built-in QuickJS JavaScript interpreter** available via the `cove_interpreter` tool. You CAN execute JavaScript code directly — no external runtime or installation required.
 
-## Rule: prefer `js_interpreter` over `bash` for JS-capable tasks
+## Rule: prefer `cove_interpreter` over `bash` for JS-capable tasks
 
-**ALWAYS use `js_interpreter` (not bash) for:**
+**ALWAYS use `cove_interpreter` (not bash) for:**
 - Math calculations and numeric analysis
 - JSON parsing, transforming, and formatting
 - String processing and regex matching
@@ -21,7 +18,7 @@ You have a **built-in QuickJS JavaScript interpreter** available via the `js_int
 - Any task expressible in pure JavaScript
 - Office document operations: extract text, replace text, convert to PDF, apply formatting
 
-**Use `bash` only when `js_interpreter` cannot help:**
+**Use `bash` only when `cove_interpreter` cannot help:**
 - System commands: `git`, `npm`, `cargo`, `pnpm`, etc.
 - Shell features: pipes, redirects, environment variables
 - Network access: `curl`, `wget`

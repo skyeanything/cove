@@ -1,3 +1,7 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # Office Chat — ChatWise Clone
 
 ## Project Overview
@@ -11,6 +15,8 @@ A desktop AI chat client cloning [ChatWise](https://chatwise.app), built with **
 - **State**: Zustand
 - **DB**: SQLite via `tauri-plugin-sql`
 - **Package Manager**: pnpm
+- **Rust**: 1.77.2+
+- **Node.js**: >= 20
 
 ## Design System — "Quiet Elegance"
 
@@ -276,7 +282,7 @@ metadata:                 # 可选，额外元数据
 ### 工具可见性（Tool Visibility）
 
 `ToolInfo.userVisible` 控制工具是否在 `@mention` 中显示：
-- **可见**：`read`, `write`, `edit`, `bash`, `fetch_url`, `parse_document`, `js_interpreter`, `officellm`, `render_mermaid`
+- **可见**：`read`, `write`, `edit`, `bash`, `fetch_url`, `parse_document`, `cove_interpreter`, `officellm`, `render_mermaid`
 - **隐藏**（agent 内部使用）：`skill`, `skill_resource`, `write_skill`
 
 ## Development Workflow

@@ -188,7 +188,7 @@ export const TOOL_ICON_MAP: Record<string, typeof Wrench> = {
   edit: FileDiff,
   read: FileSearch,
   write: FilePenLine,
-  js_interpreter: Code,
+  cove_interpreter: Code,
 };
 
 export function ToolCallIcon({ toolName }: { toolName: string }) {
@@ -207,7 +207,7 @@ export function getToolHeaderSummary(toolName: string, args: Record<string, unkn
     const path = args.filePath;
     return typeof path === "string" && path.trim() ? path.trim() : null;
   }
-  if (toolName === "js_interpreter") {
+  if (toolName === "cove_interpreter") {
     const desc = args.description;
     return typeof desc === "string" && desc.trim() ? desc.trim() : null;
   }
@@ -314,7 +314,7 @@ export function ToolCallArgsDisplay({
     const command = (args.command as string) ?? "—";
     return <div className="mb-2">{renderBashCommand(command)}</div>;
   }
-  if (toolName === "js_interpreter") {
+  if (toolName === "cove_interpreter") {
     const code = (args.code as string) ?? "—";
     return (
       <div className="mb-2 space-y-1">

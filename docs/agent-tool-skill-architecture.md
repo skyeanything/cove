@@ -17,11 +17,10 @@ graph LR
         read & write & edit & bash
         fetch_url & parse_document
         skill & skill_resource
-        spawn_agent
+        spawn_agent & cove_interpreter
     end
 
     subgraph skill-bundled
-        js_interpreter --> cove
         office --> office_skill[office]
         diagram --> office_skill
         write_skill --> skill-creator
@@ -61,9 +60,10 @@ graph TD
 |------|------|------|
 | `officellm` (tool) | `office` | TS 层重命名，Rust 命令不变 |
 | `render_mermaid` (tool) | `diagram` | 去技术化命名 |
-| `code-interpreter` (skill) | `cove` | 合并为核心 skill |
+| `code-interpreter` (skill) | `cove-core` | 合并为核心 skill |
+| `js_interpreter` (tool) | `cove_interpreter` | 升级为 built-in |
 | `core / extension` (分类) | `built-in / skill-bundled` | 语义更清晰 |
 
 Settings 自动迁移：
-- `skillsStore`: `SKILL_NAME_MIGRATIONS` (`officellm→office`, `code-interpreter→cove`)
+- `skillsStore`: `SKILL_NAME_MIGRATIONS` (`officellm→office`, `code-interpreter→cove-core`, `cove→cove-core`)
 - `toolsStore`: `TOOL_ID_MIGRATIONS` (`officellm→office`, `render_mermaid→diagram`)

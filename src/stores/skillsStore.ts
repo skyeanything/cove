@@ -42,7 +42,8 @@ export interface ExternalSkillWithSource {
 /** Migrate legacy skill names to current names */
 const SKILL_NAME_MIGRATIONS: Record<string, string> = {
   officellm: "office",
-  "code-interpreter": "cove",
+  "code-interpreter": "cove-core",
+  cove: "cove-core",
 };
 
 /** 从 settings 读取已勾选 skill 名称；若为空则用内置 skill 名单填充并保存 */
