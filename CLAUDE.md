@@ -250,6 +250,35 @@ metadata:                 # 可选，额外元数据
 
 外部 Skill 列表中的 React key 使用 `ext.path`（磁盘完整路径），保证即使同 source + 同名但来自不同发现根目录的 Skill 也不会冲突。
 
+## @Mention 系统
+
+### 概述
+
+用户在聊天输入框中输入 `@` 触发自动补全弹窗，可引用 **Tools**、**Skills**、**Files** 三类实体。所有工具默认对 agent 可用（无手动开关），`@mention` 用于用户主动引导 agent 使用特定工具。
+
+### 数据流
+
+1. `useMentionDetect` 在 `onChange` 时从光标位置向前扫描 `@` 字符
+2. `@` 必须在行首或前面是空白字符；query 中含空白则关闭
+3. `MentionPopover` 根据 query 过滤 `USER_VISIBLE_TOOLS`、`allSkillMetas`、`useMentionFiles` 结果
+4. 选中后 `insertMention()` 将 `@query` 替换为 `@type:id `（含尾随空格）
+
+### 关键文件
+
+| 文件 | 职责 |
+|------|------|
+| `src/hooks/useMentionDetect.ts` | `@` 检测、query 提取、文本插入 |
+| `src/hooks/useMentionFiles.ts` | 通过 Tauri `list_dir` 获取工作区文件列表 |
+| `src/components/chat/MentionPopover.tsx` | 三分类自动补全 UI（Tools/Skills/Files） |
+| `src/components/chat/ChatToolbar.tsx` | 从 ChatInput 提取的底部工具栏 |
+| `src/lib/ai/tools/tool-meta.ts` | `userVisible` 字段区分用户可见 / 内部工具 |
+
+### 工具可见性（Tool Visibility）
+
+`ToolInfo.userVisible` 控制工具是否在 `@mention` 中显示：
+- **可见**：`read`, `write`, `edit`, `bash`, `fetch_url`, `parse_document`, `js_interpreter`, `officellm`, `render_mermaid`
+- **隐藏**（agent 内部使用）：`skill`, `skill_resource`, `write_skill`
+
 ## Development Workflow
 
 ### 文件大小限制（Hard Constraint）
