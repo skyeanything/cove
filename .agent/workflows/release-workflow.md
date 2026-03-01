@@ -47,6 +47,7 @@ main ──●──●──●──●──────────●──
 - **Do not** tag releases. Only humans tag.
 - **Do not** merge into `main` or `release/*`. Only PRs merged by humans.
 - Before any release, run the full readiness check via the `dev-workflow` skill.
+- Production builds **must** be code-signed and notarized (see #161). Do not distribute unsigned builds.
 
 ## Release Readiness
 

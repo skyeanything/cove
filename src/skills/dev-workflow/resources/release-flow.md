@@ -14,7 +14,8 @@ Step-by-step procedures for Feature and Hotfix releases.
 5. Commit version bump: `chore: bump version to x.y.0`
 6. Human creates tag `vx.y.0` on `main`
 7. Human creates branch `release/x.y` from that tag
-8. Human triggers build/publish pipeline
+8. Human signs and notarizes the build (see #161: sidecar + app code signing, Apple notarization)
+9. Human triggers build/publish pipeline
 
 ## B. Hotfix Release (x.y.z)
 
@@ -30,7 +31,8 @@ Step-by-step procedures for Feature and Hotfix releases.
    ./scripts/bump-version.sh <major> <minor> <patch>
    ```
 6. Human tags `vx.y.z` on `release/x.y`
-7. Cherry-pick the fix commit(s) back to `main`:
+7. Human signs and notarizes the build (#161)
+8. Cherry-pick the fix commit(s) back to `main`:
    ```bash
    git cherry-pick <commit-hash>
    ```

@@ -130,6 +130,7 @@ A single blocking item means NOT READY.
 - Do not modify version numbers directly. Use `scripts/bump-version.sh`.
 - Do not merge into `main` or `release/*`. PRs only.
 - Do not skip any phase during release readiness checks.
+- Production builds must be code-signed and notarized before distribution (#161).
 
 ## Resources
 
