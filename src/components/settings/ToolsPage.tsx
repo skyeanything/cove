@@ -4,6 +4,7 @@ import { ALL_TOOL_INFOS, type ToolInfo } from "@/lib/ai/tools/tool-meta";
 import { AGENT_TOOLS, getAgentTools } from "@/lib/ai/tools/index";
 import { isOfficellmAvailable } from "@/lib/ai/officellm-detect";
 import { getEnabledSkillNames } from "@/stores/skillsStore";
+import { getDisabledToolIds } from "@/stores/toolsStore";
 
 /** Extract the first sentence from a tool description (before the first period+space or newline). */
 function firstSentence(desc: string | undefined): string {
@@ -15,20 +16,23 @@ function firstSentence(desc: string | undefined): string {
 export function ToolsPage() {
   const { t } = useTranslation();
   const [activeToolIds, setActiveToolIds] = useState<Set<string>>(new Set());
+  const [disabledIds, setDisabledIds] = useState<Set<string>>(new Set());
   const [descriptions, setDescriptions] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const [enabledSkills, officellm] = await Promise.all([
+      const [enabledSkills, officellm, disabled] = await Promise.all([
         getEnabledSkillNames(),
         isOfficellmAvailable(),
+        getDisabledToolIds(),
       ]);
       if (cancelled) return;
 
       const tools = getAgentTools(enabledSkills, { officellm });
       setActiveToolIds(new Set(Object.keys(tools)));
+      setDisabledIds(new Set(disabled));
 
       // Build description map: active tool → AGENT_TOOLS → ToolInfo fallback
       const descs: Record<string, string> = {};
@@ -57,8 +61,8 @@ export function ToolsPage() {
 
   return (
     <div className="flex flex-1 flex-col overflow-auto">
-      <ToolGroup label="Core" tools={core} activeIds={activeToolIds} descriptions={descriptions} />
-      <ToolGroup label="Extension" tools={extension} activeIds={activeToolIds} descriptions={descriptions} />
+      <ToolGroup label="Core" tools={core} activeIds={activeToolIds} disabledIds={disabledIds} descriptions={descriptions} />
+      <ToolGroup label="Extension" tools={extension} activeIds={activeToolIds} disabledIds={disabledIds} descriptions={descriptions} />
     </div>
   );
 }
@@ -67,11 +71,13 @@ function ToolGroup({
   label,
   tools,
   activeIds,
+  disabledIds,
   descriptions,
 }: {
   label: string;
   tools: ToolInfo[];
   activeIds: Set<string>;
+  disabledIds: Set<string>;
   descriptions: Record<string, string>;
 }) {
   if (tools.length === 0) return null;
@@ -86,7 +92,7 @@ function ToolGroup({
           <ToolRow
             key={info.id}
             info={info}
-            active={activeIds.has(info.id)}
+            active={activeIds.has(info.id) && !disabledIds.has(info.id)}
             description={descriptions[info.id] ?? ""}
           />
         ))}
