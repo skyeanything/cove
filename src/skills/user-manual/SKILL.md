@@ -38,12 +38,12 @@ All tools are available by default. Category determines gating.
 | Shell Command | Execute a shell command |
 | Fetch URL | Fetch content from a URL as text |
 | Parse Document | Parse document files into structured text |
+| Cove Interpreter | Run JS in a sandboxed QuickJS interpreter |
 
 ### Skill-bundled (available when parent skill is enabled)
 
 | Tool | Skill | Description |
 |------|-------|-------------|
-| JavaScript Interpreter | cove | Run JS in a sandboxed QuickJS interpreter |
 | Office | office | Interact with office documents (DOCX/PPTX/XLSX) |
 | Diagram | office | Render diagrams to images |
 | Create Skill | skill-creator | Save a skill to user's Cove skill directory |
@@ -66,7 +66,7 @@ Modular capability packs. Each skill is a `SKILL.md` file with YAML frontmatter.
 
 - Enable/disable in Settings > Skills
 - Three sources: built-in (bundled in app), user (`~/.cove/skills/`), discovered (from other tools)
-- `cove` core skill is always active (provides JS interpreter rules)
+- `cove-core` core skill is always active (provides JS interpreter rules)
 - Create custom skills by enabling `skill-creator` and asking the AI
 
 ## Settings
