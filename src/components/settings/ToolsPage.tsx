@@ -50,7 +50,7 @@ export function ToolsPage() {
   if (loading) {
     return (
       <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-        {t("tools.loading")}
+        {t("tool.loading")}
       </div>
     );
   }
