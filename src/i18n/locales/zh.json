@@ -4,6 +4,7 @@
       "general": "通用",
       "providers": "提供商",
       "skills": "技能",
+      "tools": "工具",
       "appearance": "外观",
       "workspaces": "工作区"
     },
@@ -196,7 +197,8 @@
     "oldString": "原字符串：",
     "newString": "新字符串：",
     "jsCode": "JavaScript 代码：",
-    "sandboxed": "已沙箱化"
+    "sandboxed": "已沙箱化",
+    "loading": "正在加载工具…"
   },
   "permission": {
     "title": "需要确认",

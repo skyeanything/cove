@@ -4,6 +4,7 @@
       "general": "General",
       "providers": "Providers",
       "skills": "Skills",
+      "tools": "Tools",
       "appearance": "Appearance",
       "workspaces": "Workspaces"
     },
@@ -196,7 +197,8 @@
     "oldString": "Old string:",
     "newString": "New string:",
     "jsCode": "JavaScript code:",
-    "sandboxed": "Sandboxed"
+    "sandboxed": "Sandboxed",
+    "loading": "Loading tools…"
   },
   "permission": {
     "title": "Confirmation required",
