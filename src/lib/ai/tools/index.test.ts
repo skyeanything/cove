@@ -93,4 +93,29 @@ describe("getAgentTools", () => {
     expect(keys).toContain("officellm");
     expect(keys).toContain("render_mermaid");
   });
+
+  it("excludes tools listed in disabledToolIds", () => {
+    const tools = getAgentTools([], { disabledToolIds: ["bash", "js_interpreter"] });
+    const keys = Object.keys(tools);
+    expect(keys).not.toContain("bash");
+    expect(keys).not.toContain("js_interpreter");
+    expect(keys).toContain("read");
+    expect(keys).toContain("write");
+  });
+
+  it("excludes extension tools listed in disabledToolIds", () => {
+    const tools = getAgentTools(["skill-creator"], { officellm: true, disabledToolIds: ["officellm", "write_skill"] });
+    const keys = Object.keys(tools);
+    expect(keys).not.toContain("officellm");
+    expect(keys).not.toContain("write_skill");
+    expect(keys).toContain("render_mermaid");
+  });
+
+  it("returns all tools when disabledToolIds is empty", () => {
+    const tools = getAgentTools(["skill-creator"], { officellm: true, disabledToolIds: [] });
+    const keys = Object.keys(tools);
+    expect(keys).toContain("write_skill");
+    expect(keys).toContain("officellm");
+    expect(keys).toContain("bash");
+  });
 });

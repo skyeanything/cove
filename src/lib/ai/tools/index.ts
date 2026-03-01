@@ -32,9 +32,12 @@ export type ToolRecord = Record<string, Tool<any, any>>;
 /** 根据勾选名单生成工具集：仅勾选的 skill 会出现在 skill 工具中并可供模型调用 */
 export function getAgentTools(
   enabledSkillNames: string[],
-  options?: { officellm?: boolean },
+  options?: { officellm?: boolean; disabledToolIds?: string[] },
 ): ToolRecord {
-  const tools: ToolRecord = {
+  const disabled = new Set(options?.disabledToolIds ?? []);
+  const tools: ToolRecord = {};
+
+  const base: ToolRecord = {
     read: readTool,
     parse_document: parseDocumentTool,
     write: writeTool,
@@ -45,12 +48,16 @@ export function getAgentTools(
     skill_resource: createSkillResourceTool(enabledSkillNames),
     js_interpreter: jsInterpreterTool,
   };
-  if (enabledSkillNames.includes("skill-creator")) {
+  for (const [id, tool] of Object.entries(base)) {
+    if (!disabled.has(id)) tools[id] = tool;
+  }
+
+  if (enabledSkillNames.includes("skill-creator") && !disabled.has("write_skill")) {
     tools.write_skill = writeSkillTool;
   }
   if (options?.officellm) {
-    tools.officellm = officellmTool;
-    tools.render_mermaid = renderMermaidTool;
+    if (!disabled.has("officellm")) tools.officellm = officellmTool;
+    if (!disabled.has("render_mermaid")) tools.render_mermaid = renderMermaidTool;
   }
   return tools;
 }
