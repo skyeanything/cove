@@ -43,7 +43,7 @@
     "sessionTokens": "会话用量",
     "tokensTooltip": "输入 tokens：{{input}}，输出 tokens：{{output}}",
     "copyTip": "复制为纯文本",
-    "copyMarkdownTip": "复制为Markdown）",
+    "copyMarkdownTip": "复制为 Markdown",
     "regenerateTip": "重新生成",
     "contextUsed": "已用 {{percent}}% 上下文",
     "contextUsedFormula": "{{used}} / {{limit}} = {{percent}}%",
