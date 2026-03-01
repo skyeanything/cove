@@ -7,8 +7,9 @@ import { reportAgentRunMetrics, trackAgentPart } from "@/lib/ai/agent-metrics";
 import type { AgentRunMetrics } from "@/lib/ai/agent-metrics";
 import { handleAgentStream, type StreamResult } from "@/lib/ai/stream-handler";
 import { buildSystemPrompt } from "@/lib/ai/context";
-import { isOfficellmAvailable } from "@/lib/ai/officellm-detect";
+import { isOfficeAvailable } from "@/lib/ai/office-detect";
 import { getAgentTools } from "@/lib/ai/tools";
+import type { SubAgentContext } from "@/lib/ai/sub-agent";
 import { getEnabledSkillNames } from "./skillsStore";
 import type { StreamUpdate } from "@/lib/ai/stream-types";
 import { isRateLimitErrorMessage, backoffDelayMs, sleep, RETRYABLE_ATTEMPTS } from "./chat-retry-utils";
@@ -47,15 +48,31 @@ export async function runStreamLoop(
   const model = getModel(provider, modelId);
   const modelOption = getModelOption(provider, modelId);
   const enabledSkillNames = await getEnabledSkillNames();
-  const officellmAvailable = await isOfficellmAvailable();
-  const tools = getAgentTools(enabledSkillNames, { officellm: officellmAvailable });
+  const officeAvailable = await isOfficeAvailable();
+  // Build base tools first (without spawn_agent) to use as parentTools
+  const baseTools = getAgentTools(enabledSkillNames, {
+    runtimeAvailability: { office: officeAvailable },
+  });
+  const subAgentContext: SubAgentContext = {
+    model,
+    parentTools: baseTools,
+    enabledSkillNames,
+    abortSignal,
+    workspacePath,
+    currentDepth: 0,
+    maxDepth: 2,
+  };
+  const tools = getAgentTools(enabledSkillNames, {
+    runtimeAvailability: { office: officeAvailable },
+    subAgentContext,
+  });
 
   let streamResult: StreamResult | null = null;
   for (let attempt = 1; attempt <= RETRYABLE_ATTEMPTS; attempt++) {
     const attemptResult = runAgent({
       model,
       messages: modelMessages,
-      system: buildSystemPrompt({ workspacePath, officellmAvailable }),
+      system: buildSystemPrompt({ workspacePath, officeAvailable }),
       tools,
       abortSignal,
       maxOutputTokens: modelOption?.max_output_tokens,

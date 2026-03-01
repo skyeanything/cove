@@ -8,13 +8,8 @@ vi.mock("ai", () => ({
 vi.mock("./context", () => ({
   buildSystemPrompt: vi.fn(() => "default-system-prompt"),
 }));
-vi.mock("./tools", () => ({
-  AGENT_TOOLS: { read: "read-tool-mock" },
-}));
-
 import { streamText, stepCountIs } from "ai";
 import { buildSystemPrompt } from "./context";
-import { AGENT_TOOLS } from "./tools";
 import { toModelMessages, runAgent } from "./agent";
 
 const mockStreamText = vi.mocked(streamText);
@@ -270,21 +265,22 @@ describe("toModelMessages", () => {
 describe("runAgent", () => {
   const fakeModel = { id: "test-model" } as never;
   const fakeMessages = [{ role: "user", content: "hi" }] as never;
+  const fakeTools = { read: "read-tool-mock" } as never;
 
   it("calls streamText with correct defaults", () => {
-    runAgent({ model: fakeModel, messages: fakeMessages });
+    runAgent({ model: fakeModel, messages: fakeMessages, tools: fakeTools });
 
     expect(mockStreamText).toHaveBeenCalledTimes(1);
     const call = mockStreamText.mock.calls[0]![0];
     expect(call.model).toBe(fakeModel);
     expect(call.messages).toBe(fakeMessages);
     expect(call.system).toBe("default-system-prompt");
-    expect(call.tools).toBe(AGENT_TOOLS);
+    expect(call.tools).toBe(fakeTools);
     expect(mockStepCountIs).toHaveBeenCalledWith(30);
   });
 
   it("uses provided system prompt", () => {
-    runAgent({ model: fakeModel, messages: fakeMessages, system: "custom prompt" });
+    runAgent({ model: fakeModel, messages: fakeMessages, tools: fakeTools, system: "custom prompt" });
 
     const call = mockStreamText.mock.calls[0]![0];
     expect(call.system).toBe("custom prompt");
@@ -300,35 +296,35 @@ describe("runAgent", () => {
   });
 
   it("uses provided maxSteps", () => {
-    runAgent({ model: fakeModel, messages: fakeMessages, maxSteps: 10 });
+    runAgent({ model: fakeModel, messages: fakeMessages, tools: fakeTools, maxSteps: 10 });
 
     expect(mockStepCountIs).toHaveBeenCalledWith(10);
   });
 
   it("passes abortSignal", () => {
     const ac = new AbortController();
-    runAgent({ model: fakeModel, messages: fakeMessages, abortSignal: ac.signal });
+    runAgent({ model: fakeModel, messages: fakeMessages, tools: fakeTools, abortSignal: ac.signal });
 
     const call = mockStreamText.mock.calls[0]![0];
     expect(call.abortSignal).toBe(ac.signal);
   });
 
   it("passes maxOutputTokens when positive", () => {
-    runAgent({ model: fakeModel, messages: fakeMessages, maxOutputTokens: 4096 });
+    runAgent({ model: fakeModel, messages: fakeMessages, tools: fakeTools, maxOutputTokens: 4096 });
 
     const call = mockStreamText.mock.calls[0]![0];
     expect((call as Record<string, unknown>).maxOutputTokens).toBe(4096);
   });
 
   it("omits maxOutputTokens when zero", () => {
-    runAgent({ model: fakeModel, messages: fakeMessages, maxOutputTokens: 0 });
+    runAgent({ model: fakeModel, messages: fakeMessages, tools: fakeTools, maxOutputTokens: 0 });
 
     const call = mockStreamText.mock.calls[0]![0];
     expect((call as Record<string, unknown>).maxOutputTokens).toBeUndefined();
   });
 
   it("returns streamText result", () => {
-    const result = runAgent({ model: fakeModel, messages: fakeMessages });
+    const result = runAgent({ model: fakeModel, messages: fakeMessages, tools: fakeTools });
 
     expect(result).toBe("stream-result");
   });

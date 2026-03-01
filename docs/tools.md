@@ -1,6 +1,6 @@
 # AI 工具文档
 
-Cove 内置 8 个 AI 工具，在对话过程中模型可自动调用。工具通过 `src/lib/ai/tools/index.ts` 注册，并由 `getAgentTools()` 按启用配置动态装配。
+Cove 的 AI 工具分为 built-in（始终可用）和 skill-bundled（需 Skill 启用）两类。工具通过 `src/lib/ai/tools/index.ts` 注册，由 `getAgentTools()` 按启用配置动态装配。详见 [Agent/Tool/Skill 架构](agent-tool-skill-architecture.md)。
 
 ---
 
@@ -148,7 +148,7 @@ Cove 内置 8 个 AI 工具，在对话过程中模型可自动调用。工具�
 
 | 技能 | 功能 |
 |------|------|
-| `officellm` | 通过自然语言操作 Office 文档 |
+| `office` | 通过自然语言操作 Office 文档 |
 | `web-research` | 多步骤网络研究与信息整合 |
 
 **自定义技能**
@@ -157,9 +157,9 @@ Cove 内置 8 个 AI 工具，在对话过程中模型可自动调用。工具�
 
 ---
 
-## `officellm` — Office 文档操作
+## `office` — Office 文档操作
 
-通过集成的 officellm 进程，对本地 Office 文档（DOCX / PPTX / XLSX）执行程序化命令。
+通过集成的 office sidecar 进程，对本地 Office 文档（DOCX / PPTX / XLSX）执行程序化命令。
 
 **参数**
 
@@ -174,7 +174,7 @@ Cove 内置 8 个 AI 工具，在对话过程中模型可自动调用。工具�
 
 | action | 说明 |
 |--------|------|
-| `detect` | 检测本地是否已安装 officellm |
+| `detect` | 检测本地是否已安装 office sidecar |
 | `open` | 打开指定路径的 Office 文档，建立会话 |
 | `call` | 对已打开的文档执行命令（需提供 `command`） |
 | `save` | 保存当前文档（提供 `path` 则另存为） |
@@ -187,5 +187,5 @@ Cove 内置 8 个 AI 工具，在对话过程中模型可自动调用。工具�
 { "action": "call", "command": "addSlide", "args": { "title": "新章节" } }
 ```
 
-> **注意**：此工具调用的是内嵌 sidecar，与外部安装的 officellm CLI 是独立的两套体系。
-> 详见 [officellm 双轨体系](officellm-dual-track.md)。
+> **注意**：此工具调用的是内嵌 sidecar，与外部安装的 CLI 是独立的两套体系。
+> 详见 [双轨体系](officellm-dual-track.md)。

@@ -1,18 +1,18 @@
 ---
-name: officellm
-description: Bootstrap for bundled officellm — Tauri tool for document operations (DOCX/PPTX/XLSX).
-emoji: "\U0001F4C4"
+name: office
+description: Bootstrap for bundled office tool — Tauri tool for document operations (DOCX/PPTX/XLSX).
+emoji: "📄"
 always: false
 ---
 
-# officellm (Bundled Tauri Tool)
+# Office (Bundled Tauri Tool)
 
-Use the `officellm` Tauri tool for document operations. Do NOT use bash to call officellm — it is accessed through dedicated Tauri IPC commands.
+Use the `office` Tauri tool for document operations. Do NOT use bash to call office — it is accessed through dedicated Tauri IPC commands.
 
 ## Calling Priority
 
 - If the external `OfficeLLM` skill is enabled, prefer `bash` + `officellm` CLI (version matches that skill's docs).
-- Otherwise use the `officellm` Tauri tool (bundled sidecar).
+- Otherwise use the `office` Tauri tool (bundled sidecar).
 
 ## Loading the Full Command Reference
 
@@ -30,7 +30,7 @@ Do NOT guess command names — always load the full skill first.
 
 Before any document operation, run `doctor` once per session:
 
-1. Call `officellm` tool with `action: "doctor"`
+1. Call `office` tool with `action: "doctor"`
 2. Check `dependencies` array — each has `name`, `available`, `required`
 3. Install missing **required** dependencies:
 

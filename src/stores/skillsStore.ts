@@ -39,13 +39,26 @@ export interface ExternalSkillWithSource {
   folderName: string;
 }
 
+/** Migrate legacy skill names to current names */
+const SKILL_NAME_MIGRATIONS: Record<string, string> = {
+  officellm: "office",
+  "code-interpreter": "cove",
+};
+
 /** 从 settings 读取已勾选 skill 名称；若为空则用内置 skill 名单填充并保存 */
 export async function getEnabledSkillNames(): Promise<string[]> {
   const raw = await settingsRepo.get(ENABLED_SKILL_NAMES_KEY);
   if (raw) {
     try {
       const arr = JSON.parse(raw) as unknown;
-      if (Array.isArray(arr)) return arr.filter((x): x is string => typeof x === "string");
+      if (Array.isArray(arr)) {
+        const names = arr.filter((x): x is string => typeof x === "string");
+        const migrated = names.map((n) => SKILL_NAME_MIGRATIONS[n] ?? n);
+        if (JSON.stringify(migrated) !== JSON.stringify(names)) {
+          await settingsRepo.set(ENABLED_SKILL_NAMES_KEY, JSON.stringify(migrated));
+        }
+        return migrated;
+      }
     } catch {
       /* ignore */
     }

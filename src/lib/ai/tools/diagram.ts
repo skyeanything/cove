@@ -65,17 +65,17 @@ async function svgToPngBase64(svgStr: string, scale: number): Promise<string> {
   return dataUrl.slice(prefix.length);
 }
 
-export const renderMermaidTool = tool({
+export const diagramTool = tool({
   description:
     "Render a Mermaid diagram to a PNG image file in the workspace. " +
     "Accepts mermaid code and saves the rendered PNG. " +
-    "Use this before officellm addImage to insert diagrams into documents.",
+    "Use this before office addImage to insert diagrams into documents.",
   inputSchema: z.object({
     code: z.string().describe("Mermaid diagram code"),
     filename: z
       .string()
       .optional()
-      .describe("Output filename (default: mermaid-{timestamp}.png)"),
+      .describe("Output filename (default: diagram-{timestamp}.png)"),
     scale: z
       .number()
       .min(1)
@@ -85,16 +85,16 @@ export const renderMermaidTool = tool({
     theme: z
       .enum(["default", "dark", "forest", "neutral"])
       .optional()
-      .describe("Mermaid theme (default: 'default')"),
+      .describe("Diagram theme (default: 'default')"),
   }),
   execute: async ({ code, filename, scale, theme }) => {
     const activeWorkspace = useWorkspaceStore.getState().activeWorkspace;
     if (!activeWorkspace) {
-      return "请先在输入框上方选择工作区目录，再使用 render_mermaid 工具。";
+      return "请先在输入框上方选择工作区目录，再使用 diagram 工具。";
     }
     const workspaceRoot = activeWorkspace.path;
     const resolvedScale = scale ?? 2;
-    let outputName = filename || `mermaid-${Date.now()}.png`;
+    let outputName = filename || `diagram-${Date.now()}.png`;
     if (!outputName.toLowerCase().endsWith(".png")) {
       outputName += ".png";
     }
@@ -114,10 +114,10 @@ export const renderMermaidTool = tool({
         },
       });
 
-      return `Mermaid diagram saved to: ${absPath}`;
+      return `Diagram saved to: ${absPath}`;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      return `render_mermaid failed: ${msg}`;
+      return `diagram failed: ${msg}`;
     }
   },
 });

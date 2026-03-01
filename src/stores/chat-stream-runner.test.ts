@@ -11,7 +11,7 @@ vi.mock("@/lib/ai/agent-metrics", () => ({
 }));
 vi.mock("@/lib/ai/stream-handler", () => ({ handleAgentStream: vi.fn() }));
 vi.mock("@/lib/ai/context", () => ({ buildSystemPrompt: vi.fn().mockReturnValue("system-prompt") }));
-vi.mock("@/lib/ai/officellm-detect", () => ({ isOfficellmAvailable: vi.fn().mockResolvedValue(false) }));
+vi.mock("@/lib/ai/office-detect", () => ({ isOfficeAvailable: vi.fn().mockResolvedValue(false) }));
 vi.mock("@/lib/ai/tools", () => ({ getAgentTools: vi.fn().mockReturnValue({}) }));
 vi.mock("./skillsStore", () => ({ getEnabledSkillNames: vi.fn().mockResolvedValue([]) }));
 vi.mock("./chat-retry-utils", () => ({
@@ -29,7 +29,7 @@ import { runAgent } from "@/lib/ai/agent";
 import { reportAgentRunMetrics, trackAgentPart } from "@/lib/ai/agent-metrics";
 import { handleAgentStream } from "@/lib/ai/stream-handler";
 import { buildSystemPrompt } from "@/lib/ai/context";
-import { isOfficellmAvailable } from "@/lib/ai/officellm-detect";
+import { isOfficeAvailable } from "@/lib/ai/office-detect";
 import { getAgentTools } from "@/lib/ai/tools";
 import { getEnabledSkillNames } from "./skillsStore";
 import { isRateLimitErrorMessage, backoffDelayMs, sleep } from "./chat-retry-utils";
@@ -81,7 +81,7 @@ function makeCallbacks(overrides: Partial<StreamRunCallbacks> = {}): StreamRunCa
 
 describe("runStreamLoop", () => {
   describe("successful run", () => {
-    it("calls getModel, getModelOption, getEnabledSkillNames, isOfficellmAvailable, getAgentTools", async () => {
+    it("calls getModel, getModelOption, getEnabledSkillNames, isOfficeAvailable, getAgentTools", async () => {
       const result = makeStreamResult();
       vi.mocked(getModel).mockReturnValue("model" as never);
       vi.mocked(getModelOption).mockReturnValue({ max_output_tokens: 4096 });
@@ -93,7 +93,7 @@ describe("runStreamLoop", () => {
       expect(getModel).toHaveBeenCalled();
       expect(getModelOption).toHaveBeenCalled();
       expect(getEnabledSkillNames).toHaveBeenCalled();
-      expect(isOfficellmAvailable).toHaveBeenCalled();
+      expect(isOfficeAvailable).toHaveBeenCalled();
       expect(getAgentTools).toHaveBeenCalled();
     });
 
@@ -171,7 +171,6 @@ describe("runStreamLoop", () => {
         .mockResolvedValueOnce(errorResult)
         .mockResolvedValueOnce(errorResult)
         .mockResolvedValueOnce(successResult);
-      // isRateLimitErrorMessage returns true for any error; loop breaks via !current.error for success
       vi.mocked(isRateLimitErrorMessage).mockReturnValue(true);
 
       const cbs = makeCallbacks();
@@ -327,7 +326,7 @@ describe("runStreamLoop", () => {
 
       expect(buildSystemPrompt).toHaveBeenCalledWith({
         workspacePath: undefined,
-        officellmAvailable: false,
+        officeAvailable: false,
       });
     });
 
