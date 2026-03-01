@@ -10,6 +10,7 @@ import { buildSystemPrompt } from "@/lib/ai/context";
 import { isOfficellmAvailable } from "@/lib/ai/officellm-detect";
 import { getAgentTools } from "@/lib/ai/tools";
 import { getEnabledSkillNames } from "./skillsStore";
+import { getDisabledToolIds } from "./toolsStore";
 import type { StreamUpdate } from "@/lib/ai/stream-types";
 import { isRateLimitErrorMessage, backoffDelayMs, sleep, RETRYABLE_ATTEMPTS } from "./chat-retry-utils";
 
@@ -48,7 +49,8 @@ export async function runStreamLoop(
   const modelOption = getModelOption(provider, modelId);
   const enabledSkillNames = await getEnabledSkillNames();
   const officellmAvailable = await isOfficellmAvailable();
-  const tools = getAgentTools(enabledSkillNames, { officellm: officellmAvailable });
+  const disabledToolIds = await getDisabledToolIds();
+  const tools = getAgentTools(enabledSkillNames, { officellm: officellmAvailable, disabledToolIds });
 
   let streamResult: StreamResult | null = null;
   for (let attempt = 1; attempt <= RETRYABLE_ATTEMPTS; attempt++) {

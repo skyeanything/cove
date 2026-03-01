@@ -185,6 +185,12 @@
       "active": "已启用"
     }
   },
+  "tools": {
+    "title": "工具",
+    "tooltipEnabled": "工具（已启用 {{count}} 个）",
+    "hint": "选择 agent 可使用的工具",
+    "unavailable": "不可用"
+  },
   "tool": {
     "pending": "进行中",
     "completed": "已完成",

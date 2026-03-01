@@ -23,6 +23,7 @@ import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { listSkills } from "@/lib/ai/skills/loader";
 import { WorkspacePopover } from "./WorkspacePopover";
 import { SkillsPopover } from "./SkillsPopover";
+import { ToolsPopover } from "./ToolsPopover";
 import { ModelSelector } from "./ModelSelector";
 import { AttachmentBar } from "./AttachmentBar";
 import {
@@ -353,6 +354,7 @@ export function ChatInput({
             <ToolbarIcon icon={<Paperclip />} title={t("chat.attachFiles")} onClick={handleAttachFiles} />
             <ToolbarIcon icon={<Globe />} title={t("chat.webSearch")} />
             <SkillsPopover />
+            <ToolsPopover />
             {/* 模型选择：卡片 Popover，与 Skills 同风格 */}
             <ModelSelector
               open={modelSelectorOpen}
