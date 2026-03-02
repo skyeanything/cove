@@ -173,6 +173,23 @@ describe("officeTool – open", () => {
     await exec({ action: "open", path: "relative/doc.docx" });
     expect(capturedPath).toBe("relative/doc.docx");
   });
+
+  it("rejects open when a session is already active", async () => {
+    setupTauriMocks({
+      officellm_status: () => ({
+        documentPath: "/workspace/existing.docx",
+        pid: 9999,
+        uptimeSecs: 120,
+      }),
+      officellm_open: () => undefined,
+    });
+
+    const result = await exec({ action: "open", path: "new.docx" });
+    expect(result).toContain("Error");
+    expect(result).toContain("session is already active");
+    expect(result).toContain("existing.docx");
+    expect(result).toContain("action:'close'");
+  });
 });
 
 // ── call ──────────────────────────────────────────────────────────────────────

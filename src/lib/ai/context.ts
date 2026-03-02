@@ -34,7 +34,7 @@ export function buildSystemPrompt(options: {
   }
 
   // Operational rules (tool-usage, not identity — kept outside SOUL)
-  parts.push("Write/edit files only after reading them first. Dangerous bash commands require user approval.");
+  parts.push("Write/edit files only after reading them first. Dangerous bash commands require user approval. When multiple valid approaches exist, present options to the user.");
   parts.push("Use the skill tool to load domain-specific instructions when a task matches an available skill in that tool.");
   parts.push("Use the spawn_agent tool to delegate independent subtasks to a sub-agent when the task can be completed without real-time user interaction.");
 

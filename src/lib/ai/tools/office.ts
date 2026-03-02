@@ -79,6 +79,11 @@ export const officeTool = tool({
 
         case "open": {
           if (!path) return "Error: 'path' is required for the 'open' action.";
+          // Pre-check: reject if session already active
+          const existing = await invoke<SessionInfo | null>("officellm_status");
+          if (existing) {
+            return `Error: A session is already active for '${existing.documentPath}' (pid=${existing.pid}, uptime=${existing.uptimeSecs}s). Call action:'close' first, then action:'open' the new document.`;
+          }
           const workspaceRoot = useWorkspaceStore.getState().activeWorkspace?.path;
           const absPath =
             workspaceRoot && !path.startsWith("/")
