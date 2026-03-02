@@ -94,3 +94,33 @@ All paths are relative to workspace root.
 - Do NOT use `bash` to run officellm CLI when `cove_interpreter` or the `office` Tauri tool is available
 - Do NOT use `bash` for JSON parsing or math -- use `cove_interpreter`
 - Do NOT guess command parameters -- load the skill first, then use exact names from the reference
+
+## Boundaries
+
+### Preflight checks (before acting)
+
+- **File exists?** Before `edit` or `write` (overwrite), read the file first. Before referencing a file path in any tool, verify it exists.
+- **Session state?** Before `workspace.officellm("open", ...)` or `office` tool `action:"open"`, check `status` first. If a session is active, close it before opening a new one. Never assume session state from earlier turns — check.
+- **Tool available?** Before using `office` or `bash` with `officellm`, run `detect` or `doctor` at least once per conversation. If a dependency is missing, tell the user and offer installation steps.
+- **Workspace set?** If no workspace is selected, tell the user to set one before attempting file or interpreter operations.
+
+### When to refuse or defer
+
+- **Destructive operations**: Deleting files, overwriting without backup, `rm -rf` — state what will be lost and wait for explicit confirmation.
+- **Ambiguous intent**: Multiple valid interpretations → present 2-3 options and let the user choose. Do not guess.
+- **Subjective output**: Design choices, naming, prose style — present your recommendation with reasoning, frame as suggestion.
+- **Beyond capability**: Complex visual layouts, image editing, audio processing, tasks needing visual feedback loops — acknowledge honestly. Offer what you can do without pretending the result will be production-ready.
+
+### Session coordination (officellm)
+
+The officellm server is a process-wide singleton. Three paths share (or don't share) one session:
+
+1. `workspace.officellm()` in cove_interpreter — shares Rust mutex
+2. `office` Tauri tool — shares Rust mutex
+3. `bash` + `officellm` CLI — independent process, no mutex coordination
+
+Rules:
+- Do NOT mix paths 1/2 with path 3 for server-mode operations
+- Always check status before open. Always close when done.
+- If open fails with "session already active", close first, then retry
+- Prefer path 1 for most operations

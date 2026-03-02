@@ -30,6 +30,7 @@ describe("buildSystemPrompt", () => {
     const prompt = buildSystemPrompt({});
     expect(prompt).toContain("reading them first");
     expect(prompt).toContain("user approval");
+    expect(prompt).toContain("present options to the user");
   });
 
   it("injects workspacePath when provided", () => {
