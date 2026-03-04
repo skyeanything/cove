@@ -91,18 +91,36 @@ cove/
 
 ## AI 工具
 
-Cove 内置 8 个 AI 工具，模型可在对话中自动调用：
+Cove 内置 15 个 AI 工具，模型可在对话中自动调用。
+
+### 用户可见工具
+
+用户可通过 `@mention` 主动引导 agent 使用：
 
 | 工具 | 功能 |
 |------|------|
 | `read` | 读取工作区文件内容 |
 | `write` | 创建或覆盖文件 |
-| `edit` | 精准编辑（oldString → newString 替换） |
+| `edit` | 精准编辑（oldString -> newString 替换） |
 | `bash` | 执行 shell 命令（含安全分级） |
 | `fetch_url` | 获取并解析网页内容 |
 | `parse_document` | 解析 PDF / DOCX / PPTX / XLSX |
-| `skill` | 加载并执行领域技能 |
-| `officellm` | Office 文档操作（检测 / 打开 / 操作 / 保存 / 关闭） |
+| `cove_interpreter` | 沙盒内执行 JavaScript 代码 |
+| `office` | Office 文档操作（检测 / 打开 / 操作 / 保存 / 关闭） |
+| `diagram` | 渲染 Mermaid 等图表为图片 |
+
+### 内部工具
+
+Agent 自动调用，无需手动触发：
+
+| 工具 | 功能 |
+|------|------|
+| `recall` | 按主题搜索历史对话摘要 |
+| `recall_detail` | 获取特定历史对话的原始消息 |
+| `skill` | 加载并执行领域技能指令 |
+| `skill_resource` | 加载技能的特定资源文件 |
+| `spawn_agent` | 启动子 agent 执行独立子任务 |
+| `write_skill` | 创建新技能并保存到磁盘 |
 
 详细说明见 [docs/tools.md](docs/tools.md)。
 
@@ -111,7 +129,7 @@ Cove 内置 8 个 AI 工具，模型可在对话中自动调用：
 | 文档 | 内容 |
 |------|------|
 | [架构说明](docs/architecture.md) | 前端架构与数据流 |
-| [AI 工具](docs/tools.md) | 8 个内置工具的参数与使用场景 |
+| [AI 工具](docs/tools.md) | 内置工具的参数与使用场景 |
 | [LLM 供应商](docs/providers.md) | 供应商配置与支持列表 |
 | [工具-技能架构](docs/agent-tool-skill-architecture.md) | 工具分类、Skill 门控、命名迁移 |
 | [officellm 双轨体系](docs/officellm-dual-track.md) | 内嵌 vs 外部 officellm 架构 |
