@@ -132,6 +132,7 @@ Agent 自动调用，无需手动触发：
 
 | 文档 | 内容 |
 |------|------|
+| [快速开始](docs/getting-started.md) | 开发环境搭建指南（macOS） |
 | [架构说明](docs/architecture.md) | 前端架构与数据流 |
 | [AI 工具](docs/tools.md) | 内置工具的参数与使用场景 |
 | [LLM 供应商](docs/providers.md) | 供应商配置与支持列表 |
