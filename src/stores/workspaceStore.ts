@@ -48,7 +48,13 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     // Ensure default workspace exists
     let defaultWs = await workspaceRepo.getDefault();
     if (!defaultWs) {
-      const defaultPath = await appDataDir();
+      let defaultPath: string;
+      try {
+        defaultPath = await appDataDir();
+      } catch (e) {
+        console.warn("[workspaceStore] appDataDir() failed, using fallback:", e);
+        defaultPath = "~/Documents";
+      }
       defaultWs = {
         id: "default",
         name: "Default",

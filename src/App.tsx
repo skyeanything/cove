@@ -17,6 +17,7 @@ export function App() {
   const theme = useThemeStore((s) => s.theme);
   const init = useDataStore((s) => s.init);
   const initialized = useDataStore((s) => s.initialized);
+  const initError = useDataStore((s) => s.initError);
   useTauriDrag();
 
   // Initialize data store (loads providers, assistants, etc. from SQLite)
@@ -84,7 +85,28 @@ export function App() {
   if (!initialized) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-background">
-        <div className="text-[13px] text-muted-foreground">Loading...</div>
+        {initError ? (
+          <div className="flex max-w-md flex-col items-center gap-3 px-6 text-center">
+            <p className="text-[13px] font-medium text-destructive">
+              Failed to initialize
+            </p>
+            <p className="rounded-lg bg-background-tertiary px-3 py-2 font-mono text-[11px] text-muted-foreground">
+              {initError}
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                useDataStore.setState({ initError: null });
+                init();
+              }}
+              className="mt-1 rounded-lg bg-accent px-3 py-1.5 text-[12px] font-medium text-accent-foreground transition-colors hover:bg-accent-hover"
+            >
+              Retry
+            </button>
+          </div>
+        ) : (
+          <div className="text-[13px] text-muted-foreground">Loading...</div>
+        )}
       </div>
     );
   }

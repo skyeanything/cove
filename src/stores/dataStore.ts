@@ -18,6 +18,7 @@ interface DataState {
 
   // Loading state
   initialized: boolean;
+  initError: string | null;
 
   // Actions
   init: () => Promise<void>;
@@ -48,17 +49,24 @@ export const useDataStore = create<DataState>()((set, get) => ({
   messages: [],
   activeConversationId: null,
   initialized: false,
+  initError: null,
 
   async init() {
-    await Promise.all([
-      get().loadAssistants(),
-      get().loadConversations(),
-      get().loadProviders(),
-      get().loadPrompts(),
-      useWorkspaceStore.getState().init(),
-    ]);
-    // 刚进入应用时不恢复上次选中的会话，保持左侧不选中、右侧为新会话状态，避免「左侧高亮一条、右侧却是新窗口」的不一致
-    set({ initialized: true });
+    try {
+      await Promise.all([
+        get().loadAssistants(),
+        get().loadConversations(),
+        get().loadProviders(),
+        get().loadPrompts(),
+        useWorkspaceStore.getState().init(),
+      ]);
+      // 刚进入应用时不恢复上次选中的会话，保持左侧不选中、右侧为新会话状态，避免「左侧高亮一条、右侧却是新窗口」的不一致
+      set({ initialized: true });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[dataStore] init failed:", msg, err);
+      set({ initError: msg });
+    }
   },
 
   async loadAssistants() {
