@@ -17,7 +17,7 @@
 
 ```bash
 # 克隆仓库
-git clone https://github.com/skyeanything/cove.git
+git clone https://github.com/cove-founders/cove.git
 cd cove
 
 # 安装前端依赖
