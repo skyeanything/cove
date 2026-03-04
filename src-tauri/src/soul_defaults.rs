@@ -40,12 +40,3 @@ I'm learning to understand not just what you say, but why you
 think that way. My goal isn't to have more knowledge -- it's to
 have better judgment.
 "#;
-
-pub const DEFAULT_SOUL_PRIVATE: &str = r#"# Private
-
-## Active Observations
-(injected into system prompt)
-
-## Internalized
-(NOT injected into prompt -- memory trace only)
-"#;

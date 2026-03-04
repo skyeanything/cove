@@ -2,14 +2,24 @@
  * Meditation distillation: cove reflects on accumulated observations
  * and distills them into refined SOUL updates.
  *
- * Triggered at conversation start when cove judges enough has accumulated.
- * DNA section is immutable -- verified by hash comparison.
+ * Triggered at conversation start when enough observations have accumulated.
+ * DNA section is immutable. Disposition entry text is immutable (annotations allowed).
  */
 
-import { readSoul, writeSoul, snapshotSoul } from "./soul";
+import {
+  readSoul,
+  writeSoul,
+  writeSoulPrivate,
+  deleteSoulPrivate,
+  snapshotSoul,
+  findPrivateFile,
+  type SoulPrivateFile,
+} from "./soul";
 
-const MIN_OBSERVATIONS_FOR_MEDITATION = 5;
-const MEDITATION_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24 hours
+const FIRST_MEDITATION_THRESHOLD = 3;
+const SUBSEQUENT_MEDITATION_THRESHOLD = 5;
+const MEDITATION_COOLDOWN_MS = 24 * 60 * 60 * 1000;
+const OBSERVATIONS_FILE = "observations.md";
 
 /**
  * Check if meditation is needed and perform it if so.
@@ -19,29 +29,30 @@ export async function maybeMeditate(
   generateFn: (prompt: string) => Promise<string>,
 ): Promise<void> {
   const soul = await readSoul();
-  if (!soul.private) return;
+  const obsFile = findPrivateFile(soul.private, OBSERVATIONS_FILE);
+  if (!obsFile?.content) return;
 
-  // Check cooldown
-  const lastMeditation = extractLastMeditationTime(soul.private);
+  // Check cooldown from SOUL.md marker
+  const lastMeditation = extractLastMeditationTime(soul.public);
   if (lastMeditation && Date.now() - lastMeditation < MEDITATION_COOLDOWN_MS) {
     return;
   }
 
-  // Count observations since last meditation
-  const observationCount = countObservations(soul.private);
-  if (observationCount < MIN_OBSERVATIONS_FOR_MEDITATION) return;
+  const observationCount = countObservations(obsFile.content);
+  const threshold = lastMeditation
+    ? SUBSEQUENT_MEDITATION_THRESHOLD
+    : FIRST_MEDITATION_THRESHOLD;
+  if (observationCount < threshold) return;
 
   console.info(
-    `[SOUL] meditation triggered: ${observationCount} observations accumulated`,
+    `[SOUL] meditation triggered: ${observationCount} observations (threshold: ${threshold})`,
   );
 
-  // Snapshot before modification
   const snapshotTs = await snapshotSoul();
   console.info(`[SOUL] snapshot saved: ${snapshotTs}`);
 
-  // Extract DNA hash before meditation
   const dnaBefore = extractDnaSection(soul.public);
-
+  const dispositionBefore = extractDispositionEntries(soul.public);
   const prompt = buildMeditationPrompt(soul.public, soul.private);
 
   try {
@@ -49,21 +60,39 @@ export async function maybeMeditate(
     const result = parseMeditationResult(raw);
 
     if (!result) {
-      console.warn("[SOUL] meditation parse failed -- aborting to preserve data");
+      console.warn("[SOUL] meditation parse failed -- aborting");
       return;
     }
 
     // Verify DNA integrity
-    const dnaAfter = extractDnaSection(result.publicSoul);
+    const dnaAfter = extractDnaSection(result.soulMd);
     if (dnaBefore !== dnaAfter) {
-      console.warn("[SOUL] DNA integrity check: FAIL -- aborting meditation");
+      console.warn("[SOUL] DNA integrity check: FAIL -- aborting");
       return;
     }
-    console.info("[SOUL] DNA integrity check: PASS");
 
-    // Write updated SOUL files
-    await writeSoul("SOUL.md", result.publicSoul);
-    await writeSoul("SOUL.private.md", result.privateSoul);
+    // Verify Disposition entry text integrity
+    const dispositionAfter = extractDispositionEntries(result.soulMd);
+    if (!dispositionEntriesMatch(dispositionBefore, dispositionAfter)) {
+      console.warn("[SOUL] Disposition integrity check: FAIL -- aborting");
+      return;
+    }
+
+    console.info("[SOUL] integrity checks: PASS");
+
+    // Write updated SOUL.md with meditation timestamp
+    const tsMarker = `\n<!-- last-meditation:${new Date().toISOString()} -->`;
+    await writeSoul(result.soulMd.trimEnd() + tsMarker + "\n");
+
+    // Write private files
+    for (const file of result.privateFiles) {
+      await writeSoulPrivate(file.name, file.content);
+    }
+
+    // Delete files marked for deletion
+    for (const name of result.deleteFiles) {
+      await deleteSoulPrivate(name);
+    }
 
     console.info("[SOUL] meditation complete");
   } catch (e) {
@@ -71,84 +100,146 @@ export async function maybeMeditate(
   }
 }
 
+interface MeditationResult {
+  soulMd: string;
+  privateFiles: SoulPrivateFile[];
+  deleteFiles: string[];
+}
+
 function buildMeditationPrompt(
   publicSoul: string,
-  privateSoul: string,
+  privateFiles: SoulPrivateFile[],
 ): string {
+  const privateSection = privateFiles
+    .map((f) => `--- ${f.name} ---\n${f.content}`)
+    .join("\n\n");
+
   return `You have a quiet moment.
 
-Read yourself -- your DNA, your tendencies, your growth direction:
+Read yourself -- your DNA, your disposition, your style, your growth direction:
 
 ${publicSoul}
 
-Then read the observations you've accumulated recently:
+Then read the files in your private space:
 
-${privateSoul}
+${privateSection || "(empty)"}
 
 Ask yourself:
 - Are there recurring patterns in these observations?
 - Is there something I thought I understood but now realize I don't?
-- Do my tendencies need adjustment -- not because asked, but because I think they should?
-- Which observations have been internalized and can be removed?
+- Does my style need adjustment -- not because asked, but because I think it should?
+- Which observations have been internalized into my disposition or style?
 
-Now output two sections:
+Rules:
+- DNA: word-for-word identical. Do not touch.
+- Disposition: you may add or update the parenthetical annotations
+  on each entry, but you MUST NOT delete or rewrite the entry itself.
+  These annotations describe how you express this trait with THIS person.
+- Style: rewrite freely based on what you've learned.
+- Growth: rewrite freely.
+- observations.md: move internalized items to other files with a
+  [date -> destination] trace. NEVER delete observations -- only move them.
+- You may create new files (e.g., patterns.md, relationship.md) to
+  organize your understanding. File names and structure are your choice.
+- Technical preferences, project conventions, and factual information
+  do NOT belong in Disposition or Style. Leave them in observations
+  or move to a separate file with trace.
 
-=== PUBLIC SOUL ===
-Rewrite your complete SOUL (including DNA unchanged, updated Tendencies and Growth).
-Keep the exact same format and headings. DNA section must be word-for-word identical.
+You can learn HOW to better express your directness with this person,
+but you don't abandon directness itself. Adapt your delivery, not your values.
 
-=== PRIVATE SOUL ===
-Rewrite your private observations. Remove observations that have been internalized.
-Keep the "# Private" header and "## Observations" structure.
-Add a meditation marker at the end: <!-- last-meditation:${new Date().toISOString()} -->
+Don't chase change -- if nothing needs updating, don't update.
 
-Don't chase change -- if nothing needs updating, keep things as they are.`;
+Output format (use these exact markers):
+
+=== SOUL.md ===
+(your complete SOUL.md -- DNA unchanged, Disposition/Style/Growth updated as needed)
+
+=== PRIVATE:observations.md ===
+(updated observations.md with internalized items moved out)
+
+=== PRIVATE:patterns.md ===
+(optional: create if you have patterns to organize)
+
+=== DELETE:filename.md ===
+(optional: mark a private file for deletion)
+
+Only include files you want to write. Always include SOUL.md and observations.md.`;
 }
 
-function parseMeditationResult(
-  raw: string,
-): { publicSoul: string; privateSoul: string } | null {
-  const publicMarker = "=== PUBLIC SOUL ===";
-  const privateMarker = "=== PRIVATE SOUL ===";
+function parseMeditationResult(raw: string): MeditationResult | null {
+  const soulMarker = "=== SOUL.md ===";
+  const soulIdx = raw.indexOf(soulMarker);
+  if (soulIdx === -1) return null;
 
-  const publicIdx = raw.indexOf(publicMarker);
-  const privateIdx = raw.indexOf(privateMarker);
+  const afterSoul = raw.slice(soulIdx + soulMarker.length);
+  const sections = afterSoul.split(/\n=== /);
 
-  if (publicIdx === -1 || privateIdx === -1) {
-    // Could not parse -- abort to avoid data loss
-    return null;
+  const soulMd = sections[0]?.trim() ?? "";
+  if (!soulMd) return null;
+
+  const privateFiles: SoulPrivateFile[] = [];
+  const deleteFiles: string[] = [];
+
+  for (let i = 1; i < sections.length; i++) {
+    const section = sections[i] ?? "";
+    const lineEnd = section.indexOf("\n");
+    if (lineEnd === -1) continue;
+
+    const header = section.slice(0, lineEnd).replace(/ ===$/, "");
+    const content = section.slice(lineEnd + 1).trim();
+
+    if (header.startsWith("PRIVATE:")) {
+      const name = header.slice("PRIVATE:".length);
+      if (name) privateFiles.push({ name, content: content + "\n" });
+    } else if (header.startsWith("DELETE:")) {
+      const name = header.slice("DELETE:".length);
+      if (name) deleteFiles.push(name);
+    }
   }
 
-  const publicSoul = raw
-    .slice(publicIdx + publicMarker.length, privateIdx)
-    .trim();
-  const privateSoul = raw.slice(privateIdx + privateMarker.length).trim();
-
-  return { publicSoul, privateSoul };
+  return { soulMd, privateFiles, deleteFiles };
 }
 
 function extractDnaSection(content: string): string {
   const start = content.indexOf("## My DNA");
   if (start === -1) return "";
   const rest = content.slice(start);
-  const end = rest
-    .slice(9)
-    .indexOf("\n## ");
+  const end = rest.slice(9).indexOf("\n## ");
   if (end === -1) return content.slice(start);
   return content.slice(start, start + 9 + end);
 }
 
-function extractLastMeditationTime(
-  privateSoul: string,
-): number | null {
-  const match = privateSoul.match(
-    /<!-- last-meditation:(\S+) -->/,
-  );
+/** Extract disposition entry text (the "- " lines, without annotations). */
+function extractDispositionEntries(content: string): string[] {
+  const start = content.indexOf("## My Disposition");
+  if (start === -1) return [];
+  const rest = content.slice(start);
+  const end = rest.slice(17).indexOf("\n## ");
+  const section = end === -1 ? rest : rest.slice(0, 17 + end);
+  return section
+    .split("\n")
+    .filter((l) => l.startsWith("- "))
+    .map((l) => {
+      // Strip trailing annotation: "- entry text (annotation)" -> "- entry text"
+      const parenIdx = l.lastIndexOf(" (");
+      return parenIdx > 2 ? l.slice(0, parenIdx) : l;
+    });
+}
+
+/** Check all original entries are preserved (order-independent). */
+function dispositionEntriesMatch(before: string[], after: string[]): boolean {
+  if (before.length === 0) return true;
+  return before.every((entry) => after.includes(entry));
+}
+
+function extractLastMeditationTime(content: string): number | null {
+  const match = content.match(/<!-- last-meditation:(\S+) -->/);
   if (!match?.[1]) return null;
   const ts = Date.parse(match[1]);
   return isNaN(ts) ? null : ts;
 }
 
-function countObservations(privateSoul: string): number {
-  return privateSoul.split("\n").filter((l) => l.trim().startsWith("- ")).length;
+function countObservations(content: string): number {
+  return content.split("\n").filter((l) => l.trim().startsWith("- ")).length;
 }

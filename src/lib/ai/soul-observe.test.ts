@@ -2,10 +2,11 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 
 vi.mock("./soul", () => ({
   readSoul: vi.fn(),
-  writeSoul: vi.fn(),
+  writeSoulPrivate: vi.fn(),
+  findPrivateFile: vi.fn(),
 }));
 
-import { readSoul, writeSoul } from "./soul";
+import { readSoul, writeSoulPrivate, findPrivateFile } from "./soul";
 import { maybeRecordObservation } from "./soul-observe";
 import type { Message } from "@/db/types";
 
@@ -26,54 +27,69 @@ describe("maybeRecordObservation", () => {
     vi.clearAllMocks();
     vi.mocked(readSoul).mockResolvedValue({
       public: "# Who I Am",
-      private: "# Private\n\n## Observations\n",
+      private: [{ name: "observations.md", content: "### 2026-03-03\n- old obs\n" }],
     });
-    vi.mocked(writeSoul).mockResolvedValue(undefined);
+    vi.mocked(findPrivateFile).mockReturnValue({
+      name: "observations.md",
+      content: "### 2026-03-03\n- old obs\n",
+    });
+    vi.mocked(writeSoulPrivate).mockResolvedValue(undefined);
   });
 
-  it("skips when fewer than 3 user turns", async () => {
-    const messages = [makeMsg("user", "hi"), makeMsg("assistant", "hello")];
+  it("skips when fewer than 2 user turns", async () => {
+    const messages = [makeMsg("user", "hi")];
     await maybeRecordObservation("conv-1", messages, generateFn);
     expect(generateFn).not.toHaveBeenCalled();
   });
 
+  it("triggers after 2 user turns", async () => {
+    const messages = [
+      makeMsg("user", "hello"),
+      makeMsg("assistant", "hi"),
+      makeMsg("user", "question"),
+      makeMsg("assistant", "answer"),
+    ];
+    generateFn.mockResolvedValue("nothing");
+    await maybeRecordObservation("conv-1", messages, generateFn);
+    expect(generateFn).toHaveBeenCalled();
+  });
+
   it("skips when LLM responds with nothing", async () => {
-    const messages = Array.from({ length: 8 }, (_, i) =>
+    const messages = Array.from({ length: 6 }, (_, i) =>
       makeMsg(i % 2 === 0 ? "user" : "assistant", `msg ${i}`),
     );
     generateFn.mockResolvedValue("nothing");
     await maybeRecordObservation("conv-1", messages, generateFn);
-    expect(writeSoul).not.toHaveBeenCalled();
+    expect(writeSoulPrivate).not.toHaveBeenCalled();
   });
 
-  it("appends observations to SOUL.private.md", async () => {
-    const messages = Array.from({ length: 8 }, (_, i) =>
+  it("appends observations to observations.md", async () => {
+    const messages = Array.from({ length: 6 }, (_, i) =>
       makeMsg(i % 2 === 0 ? "user" : "assistant", `msg ${i}`),
     );
     generateFn.mockResolvedValue(
       "- He prefers concise answers\n- Values directness",
     );
     await maybeRecordObservation("conv-1", messages, generateFn);
-    expect(writeSoul).toHaveBeenCalledWith(
-      "SOUL.private.md",
+    expect(writeSoulPrivate).toHaveBeenCalledWith(
+      "observations.md",
       expect.stringContaining("- He prefers concise answers"),
     );
   });
 
   it("adds date header when not present", async () => {
-    const messages = Array.from({ length: 8 }, (_, i) =>
+    const messages = Array.from({ length: 6 }, (_, i) =>
       makeMsg(i % 2 === 0 ? "user" : "assistant", `msg ${i}`),
     );
     generateFn.mockResolvedValue("- New observation");
     await maybeRecordObservation("conv-1", messages, generateFn);
-    const writeCall = vi.mocked(writeSoul).mock.calls[0];
+    const writeCall = vi.mocked(writeSoulPrivate).mock.calls[0];
     const content = writeCall?.[1] ?? "";
-    // Should contain a date header in YYYY-MM-DD format
     expect(content).toMatch(/### \d{4}-\d{2}-\d{2}/);
   });
 
   it("handles errors gracefully", async () => {
-    const messages = Array.from({ length: 8 }, (_, i) =>
+    const messages = Array.from({ length: 6 }, (_, i) =>
       makeMsg(i % 2 === 0 ? "user" : "assistant", `msg ${i}`),
     );
     generateFn.mockRejectedValue(new Error("fail"));

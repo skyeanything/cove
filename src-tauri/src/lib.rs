@@ -10,6 +10,7 @@ mod skill_commands;
 mod skill_discovery;
 mod soul_commands;
 mod soul_defaults;
+mod soul_migrate;
 mod workspace_watcher;
 
 #[cfg(test)]
@@ -129,6 +130,9 @@ pub fn run() {
       skill_commands::read_skill,
       soul_commands::read_soul,
       soul_commands::write_soul,
+      soul_commands::read_soul_private,
+      soul_commands::write_soul_private,
+      soul_commands::delete_soul_private,
       soul_commands::snapshot_soul,
       docx_commands::docx_to_pdf,
       docx_commands::qmd_to_pdf,

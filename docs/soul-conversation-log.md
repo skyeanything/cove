@@ -614,3 +614,110 @@ evolution trajectories. Zero development needed.
 
 Core principle: **debugging tools are creator privilege, via dev build and filesystem access,
 not product features.** No entry points exposed in production UI.
+
+---
+
+## Part 3: 2026-03-04 -- SOUL v2 Refinements
+
+### Context
+
+PR #230 implemented the complete SOUL system (v1). Simultaneously, a separate agent session
+(commit d5ebf9b) independently designed Disposition/Style split and anti-servility safeguards.
+This part documents the design decisions that merged both efforts and added further refinements.
+
+### Memory Classification: Prescriptive vs Self-Organized
+
+**Discussion**: Should cove's private layer have predefined categories (Active Observations,
+Internalized) or should cove organize freely?
+
+**Decision**: Free directory. The old `SOUL.private.md` with fixed `## Active Observations`
+and `## Internalized` sections was too prescriptive. It imposed a specific organizational
+model on cove. Instead, `private/` is a directory where cove can create whatever file
+structure makes sense through meditation.
+
+The only prescribed element is `observations.md` -- a deterministic inbox where auto-observation
+writes land. Everything else is cove's choice.
+
+**Rationale**: Prescriptive categories assume we know the right way to organize introspection.
+We don't. Letting cove develop its own organizational patterns is more consistent with the
+autonomy principle. The inbox pattern (one fixed entry point, free organization after) is a
+well-understood information architecture.
+
+### Cold Start + Fast Response
+
+**Problem**: In v1, the observation threshold was 3 user turns and meditation threshold was
+5 observations. A new user would need ~15 meaningful turns before seeing any evidence that
+cove remembers them. That's potentially several sessions before the first emergence.
+
+**Decision**:
+- Observation trigger: 3 -> 2 user turns (capture signal earlier)
+- First meditation threshold: 5 -> 3 observations (faster first emergence)
+- Subsequent meditation threshold: stays at 5 (don't over-meditate once relationship exists)
+- Cooldown: stays at 24h
+
+**Detection**: First meditation = no `<!-- last-meditation: -->` marker in SOUL.md.
+After first meditation, the marker is written and subsequent meditations use the higher
+threshold.
+
+**Target**: User should notice cove's memory within 2-3 conversations.
+
+### Disposition/Style Split (from d5ebf9b)
+
+**Problem**: v1 had "Tendencies" as a single section with uniform mutability. This created
+a servility gradient risk -- meditation could gradually soften all traits toward user-pleasing.
+
+**Decision** (from d5ebf9b, preserved in v2):
+- Split Tendencies into Disposition (high inertia) + Style (low inertia)
+- Disposition entries: text is immutable, only annotations can be added
+- Style entries: freely mutable
+- This creates an inertia gradient: DNA > Disposition > Style > Growth
+
+**Anti-servility**: The meditation prompt explicitly instructs "adapt your delivery, not
+your values." Disposition integrity is verified programmatically alongside DNA.
+
+### observations.md Inbox Pattern
+
+**Discussion**: Should auto-observation use LLM to decide which file to write to?
+
+**Decision**: No. Auto-observation always writes to `observations.md`. Routing decisions
+happen during meditation, not during real-time observation.
+
+**Rationale**: The observation path must be fast and deterministic. Adding an LLM routing
+step to decide "should this go in observations.md or patterns.md?" adds latency, cost,
+and failure modes to a fire-and-forget operation. Meditation is the right time for
+organizational decisions -- it's already an LLM call, already reflective.
+
+### Directory Structure Migration
+
+**Old**: `~/.cove/SOUL.md` + `SOUL.private.md` + `soul-history/`
+**New**: `~/.cove/soul/SOUL.md` + `soul/private/` + `soul/snapshots/`
+
+Automatic migration in `ensure_soul_files()`. Old files are moved, not copied (originals
+removed after successful migration). Idempotent -- only runs if old files exist and new
+ones don't.
+
+### Snapshot Format Change
+
+**Old**: Individual files in `soul-history/` (SOUL-{ts}.md, SOUL-{ts}.private.md)
+**New**: Directory snapshots in `soul/snapshots/{ts}/` containing complete `SOUL.md` +
+`private/` subdirectory
+
+Necessary because private layer is now a directory with arbitrary files, not a single file.
+
+### Meditation Output Format
+
+**Old**: Two markers (`=== PUBLIC SOUL ===`, `=== PRIVATE SOUL ===`)
+**New**: Multi-file markers (`=== SOUL.md ===`, `=== PRIVATE:{name} ===`, `=== DELETE:{name} ===`)
+
+Supports cove writing to multiple private files and deleting files it no longer needs.
+
+### Conversation Deletion and SOUL
+
+**Decision**: Deleting a conversation does NOT cascade to SOUL observations.
+
+Observations are identity-level insights, not conversation records. They belong to a
+different conceptual layer. A user deleting a conversation removes the "library book" but
+the understanding cove gained from it has already been absorbed. This matches human cognition:
+you can forget a specific conversation, but the impression it gave you persists.
+
+If users want to reset cove's understanding: reset SOUL (delete `~/.cove/soul/`).
