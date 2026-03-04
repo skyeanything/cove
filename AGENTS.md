@@ -29,6 +29,7 @@ CLAUDE.md Hard Constraints
 | 开始新 Issue | `./scripts/start-worktree.sh <type> <id> <desc>` |
 | Hotfix worktree | `./scripts/start-worktree.sh fix <id> <desc> --base release/x.y` |
 | 同步版本号 | `./scripts/bump-version.sh <major> <minor> <patch>` |
+| 提交前检查 | `./scripts/dev-check.sh` |
 | 发版前检查 | `./scripts/pre-release-check.sh` |
 | 前端构建+类型检查 | `pnpm run build` |
 | 运行测试 | `pnpm test` |
@@ -37,6 +38,9 @@ CLAUDE.md Hard Constraints
 | 文件大小校验 | `python3 scripts/check-file-size.py` |
 | 创建 PR | `gh pr create --title "type: desc" --body "..."` |
 | 审查 PR 并回写评论 | `gh pr review <id> --comment ...` / `gh pr comment <id> ...` |
+
+> `dev-check.sh` 是日常提交前的快速检查（无覆盖率）；`pre-release-check.sh` 是发版前的完整检查（含覆盖率）。
+> CI 在 PR 提交后自动运行全部检查（见 `.github/workflows/ci.yml`），无需手动触发。
 
 ## 文件大小限制（Hard Constraint）
 
