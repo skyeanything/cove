@@ -334,9 +334,11 @@ Migration is idempotent -- only runs if old files exist and new ones don't.
 `conversation_id`. This ensures at most one summary per conversation.
 
 For pre-existing data that may contain duplicates, `runMigrations()` in
-`db/index.ts` runs an explicit dedup step: keeps the newest row per
-`conversation_id` (by `MAX(created_at)`) and deletes the rest. This runs
-on every app startup and is idempotent.
+`db/index.ts` runs two steps: (1) dedup -- keeps the newest row per
+`conversation_id` (by `MAX(created_at)`) and deletes the rest; (2) creates
+`CREATE UNIQUE INDEX IF NOT EXISTS` on `conversation_id` to durably enforce
+uniqueness for tables created without the inline `UNIQUE` constraint.
+Both steps are idempotent and run on every app startup.
 
 ### Post-Conversation Hooks
 

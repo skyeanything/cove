@@ -27,6 +27,7 @@ async function runMigrations(database: Database): Promise<void> {
     }
   }
   // Deduplicate legacy conversation_summaries (keep newest per conversation_id)
+  // then enforce uniqueness durably via index for tables created without UNIQUE
   try {
     await database.execute(
       `DELETE FROM conversation_summaries WHERE id NOT IN (
@@ -34,6 +35,9 @@ async function runMigrations(database: Database): Promise<void> {
         GROUP BY conversation_id
         HAVING MAX(created_at)
       )`,
+    );
+    await database.execute(
+      "CREATE UNIQUE INDEX IF NOT EXISTS idx_summaries_conversation_id ON conversation_summaries(conversation_id)",
     );
   } catch {
     // Table may not exist yet or no duplicates — ignore

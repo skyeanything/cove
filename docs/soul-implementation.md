@@ -140,10 +140,11 @@ for any conversation with 8+ messages.
 On update, the existing summary's UUID is reused (`INSERT OR REPLACE`),
 maintaining the `conversation_id` unique constraint without creating duplicates.
 
-**Dedup migration**: `runMigrations()` in `db/index.ts` runs an explicit dedup
-on startup -- keeps the newest row per `conversation_id` by `MAX(created_at)`.
-Handles pre-existing data that may have accumulated duplicates before the
-UNIQUE constraint was added.
+**Dedup migration**: `runMigrations()` in `db/index.ts` runs two steps on
+startup: (1) delete duplicate rows, keeping newest per `conversation_id`;
+(2) `CREATE UNIQUE INDEX IF NOT EXISTS` on `conversation_id` to durably
+enforce uniqueness for legacy tables created without the inline `UNIQUE`
+constraint. Both steps are idempotent.
 
 ### tools/recall.ts
 
