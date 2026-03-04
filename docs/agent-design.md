@@ -6,7 +6,9 @@
 
 ### 设计选择：全工具默认可用
 
-cove 中所有工具默认对 agent 可用，无手动开关。`getAgentTools()` 对 built-in 类工具无条件注册，仅 skill-bundled 工具需对应 Skill 启用。
+cove 中所有工具默认对 agent 可用，无手动开关。`getAgentTools()` 对大多数 built-in 类工具无条件注册，仅 skill-bundled 工具需对应 Skill 启用。
+
+例外：部分 built-in 工具有特殊注册逻辑。`skill` 和 `skill_resource` 是工厂函数，注册时绑定当前已启用的 Skill 列表。`spawn_agent` 需要 `SubAgentContext` 且 `currentDepth < maxDepth` 才注册，防止无限递归。这些属于注册时的参数绑定，而非用户可控的开关。
 
 这与 opencode 不同。opencode 按 agent 角色和权限过滤工具集（`ToolRegistry.tools(model, agent)`），cove 选择信任模型的工具选择能力。理由：
 
@@ -30,7 +32,9 @@ Skill 从三个来源加载：
 |------|------|----------|--------|
 | Built-in | `src/skills/*/SKILL.md` | Vite `import.meta.glob` 静态加载 | 2 (最低) |
 | External | IDE 约定目录（claude/cursor 等） | Tauri `discover_external_skills` 扫描 | 1 |
-| User | `~/.cove/skills/{name}/SKILL.md` | Tauri `read_skill` | 0 (最高) |
+| User | `~/.cove/skills/{name}/SKILL.md` | Tauri `discover_external_skills` 扫描 | 0 (最高) |
+
+External 和 User 两层均通过 `discover_external_skills` 统一扫描发现（`~/.cove/skills` 是默认扫描根之一）。`read_skill` / `write_skill` / `delete_skill` 是单个 Skill 的 CRUD API，不参与发现流程。
 
 同名 Skill 去重时保留优先级最高的来源。`sourcePriority()` 函数实现：cove(0) > claude(1) > 其他(2)。
 
@@ -38,11 +42,15 @@ Skill 从三个来源加载：
 
 ### 门控逻辑
 
-`getAgentTools()` 中的门控逻辑通用化，无 hardcoded 判断：
+`getAgentTools()` 中 skill-bundled 工具的门控逻辑通用化，无 hardcoded 判断。built-in 工具中有三个使用工厂函数特殊处理：
 
 ```
 对于每个 ToolInfo:
-  category === "built-in" → 无条件注册
+  category === "built-in" →
+    id === "skill"          → createSkillTool(enabledNames) 工厂创建
+    id === "skill_resource" → createSkillResourceTool(enabledNames) 工厂创建
+    id === "spawn_agent"    → 需 subAgentContext 且 currentDepth < maxDepth
+    其他                    → 从 TOOL_IMPLS 直接注册
   category === "skill-bundled" →
     1. info.skillName 对应的 Skill 已启用？
     2. info.runtimeCheck 对应的运行时依赖可用？
