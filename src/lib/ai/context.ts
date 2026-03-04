@@ -1,14 +1,21 @@
 import type { Assistant } from "@/db/types";
 import { getAlwaysSkills } from "./skills/loader";
 
-/** System prompt: always-on skills (incl. soul) + context + assistant/custom injections */
+/** System prompt: SOUL identity + always-on skills + context + assistant/custom injections */
 export function buildSystemPrompt(options: {
   assistant?: Assistant;
   customInstructions?: string;
   workspacePath?: string;
   officeAvailable?: boolean;
+  /** Pre-formatted SOUL prompt (from formatSoulPrompt). Injected first. */
+  soulPrompt?: string;
 }): string {
   const parts: string[] = [];
+
+  // SOUL identity injected at the very top -- cove knows who she is before anything else
+  if (options.soulPrompt) {
+    parts.push(options.soulPrompt);
+  }
 
   parts.push(`Time: ${new Date().toISOString()}`);
   if (options.workspacePath) {

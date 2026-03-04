@@ -21,6 +21,7 @@ tauri-build = { version = "2.5.4", features = [] }
 serde_json = "1.0"
 serde = { version = "1.0", features = ["derive"] }
 base64 = "0.22"
+chrono = "0.4"
 calamine = "0.26"
 docx-lite = "0.2"
 dirs = "6"

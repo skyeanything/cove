@@ -12,6 +12,10 @@ vi.mock("@/lib/ai/agent-metrics", () => ({
 vi.mock("@/lib/ai/stream-handler", () => ({ handleAgentStream: vi.fn() }));
 vi.mock("@/lib/ai/context", () => ({ buildSystemPrompt: vi.fn().mockReturnValue("system-prompt") }));
 vi.mock("@/lib/ai/office-detect", () => ({ isOfficeAvailable: vi.fn().mockResolvedValue(false) }));
+vi.mock("@/lib/ai/soul", () => ({
+  readSoul: vi.fn().mockResolvedValue({ public: "", private: "" }),
+  formatSoulPrompt: vi.fn().mockReturnValue(""),
+}));
 vi.mock("@/lib/ai/tools", () => ({ getAgentTools: vi.fn().mockReturnValue({}) }));
 vi.mock("./skillsStore", () => ({ getEnabledSkillNames: vi.fn().mockResolvedValue([]) }));
 vi.mock("./chat-retry-utils", () => ({
@@ -327,6 +331,7 @@ describe("runStreamLoop", () => {
       expect(buildSystemPrompt).toHaveBeenCalledWith({
         workspacePath: undefined,
         officeAvailable: false,
+        soulPrompt: "",
       });
     });
 
