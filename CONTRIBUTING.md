@@ -152,7 +152,7 @@ pnpm test
 pnpm test:coverage
 
 # 4. Rust 静态检查
-cd src-tauri && cargo check
+(cd src-tauri && cargo check)
 
 # 5. 文件大小校验
 python3 scripts/check-file-size.py
