@@ -89,6 +89,21 @@ describe("maybeMeditate", () => {
     expect(generateFn).not.toHaveBeenCalled();
   });
 
+  it("uses latest marker when SOUL.md has multiple (legacy files)", async () => {
+    const recentTs = new Date().toISOString();
+    const obsFile = { name: "observations.md", content: "- a\n- b\n- c\n- d\n- e\n- f" };
+    vi.mocked(readSoul).mockResolvedValue({
+      public: PUBLIC_SOUL
+        + "\n<!-- last-meditation:2020-01-01T00:00:00Z -->"
+        + `\n<!-- last-meditation:${recentTs} -->`,
+      private: [obsFile],
+    });
+    vi.mocked(findPrivateFile).mockReturnValue(obsFile);
+    await maybeMeditate(generateFn);
+    // Should skip because the LATEST marker is recent (within cooldown)
+    expect(generateFn).not.toHaveBeenCalled();
+  });
+
   it("writes SOUL.md and private files on success", async () => {
     mockSoul("- a\n- b\n- c");
     generateFn.mockResolvedValue(

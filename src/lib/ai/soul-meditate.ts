@@ -235,9 +235,12 @@ function dispositionEntriesMatch(before: string[], after: string[]): boolean {
 }
 
 function extractLastMeditationTime(content: string): number | null {
-  const match = content.match(/<!-- last-meditation:(\S+) -->/);
-  if (!match?.[1]) return null;
-  const ts = Date.parse(match[1]);
+  const matches = [...content.matchAll(/<!-- last-meditation:(\S+) -->/g)];
+  if (matches.length === 0) return null;
+  // Use the last marker (most recent) to handle legacy files with multiple markers
+  const last = matches[matches.length - 1]?.[1];
+  if (!last) return null;
+  const ts = Date.parse(last);
   return isNaN(ts) ? null : ts;
 }
 
