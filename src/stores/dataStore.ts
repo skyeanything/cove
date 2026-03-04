@@ -5,6 +5,7 @@ import { conversationRepo } from "@/db/repos/conversationRepo";
 import { messageRepo } from "@/db/repos/messageRepo";
 import { providerRepo } from "@/db/repos/providerRepo";
 import { promptRepo } from "@/db/repos/promptRepo";
+import { summaryRepo } from "@/db/repos/summaryRepo";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 
 interface DataState {
@@ -116,6 +117,7 @@ export const useDataStore = create<DataState>()((set, get) => ({
   },
 
   async deleteConversation(id) {
+    await summaryRepo.deleteByConversation(id);
     await messageRepo.deleteByConversation(id);
     await conversationRepo.delete(id);
     if (get().activeConversationId === id) {
