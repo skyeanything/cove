@@ -33,6 +33,7 @@ pub struct SaveAttachmentFromBase64Args {
     pub name: String,
     pub content_base64: String,
     #[serde(default)]
+    #[allow(dead_code)]
     pub mime_type: Option<String>,
 }
 

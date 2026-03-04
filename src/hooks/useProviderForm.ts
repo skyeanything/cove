@@ -55,6 +55,7 @@ export function useProviderSave(params: SaveParams) {
         const dbData: Partial<Provider> = { api_key: apiKey, base_url: baseUrl || meta.defaultBaseUrl || "" };
         if (hasConfig) dbData.config = configStr ?? undefined;
         await updateProvider(current.id, dbData);
+        // Optimistic update already applied above; log DB error but don't revert UI state
       } catch (err) { console.error("[ProviderForm] Failed to update provider:", err); }
     } else {
       if (!apiKey && meta.requiresApiKey) return;
@@ -70,6 +71,7 @@ export function useProviderSave(params: SaveParams) {
           id: newRow.id, name: newRow.name, type: newRow.type, api_key: newRow.api_key,
           base_url: newRow.base_url, config: newRow.config, enabled: newRow.enabled,
         });
+        // Optimistic update already applied above; log DB error but don't revert UI state
       } catch (err) { console.error("[ProviderForm] Failed to create provider:", err); }
     }
   }

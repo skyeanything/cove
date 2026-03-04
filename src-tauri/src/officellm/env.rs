@@ -86,17 +86,6 @@ pub fn sandbox_temp_whitelist() -> Vec<String> {
     paths
 }
 
-/// Sets TMPDIR / TEMP / TMP environment variables on a `Command` builder
-/// so the child process uses a known-writable temp directory.
-pub fn apply_tmp_env(command: &mut Command) {
-    let dir = tmp_dir();
-    command
-        .env("TMPDIR", &dir)
-        .env("TEMP", &dir)
-        .env("TMP", &dir)
-        .env("OFFICELLM_TEMP", &dir);
-}
-
 /// Sets `OFFICELLM_HOME` and temp-dir variables on a `Command` builder,
 /// using the given `home` directory as the source of truth.
 pub fn apply_env(command: &mut Command, home: &Path) {
@@ -132,23 +121,6 @@ mod tests {
             let dir = tmp_dir();
             assert!(dir.exists());
             assert!(dir.is_dir());
-        });
-    }
-
-    #[test]
-    fn apply_tmp_env_sets_env_vars() {
-        with_home(|_home| {
-            let mut cmd = Command::new("true");
-            apply_tmp_env(&mut cmd);
-            let envs: std::collections::HashMap<_, _> =
-                cmd.get_envs().filter_map(|(k, v)| Some((k.to_owned(), v?.to_owned()))).collect();
-            let expected_keys = ["TMPDIR", "TEMP", "TMP", "OFFICELLM_TEMP"];
-            for key in expected_keys {
-                assert!(
-                    envs.contains_key(std::ffi::OsStr::new(key)),
-                    "missing env var: {key}"
-                );
-            }
         });
     }
 

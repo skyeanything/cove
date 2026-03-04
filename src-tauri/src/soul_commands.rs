@@ -145,13 +145,6 @@ fn prune_snapshots(snaps: &PathBuf) -> Result<(), String> {
     Ok(())
 }
 
-pub fn extract_dna_section(content: &str) -> &str {
-    let start = match content.find("## My DNA") { Some(s) => s, None => return "" };
-    let rest = &content[start..];
-    let end = rest[9..].find("\n## ").map(|i| start + 9 + i).unwrap_or(content.len());
-    &content[start..end]
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -237,15 +230,4 @@ mod tests {
         });
     }
 
-    #[test]
-    fn extract_dna_section_works() {
-        let dna = extract_dna_section(DEFAULT_SOUL);
-        assert!(dna.starts_with("## My DNA") && dna.contains("I pursue understanding"));
-        assert!(!dna.contains("## My Disposition"));
-    }
-
-    #[test]
-    fn extract_dna_returns_empty_for_missing() {
-        assert_eq!(extract_dna_section("no dna here"), "");
-    }
 }
