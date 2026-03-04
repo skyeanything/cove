@@ -1,0 +1,194 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '20'
+  RUST_TOOLCHAIN: stable
+
+jobs:
+  # ── macOS arm64 (Apple Silicon) ──────────────────────────────────────
+  build-macos-arm64:
+    runs-on: macos-14
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Validate version consistency
+        run: |
+          TAG_VERSION="${GITHUB_REF#refs/tags/v}"
+          PKG_VERSION=$(jq -r .version package.json)
+          TAURI_VERSION=$(jq -r .version src-tauri/tauri.conf.json)
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ] || [ "$TAG_VERSION" != "$TAURI_VERSION" ]; then
+            echo "::error::Version mismatch: tag=$TAG_VERSION package.json=$PKG_VERSION tauri.conf.json=$TAURI_VERSION"
+            exit 1
+          fi
+          echo "VERSION=$TAG_VERSION" >> "$GITHUB_ENV"
+
+      - name: Import signing certificate
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          CERT_FILE=$(mktemp /tmp/cert.XXXXXX.p12)
+          KEYCHAIN="build.keychain"
+          KEYCHAIN_PASSWORD=""
+
+          echo "$APPLE_CERTIFICATE" | base64 --decode > "$CERT_FILE"
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security default-keychain -s "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+
+          security import "$CERT_FILE" \
+            -k "$KEYCHAIN" \
+            -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/security
+
+          security set-key-partition-list \
+            -S apple-tool:,apple: \
+            -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+
+          # Prevent keychain from auto-locking during long builds
+          security set-keychain-settings -t 3600 -u "$KEYCHAIN"
+
+          security list-keychains -d user -s "$KEYCHAIN"
+
+          rm -f "$CERT_FILE"
+
+      - name: Build and sign
+        env:
+          GH_TOKEN: ${{ secrets.OFFICELLM_REPO_TOKEN }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: pnpm tauri build
+
+      - name: Notarize DMG
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          DMG_PATH=$(find src-tauri/target/release/bundle/dmg -name "*.dmg" | head -1)
+          if [ -z "$DMG_PATH" ]; then
+            echo "::error::No DMG found"
+            exit 1
+          fi
+
+          echo "Submitting $(basename "$DMG_PATH") for notarization..."
+          xcrun notarytool submit "$DMG_PATH" \
+            --apple-id "$APPLE_ID" \
+            --team-id "$APPLE_TEAM_ID" \
+            --password "$APPLE_PASSWORD" \
+            --wait
+
+          echo "Stapling notarization ticket..."
+          xcrun stapler staple "$DMG_PATH"
+
+          echo "Verifying signature..."
+          spctl --assess --type open --context context:primary-signature "$DMG_PATH" || true
+
+      - name: Upload DMG
+        uses: actions/upload-artifact@v4
+        with:
+          name: Cove-macos-arm64-dmg
+          path: src-tauri/target/release/bundle/dmg/*.dmg
+          if-no-files-found: error
+
+      - name: Upload updater bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: Cove-macos-arm64-updater
+          path: src-tauri/target/release/bundle/macos/*.app.tar.gz
+          if-no-files-found: warn
+
+  # ── Windows (placeholder) ────────────────────────────────────────────
+  build-windows:
+    runs-on: windows-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "Windows build placeholder - pending officellm multi-platform support"
+
+  # ── Linux (placeholder) ──────────────────────────────────────────────
+  build-linux:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - run: echo "Linux build placeholder - pending officellm multi-platform support"
+
+  # ── Create draft release ─────────────────────────────────────────────
+  release:
+    needs: [build-macos-arm64, build-windows, build-linux]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Create draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"
+
+          # Collect release assets
+          ASSETS=()
+          while IFS= read -r -d '' file; do
+            ASSETS+=("$file")
+          done < <(find artifacts -type f \( \
+            -name "*.dmg" \
+            -o -name "*.app.tar.gz" \
+            -o -name "*.msi" \
+            -o -name "*.nsis.zip" \
+            -o -name "*.AppImage" \
+            -o -name "*.deb" \
+          \) -print0)
+
+          if [ ${#ASSETS[@]} -eq 0 ]; then
+            echo "::warning::No release assets found, creating release without attachments"
+            gh release create "$TAG" \
+              --draft \
+              --generate-notes \
+              --title "Cove $TAG"
+          else
+            echo "Attaching ${#ASSETS[@]} assets:"
+            printf '  %s\n' "${ASSETS[@]}"
+            gh release create "$TAG" \
+              --draft \
+              --generate-notes \
+              --title "Cove $TAG" \
+              "${ASSETS[@]}"
+          fi
