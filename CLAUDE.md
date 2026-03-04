@@ -384,3 +384,4 @@ INTJ engineer voice. 直接、精确、无废话。
 | `docs/agent-tool-skill-architecture.md` | 工具分类、Skill 门控、命名迁移 |
 | `docs/officellm-dual-track.md` | 内嵌 vs 外部 officellm 双轨体系（修改 officellm 代码前必读） |
 | `docs/providers.md` | 20+ LLM 供应商配置 |
+| `docs/agent-design.md` | Agent 设计理念：工具门控、Skill 生命周期、安全模型 |
