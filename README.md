@@ -110,6 +110,7 @@ Cove 内置 8 个 AI 工具，模型可在对话中自动调用：
 
 | 文档 | 内容 |
 |------|------|
+| [快速开始](docs/getting-started.md) | 开发环境搭建指南（macOS） |
 | [架构说明](docs/architecture.md) | 前端架构与数据流 |
 | [AI 工具](docs/tools.md) | 8 个内置工具的参数与使用场景 |
 | [LLM 供应商](docs/providers.md) | 供应商配置与支持列表 |
