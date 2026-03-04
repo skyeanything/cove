@@ -308,19 +308,21 @@ describe("ToolCallBlock", () => {
     expect(container.textContent).not.toContain("0.5 s");
   });
 
-  it("collapses and expands on click", () => {
-    render(
+  it("collapses and expands on click", async () => {
+    const { container } = render(
       <ToolCallBlock
         toolCall={makeToolCall({ args: { command: "echo hi", description: "echo" } })}
         pendingAsk={null}
       />,
     );
-    // Initially expanded - content visible
-    expect(screen.getByText("echo hi")).toBeTruthy();
-    // Click the header button (first button) to toggle
-    const buttons = screen.getAllByRole("button");
-    fireEvent.click(buttons[0]!);
-    // The grid row collapses to 0fr but content is still in DOM (overflow hidden)
+    const grid = container.querySelector("[style]") as HTMLElement;
+    expect(grid.style.gridTemplateRows).toBe("1fr");
+    // Click the header button to collapse
+    const headerBtn = container.querySelector("button") as HTMLElement;
+    await fireEvent.click(headerBtn);
+    // After click, state toggles open -> closed
+    const gridAfter = container.querySelector("[style]") as HTMLElement;
+    expect(gridAfter.style.gridTemplateRows).toBe("0fr");
   });
 
   it("shows permission bar when pending ask matches", () => {
