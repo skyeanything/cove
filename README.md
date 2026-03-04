@@ -1,7 +1,8 @@
 # Cove — AI 桌面聊天客户端
 
+<!-- TODO: 截图 -->
 
-## ✨ 特性
+## 特性
 
 - **多供应商支持** — OpenAI、DeepSeek、Moonshot、OpenRouter 等供应商可在设置 UI 直接配置；Anthropic、Google Gemini、Bedrock 等更多供应商已在代码层集成，后续版本陆续开放
 - **本地 SQLite 持久化** — 所有对话数据存储在本地，数据不上云
@@ -12,7 +13,7 @@
 - **主题切换** — 亮色 / 暗色，Linear / Raycast 风格"安静优雅"设计系统
 - **附件系统** — 拖拽上传 PDF / DOCX / PPTX / XLSX，自动解析并附带到对话上下文
 
-## 🛠️ 技术栈
+## 技术栈
 
 | 层级 | 技术 |
 |------|------|
@@ -24,7 +25,7 @@
 | 数据库 | SQLite（tauri-plugin-sql） |
 | 包管理 | pnpm |
 
-## 📦 安装与运行
+## 安装与运行
 
 ### 前置条件
 
@@ -47,7 +48,7 @@ pnpm tauri dev
 pnpm tauri build
 ```
 
-## 🧩 项目结构
+## 项目结构
 
 ```
 cove/
@@ -84,11 +85,11 @@ cove/
 └── CLAUDE.md            # AI 开发规范（设计系统 + 工作流）
 ```
 
-## 🔑 配置 AI 供应商
+## 配置 AI 供应商
 
 打开 **设置 → 供应商**，选择对应供应商，填入 API Key 即可启用。支持的供应商列表见 [docs/providers.md](docs/providers.md)。
 
-## 🛠️ AI 工具
+## AI 工具
 
 Cove 内置 8 个 AI 工具，模型可在对话中自动调用：
 
@@ -105,12 +106,23 @@ Cove 内置 8 个 AI 工具，模型可在对话中自动调用：
 
 详细说明见 [docs/tools.md](docs/tools.md)。
 
-## 📖 文档
+## 文档
 
-- [架构说明](docs/architecture.md)
-- [AI 工具](docs/tools.md)
-- [LLM 供应商](docs/providers.md)
+| 文档 | 内容 |
+|------|------|
+| [架构说明](docs/architecture.md) | 前端架构与数据流 |
+| [AI 工具](docs/tools.md) | 8 个内置工具的参数与使用场景 |
+| [LLM 供应商](docs/providers.md) | 供应商配置与支持列表 |
+| [工具-技能架构](docs/agent-tool-skill-architecture.md) | 工具分类、Skill 门控、命名迁移 |
+| [officellm 双轨体系](docs/officellm-dual-track.md) | 内嵌 vs 外部 officellm 架构 |
+| [Soul 系统](docs/soul-system.md) | Agent 人格与行为框架 |
+| [Soul 实现](docs/soul-implementation.md) | Soul 系统技术实现细节 |
+| [Soul 对话日志](docs/soul-conversation-log.md) | Soul 设计过程对话记录 |
 
-## 📄 License
+## 贡献
+
+见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+
+## License
 
 MIT
