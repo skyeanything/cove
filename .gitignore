@@ -9,5 +9,8 @@ src-tauri/gen/
 *.code-workspace
 src-tauri/binaries/officellm-*
 src-tauri/binaries/.officellm-version
+src-tauri/binaries/pdftoppm-*
+src-tauri/binaries/pdftotext-*
+src-tauri/binaries/.poppler-version
 coverage/
 .claude/

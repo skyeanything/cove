@@ -7,6 +7,7 @@ mod fs_commands;
 mod js_interpreter;
 mod officellm;
 mod sandbox;
+mod sidecar;
 mod shell_commands;
 mod skill_commands;
 mod skill_discovery;

@@ -7,7 +7,7 @@
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
     "beforeDevCommand": "pnpm dev",
-    "beforeBuildCommand": "pnpm office-pull && pnpm build"
+    "beforeBuildCommand": "pnpm office-pull && pnpm poppler-pull && pnpm build"
   },
   "app": {
     "windows": [
@@ -50,7 +50,7 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "externalBin": ["binaries/officellm"],
+    "externalBin": ["binaries/officellm", "binaries/pdftoppm", "binaries/pdftotext"],
     "macOS": {
       "entitlements": "entitlements.plist"
     }

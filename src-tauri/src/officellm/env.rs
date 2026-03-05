@@ -98,7 +98,8 @@ pub fn apply_env(command: &mut Command, home: &Path) {
         .env("TMPDIR", &tmp)
         .env("TEMP", &tmp)
         .env("TMP", &tmp)
-        .env("OFFICELLM_TEMP", &tmp);
+        .env("OFFICELLM_TEMP", &tmp)
+        .env("PATH", crate::sidecar::tools_path());
 }
 
 #[cfg(test)]
@@ -134,7 +135,7 @@ mod tests {
         let envs: std::collections::HashMap<_, _> =
             cmd.get_envs().filter_map(|(k, v)| Some((k.to_owned(), v?.to_owned()))).collect();
 
-        let expected_keys = ["OFFICELLM_HOME", "TMPDIR", "TEMP", "TMP", "OFFICELLM_TEMP"];
+        let expected_keys = ["OFFICELLM_HOME", "TMPDIR", "TEMP", "TMP", "OFFICELLM_TEMP", "PATH"];
         for key in expected_keys {
             assert!(
                 envs.contains_key(std::ffi::OsStr::new(key)),

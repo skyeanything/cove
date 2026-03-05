@@ -99,13 +99,23 @@ pub fn execute(args: &RunCommandArgs, cancel: Option<CancelToken>) -> Result<Run
     })
 }
 
-/// Build PATH with ~/.local/bin prepended.
+/// Build PATH with sidecar dir and ~/.local/bin prepended.
 fn build_path_env() -> String {
-    let extra_paths: Vec<std::path::PathBuf> = dirs::home_dir()
-        .into_iter()
-        .flat_map(|home| [home.join(".local/bin")])
-        .filter(|p| p.is_dir())
-        .collect();
+    let mut extra_paths: Vec<std::path::PathBuf> = Vec::new();
+
+    // Sidecar dir (bundled tools: officellm, pdftoppm, pdftotext, quarto)
+    if let Some(dir) = crate::sidecar::sidecar_dir() {
+        extra_paths.push(dir);
+    }
+
+    // ~/.local/bin
+    if let Some(home) = dirs::home_dir() {
+        let local_bin = home.join(".local/bin");
+        if local_bin.is_dir() {
+            extra_paths.push(local_bin);
+        }
+    }
+
     if extra_paths.is_empty() {
         std::env::var("PATH").unwrap_or_default()
     } else {

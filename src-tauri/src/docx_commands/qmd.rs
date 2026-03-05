@@ -9,7 +9,20 @@ use super::conversion::temp_prefix;
 
 /// 查找 quarto CLI 二进制路径
 fn find_quarto() -> Option<String> {
-    // 优先使用 which 查找 PATH 中的 quarto
+    // 1. Managed install: ~/.cove/tools/quarto/bin/quarto
+    if let Some(home) = dirs::home_dir() {
+        let managed = home.join(".cove/tools/quarto/bin/quarto");
+        if managed.exists() {
+            return Some(managed.to_string_lossy().into_owned());
+        }
+    }
+
+    // 2. Bundled sidecar (externalBin)
+    if let Some(path) = crate::sidecar::resolve("quarto") {
+        return Some(path.to_string_lossy().into_owned());
+    }
+
+    // 3. System PATH via which
     if let Ok(out) = Command::new("which").arg("quarto").output() {
         if out.status.success() {
             let path = String::from_utf8_lossy(&out.stdout).trim().to_string();
@@ -18,7 +31,8 @@ fn find_quarto() -> Option<String> {
             }
         }
     }
-    // 回退到常见安装路径
+
+    // 4. Well-known install locations
     for candidate in ["/usr/local/bin/quarto", "/opt/homebrew/bin/quarto"] {
         if std::path::Path::new(candidate).exists() {
             return Some(candidate.to_string());

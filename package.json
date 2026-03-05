@@ -14,7 +14,9 @@
     "tauri": "tauri",
     "icon:generate": "node scripts/generate-icon.mjs",
     "icon": "pnpm icon:generate && pnpm tauri icon app-icon.png",
-    "office-pull": "bash scripts/pull-officellm.sh"
+    "office-pull": "bash scripts/pull-officellm.sh",
+    "poppler-pull": "bash scripts/pull-poppler.sh",
+    "quarto-pull": "bash scripts/pull-quarto.sh"
   },
   "dependencies": {
     "@ai-sdk/amazon-bedrock": "^4.0.51",
