@@ -3,7 +3,8 @@ import { useTranslation } from "react-i18next";
 import { emit } from "@tauri-apps/api/event";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useSandboxStore } from "@/stores/sandboxStore";
-import { settingsRepo } from "@/db/repos/settingsRepo";
+import { readConfig, writeConfig } from "@/lib/config";
+import type { GeneralConfig } from "@/lib/config/types";
 import { getSkillDirPaths, setSkillDirPaths } from "@/stores/skillsStore";
 import { i18n } from "@/i18n";
 import type { Locale } from "@/i18n";
@@ -55,15 +56,14 @@ export function GeneralPage() {
 
   const handleLocaleChange = async (value: string) => {
     const locale = value as Locale;
-    await settingsRepo.set("locale", locale);
+    const config = await readConfig<GeneralConfig>("general");
+    await writeConfig("general", { ...config, locale });
     i18n.changeLanguage(locale);
-    // 通知主窗口同步语言（设置窗口与主窗口是独立进程）
     await emit("locale-changed", { locale });
   };
 
-  const handleShortcutChange = async (value: string) => {
+  const handleShortcutChange = (value: string) => {
     const shortcut = value as SendMessageShortcut;
-    await settingsRepo.set("sendMessageShortcut", shortcut);
     setSendMessageShortcut(shortcut);
   };
 

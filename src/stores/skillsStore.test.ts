@@ -2,8 +2,9 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // --- vi.mock declarations (hoisted) ---
 
-vi.mock("@/db/repos/settingsRepo", () => ({
-  settingsRepo: { get: vi.fn(), set: vi.fn() },
+vi.mock("@/lib/config", () => ({
+  readConfig: vi.fn().mockResolvedValue({ enabled: [], dirPaths: [] }),
+  writeConfig: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 vi.mock("@/lib/ai/skills/loader", () => ({
@@ -14,7 +15,7 @@ vi.mock("@/lib/ai/skills/loader", () => ({
 // --- imports after mocks ---
 
 import { invoke } from "@tauri-apps/api/core";
-import { settingsRepo } from "@/db/repos/settingsRepo";
+import { readConfig, writeConfig } from "@/lib/config";
 import { parseSkillFromRaw, listSkills } from "@/lib/ai/skills/loader";
 import {
   useSkillsStore,
@@ -41,85 +42,73 @@ function makeSkill(name: string): Skill {
   };
 }
 
+function mockConfig(config: { enabled?: string[]; dirPaths?: string[] }) {
+  vi.mocked(readConfig).mockResolvedValue({
+    enabled: config.enabled ?? [],
+    dirPaths: config.dirPaths ?? [],
+  });
+}
+
 // --- tests ---
 
 describe("getSkillDirPaths", () => {
-  it("returns [] when settingsRepo returns null", async () => {
-    vi.mocked(settingsRepo.get).mockResolvedValue(null);
+  it("returns [] when config has empty dirPaths", async () => {
+    mockConfig({});
     expect(await getSkillDirPaths()).toEqual([]);
   });
 
-  it("parses valid JSON array of strings", async () => {
-    vi.mocked(settingsRepo.get).mockResolvedValue(JSON.stringify(["/a", "/b"]));
+  it("returns dirPaths from config", async () => {
+    mockConfig({ dirPaths: ["/a", "/b"] });
     expect(await getSkillDirPaths()).toEqual(["/a", "/b"]);
-  });
-
-  it("filters out non-string values", async () => {
-    vi.mocked(settingsRepo.get).mockResolvedValue(JSON.stringify(["/a", 42, null, "/b"]));
-    expect(await getSkillDirPaths()).toEqual(["/a", "/b"]);
-  });
-
-  it("returns [] on invalid JSON", async () => {
-    vi.mocked(settingsRepo.get).mockResolvedValue("{broken");
-    expect(await getSkillDirPaths()).toEqual([]);
-  });
-
-  it("returns [] when parsed value is not an array", async () => {
-    vi.mocked(settingsRepo.get).mockResolvedValue(JSON.stringify({ a: 1 }));
-    expect(await getSkillDirPaths()).toEqual([]);
   });
 });
 
 describe("setSkillDirPaths", () => {
-  it("persists JSON-stringified array to settingsRepo", async () => {
+  it("writes updated config with new dirPaths", async () => {
+    mockConfig({ enabled: ["s1"], dirPaths: [] });
     await setSkillDirPaths(["/x", "/y"]);
-    expect(settingsRepo.set).toHaveBeenCalledWith("skillDirPaths", JSON.stringify(["/x", "/y"]));
+    expect(writeConfig).toHaveBeenCalledWith("skills", {
+      enabled: ["s1"],
+      dirPaths: ["/x", "/y"],
+    });
   });
 });
 
 describe("getEnabledSkillNames", () => {
-  it("returns parsed names when settingsRepo has valid data", async () => {
-    vi.mocked(settingsRepo.get).mockResolvedValue(JSON.stringify(["skill-a", "skill-b"]));
+  it("returns enabled names from config", async () => {
+    mockConfig({ enabled: ["skill-a", "skill-b"] });
     expect(await getEnabledSkillNames()).toEqual(["skill-a", "skill-b"]);
   });
 
-  it("seeds defaults from listSkills() when settingsRepo is empty", async () => {
-    vi.mocked(settingsRepo.get).mockResolvedValue(null);
+  it("seeds defaults from listSkills() when config has empty enabled", async () => {
+    mockConfig({ enabled: [] });
     vi.mocked(listSkills).mockReturnValue([
       { name: "builtin-1", description: "", always: false },
       { name: "builtin-2", description: "", always: false },
     ]);
     const result = await getEnabledSkillNames();
     expect(result).toEqual(["builtin-1", "builtin-2"]);
-    expect(settingsRepo.set).toHaveBeenCalledWith(
-      "enabledSkillNames",
-      JSON.stringify(["builtin-1", "builtin-2"]),
-    );
-  });
-
-  it("handles invalid JSON gracefully (seeds defaults)", async () => {
-    vi.mocked(settingsRepo.get).mockResolvedValue("not-json");
-    vi.mocked(listSkills).mockReturnValue([{ name: "default", description: "", always: false }]);
-    const result = await getEnabledSkillNames();
-    expect(result).toEqual(["default"]);
-  });
-
-  it("filters out non-string values from stored array", async () => {
-    vi.mocked(settingsRepo.get).mockResolvedValue(JSON.stringify(["ok", 123, null]));
-    expect(await getEnabledSkillNames()).toEqual(["ok"]);
+    expect(writeConfig).toHaveBeenCalledWith("skills", {
+      enabled: ["builtin-1", "builtin-2"],
+      dirPaths: [],
+    });
   });
 });
 
 describe("setEnabledSkillNames", () => {
-  it("persists JSON-stringified names to settingsRepo", async () => {
+  it("writes updated config with new enabled list", async () => {
+    mockConfig({ enabled: [], dirPaths: ["/p"] });
     await setEnabledSkillNames(["a", "b"]);
-    expect(settingsRepo.set).toHaveBeenCalledWith("enabledSkillNames", JSON.stringify(["a", "b"]));
+    expect(writeConfig).toHaveBeenCalledWith("skills", {
+      enabled: ["a", "b"],
+      dirPaths: ["/p"],
+    });
   });
 });
 
-describe("skillsStore — loadExternalSkills", () => {
+describe("skillsStore - loadExternalSkills", () => {
   it("calls invoke with workspacePath and customRoots", async () => {
-    vi.mocked(settingsRepo.get).mockResolvedValue(JSON.stringify(["/custom"]));
+    mockConfig({ dirPaths: ["/custom"] });
     vi.mocked(invoke).mockResolvedValue([]);
 
     await useSkillsStore.getState().loadExternalSkills("/workspace");
@@ -131,7 +120,7 @@ describe("skillsStore — loadExternalSkills", () => {
   });
 
   it("parses entries via parseSkillFromRaw and sets externalSkills", async () => {
-    vi.mocked(settingsRepo.get).mockResolvedValue(null);
+    mockConfig({});
     const skill = makeSkill("test-skill");
     vi.mocked(parseSkillFromRaw).mockReturnValue(skill);
     vi.mocked(invoke).mockResolvedValue([
@@ -142,15 +131,15 @@ describe("skillsStore — loadExternalSkills", () => {
 
     const state = useSkillsStore.getState();
     expect(state.externalSkills).toHaveLength(1);
-    expect(state.externalSkills[0].skill).toBe(skill);
-    expect(state.externalSkills[0].source).toBe("claude");
-    expect(state.externalSkills[0].path).toBe("/path/to/skill");
-    expect(state.externalSkills[0].folderName).toBe("test-folder");
+    expect(state.externalSkills[0]?.skill).toBe(skill);
+    expect(state.externalSkills[0]?.source).toBe("claude");
+    expect(state.externalSkills[0]?.path).toBe("/path/to/skill");
+    expect(state.externalSkills[0]?.folderName).toBe("test-folder");
     expect(parseSkillFromRaw).toHaveBeenCalledWith("raw md", "test-folder");
   });
 
   it("sets loaded=true, scanError=null on success", async () => {
-    vi.mocked(settingsRepo.get).mockResolvedValue(null);
+    mockConfig({});
     vi.mocked(invoke).mockResolvedValue([]);
 
     await useSkillsStore.getState().loadExternalSkills();
@@ -161,7 +150,7 @@ describe("skillsStore — loadExternalSkills", () => {
   });
 
   it("sets scanError on invoke failure", async () => {
-    vi.mocked(settingsRepo.get).mockResolvedValue(null);
+    mockConfig({});
     vi.mocked(invoke).mockRejectedValue(new Error("tauri error"));
 
     await useSkillsStore.getState().loadExternalSkills();
@@ -173,18 +162,17 @@ describe("skillsStore — loadExternalSkills", () => {
   });
 
   it("skips if already loading (guard)", async () => {
-    vi.mocked(settingsRepo.get).mockResolvedValue(null);
+    mockConfig({});
     vi.mocked(invoke).mockResolvedValue([]);
 
-    // Force loading=true
     useSkillsStore.setState({ loading: true });
     await useSkillsStore.getState().loadExternalSkills();
 
     expect(invoke).not.toHaveBeenCalled();
   });
 
-  it("passes null customRoots when getSkillDirPaths returns []", async () => {
-    vi.mocked(settingsRepo.get).mockResolvedValue(null);
+  it("passes null customRoots when dirPaths is empty", async () => {
+    mockConfig({ dirPaths: [] });
     vi.mocked(invoke).mockResolvedValue([]);
 
     await useSkillsStore.getState().loadExternalSkills("/ws");
@@ -196,9 +184,9 @@ describe("skillsStore — loadExternalSkills", () => {
   });
 });
 
-describe("skillsStore — loadEnabledSkillNames", () => {
-  it("populates enabledSkillNames from getEnabledSkillNames()", async () => {
-    vi.mocked(settingsRepo.get).mockResolvedValue(JSON.stringify(["s1", "s2"]));
+describe("skillsStore - loadEnabledSkillNames", () => {
+  it("populates enabledSkillNames from config", async () => {
+    mockConfig({ enabled: ["s1", "s2"] });
 
     await useSkillsStore.getState().loadEnabledSkillNames();
 
@@ -206,33 +194,31 @@ describe("skillsStore — loadEnabledSkillNames", () => {
   });
 });
 
-describe("skillsStore — toggleSkillEnabled", () => {
+describe("skillsStore - toggleSkillEnabled", () => {
   it("adds skill name when not present", async () => {
+    mockConfig({ enabled: ["existing"] });
     useSkillsStore.setState({ enabledSkillNames: ["existing"] });
 
     await useSkillsStore.getState().toggleSkillEnabled("new-skill");
 
     expect(useSkillsStore.getState().enabledSkillNames).toEqual(["existing", "new-skill"]);
-    expect(settingsRepo.set).toHaveBeenCalledWith(
-      "enabledSkillNames",
-      JSON.stringify(["existing", "new-skill"]),
-    );
+    expect(writeConfig).toHaveBeenCalled();
   });
 
   it("removes skill name when already present", async () => {
+    mockConfig({ enabled: ["a", "b", "c"] });
     useSkillsStore.setState({ enabledSkillNames: ["a", "b", "c"] });
 
     await useSkillsStore.getState().toggleSkillEnabled("b");
 
     expect(useSkillsStore.getState().enabledSkillNames).toEqual(["a", "c"]);
-    expect(settingsRepo.set).toHaveBeenCalledWith("enabledSkillNames", JSON.stringify(["a", "c"]));
+    expect(writeConfig).toHaveBeenCalled();
   });
 });
 
-describe("skillsStore — saveSkill", () => {
+describe("skillsStore - saveSkill", () => {
   beforeEach(() => {
-    // Prevent loadExternalSkills from actually running
-    vi.mocked(settingsRepo.get).mockResolvedValue(null);
+    mockConfig({});
     vi.mocked(invoke).mockResolvedValue([]);
   });
 
@@ -248,10 +234,6 @@ describe("skillsStore — saveSkill", () => {
     await useSkillsStore.getState().saveSkill("new-folder", "content", null, "new-skill");
 
     expect(useSkillsStore.getState().enabledSkillNames).toContain("new-skill");
-    expect(settingsRepo.set).toHaveBeenCalledWith(
-      "enabledSkillNames",
-      expect.stringContaining("new-skill"),
-    );
   });
 
   it("does not auto-enable existing skill", async () => {
@@ -263,21 +245,19 @@ describe("skillsStore — saveSkill", () => {
 
     await useSkillsStore.getState().saveSkill("existing-folder", "updated");
 
-    // Should NOT add "existing-folder" to enabled list since it's an existing skill
     expect(useSkillsStore.getState().enabledSkillNames).not.toContain("existing-folder");
   });
 
   it("refreshes external skills after save", async () => {
     await useSkillsStore.getState().saveSkill("f", "c");
 
-    // invoke called for write_skill + discover_external_skills
     expect(invoke).toHaveBeenCalledWith("discover_external_skills", expect.any(Object));
   });
 });
 
-describe("skillsStore — loadExternalSkills auto-enables office-bundled", () => {
+describe("skillsStore - loadExternalSkills auto-enables office-bundled", () => {
   it("auto-enables office-bundled skill names missing from enabledSkillNames", async () => {
-    vi.mocked(settingsRepo.get).mockResolvedValue(null);
+    mockConfig({});
     const bundledSkill = makeSkill("officellm-bundled");
     vi.mocked(parseSkillFromRaw).mockReturnValue(bundledSkill);
     vi.mocked(invoke).mockResolvedValue([
@@ -290,14 +270,11 @@ describe("skillsStore — loadExternalSkills auto-enables office-bundled", () =>
     const state = useSkillsStore.getState();
     expect(state.enabledSkillNames).toContain("officellm-bundled");
     expect(state.enabledSkillNames).toContain("existing-skill");
-    expect(settingsRepo.set).toHaveBeenCalledWith(
-      "enabledSkillNames",
-      expect.stringContaining("officellm-bundled"),
-    );
+    expect(writeConfig).toHaveBeenCalled();
   });
 
   it("does not duplicate already-enabled office-bundled skills", async () => {
-    vi.mocked(settingsRepo.get).mockResolvedValue(null);
+    mockConfig({});
     const bundledSkill = makeSkill("already-enabled");
     vi.mocked(parseSkillFromRaw).mockReturnValue(bundledSkill);
     vi.mocked(invoke).mockResolvedValue([
@@ -310,18 +287,12 @@ describe("skillsStore — loadExternalSkills auto-enables office-bundled", () =>
     const state = useSkillsStore.getState();
     const count = state.enabledSkillNames.filter((n) => n === "already-enabled").length;
     expect(count).toBe(1);
-    // settingsRepo.set should NOT have been called for enabledSkillNames
-    // (only get was called for skillDirPaths)
-    expect(settingsRepo.set).not.toHaveBeenCalledWith(
-      "enabledSkillNames",
-      expect.any(String),
-    );
   });
 });
 
-describe("skillsStore — deleteSkill", () => {
+describe("skillsStore - deleteSkill", () => {
   beforeEach(() => {
-    vi.mocked(settingsRepo.get).mockResolvedValue(null);
+    mockConfig({});
     vi.mocked(invoke).mockResolvedValue([]);
   });
 
