@@ -47,8 +47,8 @@ All tools are available by default. Category determines gating.
 
 | Tool | Skill | Description |
 |------|-------|-------------|
-| Office | office | Interact with office documents (DOCX/PPTX/XLSX) |
-| Diagram | office | Render diagrams to images |
+| Office | OfficeLLM | Interact with office documents (DOCX/PPTX/XLSX) |
+| Diagram | OfficeLLM | Render diagrams to images |
 | Create Skill | skill-creator | Save a skill to user's Cove skill directory |
 
 View all tools in Settings > Tools.

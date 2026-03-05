@@ -87,7 +87,7 @@ export function ChatInput({
     [mentionQuery],
   );
   const filteredSkills = useMemo(
-    () => mentionQuery ? allSkillMetas.filter((s) => s.name.includes(mentionQuery)) : allSkillMetas,
+    () => mentionQuery ? allSkillMetas.filter((s) => s.name.toLowerCase().includes(mentionQuery)) : allSkillMetas,
     [mentionQuery, allSkillMetas],
   );
   const mentionFiles = useMentionFiles(activeWorkspace?.path ?? null, mentionQuery, mentionState.open);
