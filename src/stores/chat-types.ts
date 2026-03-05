@@ -14,6 +14,8 @@ export interface ToolCallInfo {
   argsJsonStream?: string;
 }
 
+export type AttachmentStatus = "uploading" | "processing" | "ready" | "error";
+
 export interface DraftAttachment {
   id: string;
   type: Attachment["type"];
@@ -22,6 +24,11 @@ export interface DraftAttachment {
   mime_type?: string;
   size?: number;
   content?: string;
+  status?: AttachmentStatus;
+  error?: string;
+  workspace_path?: string;
+  parsed_content?: string;
+  parsed_summary?: string;
 }
 
 /** 一条消息内的有序片段：文本与工具调用按出现顺序交错 */

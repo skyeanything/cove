@@ -16,9 +16,9 @@ export const attachmentRepo = {
   async create(attachment: Omit<Attachment, "created_at">): Promise<void> {
     const db = await getDb();
     await db.execute(
-      `INSERT INTO attachments (id, message_id, type, name, path, mime_type, size, content)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [attachment.id, attachment.message_id, attachment.type, attachment.name, attachment.path, attachment.mime_type, attachment.size, attachment.content],
+      `INSERT INTO attachments (id, message_id, type, name, path, mime_type, size, content, workspace_path, parsed_content, parsed_summary)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+      [attachment.id, attachment.message_id, attachment.type, attachment.name, attachment.path, attachment.mime_type, attachment.size, attachment.content, attachment.workspace_path, attachment.parsed_content, attachment.parsed_summary],
     );
   },
 

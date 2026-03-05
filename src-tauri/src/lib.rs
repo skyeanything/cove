@@ -58,6 +58,12 @@ pub fn run() {
       sql: include_str!("../migrations/004_workspaces_table.sql"),
       kind: MigrationKind::Up,
     },
+    Migration {
+      version: 5,
+      description: "add workspace columns to attachments",
+      sql: include_str!("../migrations/005_attachment_workspace.sql"),
+      kind: MigrationKind::Up,
+    },
   ];
 
   tauri::Builder::default()
@@ -104,6 +110,9 @@ pub fn run() {
       attachment_commands::save_attachment_from_base64,
       attachment_commands::read_attachment_as_data_url,
       attachment_commands::parse_document_text,
+      attachment_commands::save_attachment_to_workspace,
+      attachment_commands::save_attachment_to_workspace_from_base64,
+      attachment_commands::preprocess_attachment,
       fetch_commands::fetch_url,
       fs_commands::read_file,
       fs_commands::read_file_raw,

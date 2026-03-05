@@ -60,6 +60,9 @@ export function makeAttachment(
     mime_type: "image/png",
     size: 1024,
     content: undefined,
+    workspace_path: undefined,
+    parsed_content: undefined,
+    parsed_summary: undefined,
     created_at: DEFAULT_TIMESTAMP,
     ...overrides,
   };

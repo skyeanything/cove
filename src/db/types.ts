@@ -132,6 +132,9 @@ export interface Attachment {
   mime_type?: string;
   size?: number;
   content?: string;
+  workspace_path?: string;
+  parsed_content?: string;
+  parsed_summary?: string;
   created_at: string;
 }
 

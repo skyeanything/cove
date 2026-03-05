@@ -15,15 +15,14 @@ import { createAgentRunMetrics, reportAgentRunMetrics } from "@/lib/ai/agent-met
 import { generateConversationTitleFromUserQuestion } from "@/lib/ai/generate-title";
 import { conversationRepo } from "@/db/repos/conversationRepo";
 import { useWorkspaceStore } from "./workspaceStore";
-import { isImageAttachment, isPdfAttachment } from "@/lib/attachment-utils";
 import { getFetchBlockForText, injectFetchBlockIntoLastUserMessage } from "./chat-url-utils";
 import { LAST_MODEL_KEY } from "./chat-retry-utils";
 import { runStreamLoop } from "./chat-stream-runner";
-import { invoke } from "@tauri-apps/api/core";
 import type { ToolCallInfo, DraftAttachment, MessagePart } from "./chat-types";
 import { cancelAllActiveCommands } from "@/lib/ai/tools/bash";
 import { runPostConversationTasks } from "@/lib/ai/post-conversation";
 import { i18n } from "@/i18n";
+import { buildAttachmentInjection } from "@/lib/attachment-injection";
 import type { UserContent } from "ai";
 
 export type { ToolCallInfo, DraftAttachment, MessagePart };
@@ -189,6 +188,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         await Promise.all(draftAttachments.map(async (a) => attachmentRepo.create({
           id: a.id, message_id: userMsg.id, type: a.type, name: a.name,
           path: a.path, mime_type: a.mime_type, size: a.size, content: a.content,
+          workspace_path: a.workspace_path, parsed_content: a.parsed_content, parsed_summary: a.parsed_summary,
         })));
       }
 
@@ -229,30 +229,13 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         const latestUserIndex = [...modelMessages].reverse().findIndex((m) => m.role === "user");
         if (latestUserIndex >= 0) {
           const index = modelMessages.length - 1 - latestUserIndex;
-          const imageAttachments = draftAttachments.filter((a) => isImageAttachment(a));
-          const pdfAttachments = draftAttachments.filter((a) => isPdfAttachment(a));
-          const otherText = draftAttachments.filter((a) => !isImageAttachment(a) && !isPdfAttachment(a));
-          const textForManifest = modelSupportsPdfNative ? otherText : draftAttachments.filter((a) => !isImageAttachment(a));
-          const attachmentList = textForManifest.map((a) => `- attachmentId=${a.id} name=${a.name ?? "unknown"}`).join("\n");
-          const manifest = textForManifest.length > 0
-            ? i18n.t("chat.attachmentManifest", { list: attachmentList })
-            : "";
-          const userText = `${trimmedContent}${manifest}${fetchBlock}`.trim();
+          const modelSupportsVision = modelOption?.vision === true || modelOption?.image_in === true;
+          const injection = buildAttachmentInjection(draftAttachments, { modelSupportsVision, modelSupportsPdfNative });
+          const userText = `${trimmedContent}${injection.textBlock}${fetchBlock}`.trim();
           const nextContent: UserContent = [];
           if (userText) nextContent.push({ type: "text", text: userText });
-          for (const a of imageAttachments) {
-            if (a.content?.startsWith("data:image/")) nextContent.push({ type: "image", image: a.content });
-          }
-          if (modelSupportsPdfNative && pdfAttachments.length > 0) {
-            for (const a of pdfAttachments) {
-              try {
-                const dataUrl = a.content?.startsWith("data:") && a.content.includes("application/pdf")
-                  ? a.content
-                  : await invoke<{ data_url: string }>("read_attachment_as_data_url", { args: { path: a.path } }).then((r) => r.data_url);
-                nextContent.push({ type: "file", data: dataUrl, mediaType: "application/pdf" });
-              } catch { /* skip failed PDF read */ }
-            }
-          }
+          for (const part of injection.visionParts) nextContent.push(part);
+          for (const part of injection.pdfParts) nextContent.push(part);
           if (nextContent.length > 0) {
             modelMessages[index] = { role: "user", content: nextContent };
           }

@@ -188,12 +188,13 @@ describe("chatStore — sendMessage", () => {
       return msgs;
     }
 
-    it("injects image attachments as inline content", async () => {
+    it("injects image attachments as inline content via injection", async () => {
       setupDefaultMocks();
       setupModelMessages();
+      vi.mocked(getModelOption).mockReturnValue({ vision: true } as ReturnType<typeof getModelOption>);
+      vi.mocked(isImageAttachment).mockReturnValue(true);
       const draft: DraftAttachment = { id: "a1", type: "image", name: "pic.png", content: "data:image/png;base64,abc" };
       setStoreState(useChatStore, { ...useChatStore.getState(), draftAttachments: [draft] });
-      vi.mocked(isImageAttachment).mockReturnValue(true);
 
       await useChatStore.getState().sendMessage("hello");
 
@@ -208,6 +209,7 @@ describe("chatStore — sendMessage", () => {
       setupDefaultMocks();
       setupModelMessages();
       vi.mocked(getModelOption).mockReturnValue({ pdf_native: true } as ReturnType<typeof getModelOption>);
+      vi.mocked(isImageAttachment).mockReturnValue(false);
       vi.mocked(isPdfAttachment).mockReturnValue(true);
       const draft: DraftAttachment = {
         id: "a1", type: "pdf", name: "doc.pdf", content: "data:application/pdf;base64,xyz",
@@ -223,12 +225,12 @@ describe("chatStore — sendMessage", () => {
       );
     });
 
-    it("adds non-image attachments to manifest text", async () => {
+    it("injects document content text for non-image attachments", async () => {
       setupDefaultMocks();
       setupModelMessages();
       vi.mocked(isImageAttachment).mockReturnValue(false);
       vi.mocked(isPdfAttachment).mockReturnValue(false);
-      const draft: DraftAttachment = { id: "a1", type: "file", name: "data.csv" };
+      const draft: DraftAttachment = { id: "a1", type: "file", name: "data.csv", workspace_path: "/ws/data.csv", parsed_content: "a,b\n1,2" };
       setStoreState(useChatStore, { ...useChatStore.getState(), draftAttachments: [draft] });
 
       await useChatStore.getState().sendMessage("hello");
@@ -238,21 +240,26 @@ describe("chatStore — sendMessage", () => {
       const textPart = userContent.find((c: unknown) => (c as Record<string, unknown>).type === "text") as
         | { text: string }
         | undefined;
-      expect(textPart?.text).toContain("attachmentId=a1");
       expect(textPart?.text).toContain("data.csv");
+      expect(textPart?.text).toContain("a,b");
     });
 
-    it("handles invoke failure for PDF gracefully", async () => {
+    it("suggests read tool for unparsed attachments", async () => {
       setupDefaultMocks();
       setupModelMessages();
       vi.mocked(isImageAttachment).mockReturnValue(false);
-      vi.mocked(getModelOption).mockReturnValue({ pdf_native: true } as ReturnType<typeof getModelOption>);
-      vi.mocked(isPdfAttachment).mockReturnValue(true);
-      vi.mocked(invoke).mockRejectedValue(new Error("read failed"));
-      const draft: DraftAttachment = { id: "a1", type: "pdf", name: "doc.pdf", path: "/tmp/doc.pdf" };
+      vi.mocked(isPdfAttachment).mockReturnValue(false);
+      const draft: DraftAttachment = { id: "a1", type: "file", name: "doc.pdf", path: "/tmp/doc.pdf" };
       setStoreState(useChatStore, { ...useChatStore.getState(), draftAttachments: [draft] });
 
       await useChatStore.getState().sendMessage("hello");
+
+      const passedOpts = vi.mocked(runStreamLoop).mock.calls[0]![0];
+      const userContent = (passedOpts.modelMessages[0] as Record<string, unknown>).content as unknown[];
+      const textPart = userContent.find((c: unknown) => (c as Record<string, unknown>).type === "text") as
+        | { text: string }
+        | undefined;
+      expect(textPart?.text).toContain("read");
       expect(runStreamLoop).toHaveBeenCalledTimes(1);
     });
   });

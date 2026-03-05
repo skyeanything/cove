@@ -1,22 +1,12 @@
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { invoke } from "@tauri-apps/api/core";
 import type { DraftAttachment } from "@/stores/chatStore";
-import {
-  detectAttachmentType,
-  detectMimeType,
-  isSupportedUploadFile,
-} from "@/lib/attachment-utils";
-
-type SaveAttachmentFileResult = {
-  path: string;
-  name: string;
-  size: number;
-  previewDataUrl?: string;
-};
+import { isSupportedUploadFile } from "@/lib/attachment-utils";
+import { processAttachment } from "@/lib/attachment-pipeline";
 
 export async function pickAndSaveAttachments(
   addDraftAttachments: (attachments: DraftAttachment[]) => void,
   setAttachError: (err: string | null) => void,
+  workspacePath?: string,
 ) {
   const selected = await openDialog({ directory: false, multiple: true });
   if (!selected) return;
@@ -31,18 +21,7 @@ export async function pickAndSaveAttachments(
     await Promise.all(
       supportedPaths.map(async (sourcePath): Promise<DraftAttachment | null> => {
         try {
-          const saved = await invoke<SaveAttachmentFileResult>("save_attachment_file", {
-            args: { sourcePath },
-          });
-          return {
-            id: crypto.randomUUID(),
-            type: detectAttachmentType(saved.name || sourcePath),
-            name: saved.name,
-            path: saved.path,
-            mime_type: detectMimeType(saved.name || sourcePath),
-            size: saved.size,
-            content: saved.previewDataUrl,
-          };
+          return await processAttachment(sourcePath, workspacePath);
         } catch {
           return null;
         }

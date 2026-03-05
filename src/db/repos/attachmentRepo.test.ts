@@ -52,13 +52,28 @@ describe("attachmentRepo", () => {
   });
 
   describe("create", () => {
-    it("inserts attachment with 8 parameters", async () => {
+    it("inserts attachment with all columns", async () => {
       const att = makeAttachment({ id: "a-1", name: "photo.jpg" });
       const { created_at: _, ...input } = att;
       await attachmentRepo.create(input);
       expect(db.execute).toHaveBeenCalledWith(
         expect.stringContaining("INSERT INTO attachments"),
-        [att.id, att.message_id, att.type, att.name, att.path, att.mime_type, att.size, att.content],
+        [att.id, att.message_id, att.type, att.name, att.path, att.mime_type, att.size, att.content, att.workspace_path, att.parsed_content, att.parsed_summary],
+      );
+    });
+
+    it("inserts attachment with workspace columns", async () => {
+      const att = makeAttachment({
+        id: "a-2", name: "report.pdf",
+        workspace_path: "/workspace/report_123.pdf",
+        parsed_content: "Report content here...",
+        parsed_summary: "Report content",
+      });
+      const { created_at: _, ...input } = att;
+      await attachmentRepo.create(input);
+      expect(db.execute).toHaveBeenCalledWith(
+        expect.stringContaining("INSERT INTO attachments"),
+        expect.arrayContaining(["/workspace/report_123.pdf", "Report content here...", "Report content"]),
       );
     });
   });

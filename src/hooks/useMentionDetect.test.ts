@@ -153,5 +153,43 @@ describe("useMentionDetect", () => {
       expect(inserted!.newMessage).toBe("@file:package.json ");
       expect(inserted!.newCursorPos).toBe("@file:package.json ".length);
     });
+
+    it("allows sequential mention insertions", () => {
+      const { result } = renderHook(() => useMentionDetect());
+
+      // First mention: type @ba, select bash
+      act(() => result.current.updateMention("@ba", 3));
+      expect(result.current.mentionState.open).toBe(true);
+
+      let first: { newMessage: string; newCursorPos: number } | undefined;
+      act(() => {
+        first = result.current.insertMention("@ba", 3, "tool", "bash");
+      });
+      expect(result.current.mentionState.open).toBe(false);
+      expect(first!.newMessage).toBe("@tool:bash ");
+
+      // Simulate user typing second @ after insertion
+      const afterFirst = first!.newMessage + "@";
+      const cursor = afterFirst.length;
+      act(() => result.current.updateMention(afterFirst, cursor));
+
+      expect(result.current.mentionState.open).toBe(true);
+      expect(result.current.mentionState.query).toBe("");
+      expect(result.current.mentionState.triggerIndex).toBe(first!.newCursorPos);
+
+      // Type more of the second mention
+      const afterTyping = first!.newMessage + "@my-sk";
+      act(() => result.current.updateMention(afterTyping, afterTyping.length));
+      expect(result.current.mentionState.open).toBe(true);
+      expect(result.current.mentionState.query).toBe("my-sk");
+
+      // Select second mention
+      let second: { newMessage: string; newCursorPos: number } | undefined;
+      act(() => {
+        second = result.current.insertMention(afterTyping, afterTyping.length, "skill", "my-skill");
+      });
+      expect(result.current.mentionState.open).toBe(false);
+      expect(second!.newMessage).toBe("@tool:bash @skill:my-skill ");
+    });
   });
 });

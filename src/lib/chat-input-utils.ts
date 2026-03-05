@@ -1,6 +1,6 @@
 import type { DraftAttachment } from "@/stores/chat-types";
-import { detectAttachmentType, detectMimeType, isSupportedUploadFile } from "@/lib/attachment-utils";
-import { invoke } from "@tauri-apps/api/core";
+import { isSupportedUploadFile } from "@/lib/attachment-utils";
+import { processAttachmentFromBase64 } from "@/lib/attachment-pipeline";
 
 const IMAGE_MIME = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
 
@@ -31,30 +31,55 @@ export async function fileToBase64(file: File): Promise<string> {
   });
 }
 
-export async function imageFilesToDraftAttachments(files: File[]): Promise<DraftAttachment[]> {
+/**
+ * Convert image files to draft attachments.
+ * When a workspace path is provided, images are also saved to workspace via the pipeline.
+ */
+export async function imageFilesToDraftAttachments(
+  files: File[],
+  workspacePath?: string,
+): Promise<DraftAttachment[]> {
   const imageFiles = Array.from(files).filter(isImageFile);
   if (imageFiles.length === 0) return [];
   const attachments: DraftAttachment[] = [];
   for (const file of imageFiles) {
     try {
-      const content = await fileToDataUrl(file);
-      attachments.push({
-        id: crypto.randomUUID(),
-        type: "image",
-        name: file.name || "image.png",
-        mime_type: file.type,
-        size: file.size,
-        content,
-      });
+      if (workspacePath) {
+        const base64 = await fileToBase64(file);
+        const draft = await processAttachmentFromBase64(
+          file.name || "image.png", base64, workspacePath, file.type,
+        );
+        // Ensure image has data URL content for vision models
+        if (!draft.content?.startsWith("data:image/")) {
+          draft.content = await fileToDataUrl(file);
+        }
+        attachments.push(draft);
+      } else {
+        const content = await fileToDataUrl(file);
+        attachments.push({
+          id: crypto.randomUUID(),
+          type: "image",
+          name: file.name || "image.png",
+          mime_type: file.type,
+          size: file.size,
+          content,
+          status: "ready",
+        });
+      }
     } catch {
-      // 单文件失败时跳过
+      // Skip failed individual files
     }
   }
   return attachments;
 }
 
-/** 拖放的非图片支持文件（PDF/文档等）通过 Tauri 保存到 AppData 并转为草稿附件 */
-export async function nonImageFilesToDraftAttachments(files: File[]): Promise<DraftAttachment[]> {
+/**
+ * Convert non-image supported files to draft attachments via the pipeline.
+ */
+export async function nonImageFilesToDraftAttachments(
+  files: File[],
+  workspacePath?: string,
+): Promise<DraftAttachment[]> {
   const supported = Array.from(files).filter(
     (f) => !isImageFile(f) && isSupportedUploadFile(f.name || ""),
   );
@@ -62,28 +87,13 @@ export async function nonImageFilesToDraftAttachments(files: File[]): Promise<Dr
   const attachments: DraftAttachment[] = [];
   for (const file of supported) {
     try {
-      const contentBase64 = await fileToBase64(file);
-      const saved = await invoke<{ path: string; name: string; size: number; previewDataUrl?: string }>(
-        "save_attachment_from_base64",
-        {
-          args: {
-            name: file.name || "file",
-            contentBase64,
-            mimeType: file.type || undefined,
-          },
-        },
+      const base64 = await fileToBase64(file);
+      const draft = await processAttachmentFromBase64(
+        file.name || "file", base64, workspacePath, file.type || undefined,
       );
-      attachments.push({
-        id: crypto.randomUUID(),
-        type: detectAttachmentType(saved.name),
-        name: saved.name,
-        path: saved.path,
-        mime_type: detectMimeType(saved.name),
-        size: saved.size,
-        content: saved.previewDataUrl,
-      });
+      attachments.push(draft);
     } catch {
-      // 单文件失败时跳过
+      // Skip failed individual files
     }
   }
   return attachments;
