@@ -120,6 +120,7 @@ fi
 # ── Install binary ──────────────────────────────────────────────────────
 cp "$EXTRACTED_BIN" "$TARGET_BIN"
 chmod +x "$TARGET_BIN"
+xattr -cr "$TARGET_BIN" 2>/dev/null || true
 echo "$LATEST_TAG" > "$VERSION_FILE"
 
 echo "Installed officellm $LATEST_TAG -> $TARGET_BIN"
