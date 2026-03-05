@@ -25,12 +25,25 @@ Semantic versioning: `MAJOR.MINOR.PATCH`
 | Worktree | `./scripts/start-worktree.sh feature <id> <desc>` | `./scripts/start-worktree.sh fix <id> <desc> --base release/x.y` |
 
 ```
-main ──●──●──●──●──────────●──●──●──→
-               │                ↑
-               ▼ tag v0.2.0     │ cherry-pick
-         release/0.2 ──●──●────┘
-                     v0.2.1
+dev ──●──●──●──●──●──────●──●──●──●──→  (integration, feature validation)
+       │              │
+       │ merge        │ merge
+       ▼              ▼
+main ──●──────────────●──────────────→  (stable, release only)
+       │ tag v0.2.0   │ tag v0.3.0
+       ▼              ▼
+ release/0.2    release/0.3
+       │
+       ●── v0.2.1 (hotfix, cherry-pick to main)
 ```
+
+## dev Branch
+
+- `dev` is the integration branch for feature validation across contributors.
+- All feature branches are still created from `main` (stable baseline).
+- PRs to `dev` use `Related to #<id>` (do NOT close issues).
+- When `dev` is validated, merge `dev` into `main`, then tag for release.
+- PRs to `main` use `Closes #<id>` to close issues.
 
 ## Scripts
 

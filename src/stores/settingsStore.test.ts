@@ -1,15 +1,13 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { createStoreReset } from "@/test-utils/mock-store";
 
-vi.mock("@/db/repos/settingsRepo", () => ({
-  settingsRepo: {
-    get: vi.fn(),
-    set: vi.fn(),
-  },
+vi.mock("@/lib/config", () => ({
+  readConfig: vi.fn().mockResolvedValue({ locale: "zh", sendShortcut: "enter" }),
+  writeConfig: vi.fn().mockResolvedValue(undefined),
 }));
 
 import { useSettingsStore } from "./settingsStore";
-import { settingsRepo } from "@/db/repos/settingsRepo";
+import { readConfig } from "@/lib/config";
 
 const resetStore = createStoreReset(useSettingsStore);
 afterEach(() => {
@@ -45,26 +43,20 @@ describe("settingsStore", () => {
   });
 
   describe("loadAppSettings", () => {
-    it("loads modifierEnter from DB", async () => {
-      vi.mocked(settingsRepo.get).mockResolvedValue("modifierEnter");
+    it("loads modifierEnter from config", async () => {
+      vi.mocked(readConfig).mockResolvedValue({ locale: "zh", sendShortcut: "modifierEnter" });
       await useSettingsStore.getState().loadAppSettings();
       expect(useSettingsStore.getState().sendMessageShortcut).toBe("modifierEnter");
     });
 
-    it("defaults to enter when DB returns undefined", async () => {
-      vi.mocked(settingsRepo.get).mockResolvedValue(undefined);
+    it("defaults to enter when config has no sendShortcut", async () => {
+      vi.mocked(readConfig).mockResolvedValue({ locale: "zh" });
       await useSettingsStore.getState().loadAppSettings();
       expect(useSettingsStore.getState().sendMessageShortcut).toBe("enter");
     });
 
-    it("migrates legacy shiftEnter to modifierEnter", async () => {
-      vi.mocked(settingsRepo.get).mockResolvedValue("shiftEnter");
-      await useSettingsStore.getState().loadAppSettings();
-      expect(useSettingsStore.getState().sendMessageShortcut).toBe("modifierEnter");
-    });
-
-    it("treats unknown values as enter", async () => {
-      vi.mocked(settingsRepo.get).mockResolvedValue("somethingElse");
+    it("loads enter from config", async () => {
+      vi.mocked(readConfig).mockResolvedValue({ locale: "zh", sendShortcut: "enter" });
       await useSettingsStore.getState().loadAppSettings();
       expect(useSettingsStore.getState().sendMessageShortcut).toBe("enter");
     });

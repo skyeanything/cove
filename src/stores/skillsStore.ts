@@ -2,24 +2,17 @@ import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
 import type { Skill } from "@/lib/ai/skills/types";
 import { parseSkillFromRaw, listSkills } from "@/lib/ai/skills/loader";
-import { settingsRepo } from "@/db/repos/settingsRepo";
-
-const SKILL_DIR_PATHS_KEY = "skillDirPaths";
-const ENABLED_SKILL_NAMES_KEY = "enabledSkillNames";
+import { readConfig, writeConfig } from "@/lib/config";
+import type { SkillsConfig } from "@/lib/config/types";
 
 export async function getSkillDirPaths(): Promise<string[]> {
-  const raw = await settingsRepo.get(SKILL_DIR_PATHS_KEY);
-  if (!raw) return [];
-  try {
-    const arr = JSON.parse(raw) as unknown;
-    return Array.isArray(arr) ? arr.filter((x): x is string => typeof x === "string") : [];
-  } catch {
-    return [];
-  }
+  const config = await readConfig<SkillsConfig>("skills");
+  return config.dirPaths ?? [];
 }
 
 export async function setSkillDirPaths(paths: string[]): Promise<void> {
-  await settingsRepo.set(SKILL_DIR_PATHS_KEY, JSON.stringify(paths));
+  const config = await readConfig<SkillsConfig>("skills");
+  await writeConfig("skills", { ...config, dirPaths: paths });
 }
 
 interface ExternalSkillEntry {
@@ -29,64 +22,49 @@ interface ExternalSkillEntry {
   content: string;
 }
 
-/** 外部 skill 及其来源（claude / cursor / opencode / agents / custom） */
 export interface ExternalSkillWithSource {
   skill: Skill;
   source: string;
-  /** File path of the skill on disk */
   path: string;
-  /** Folder name on disk (may differ from frontmatter name) — use for Tauri CRUD ops */
   folderName: string;
 }
 
-/** Migrate legacy skill names to current names */
 const SKILL_NAME_MIGRATIONS: Record<string, string> = {
   officellm: "office",
   "code-interpreter": "cove-core",
   cove: "cove-core",
 };
 
-/** 从 settings 读取已勾选 skill 名称；若为空则用内置 skill 名单填充并保存 */
 export async function getEnabledSkillNames(): Promise<string[]> {
-  const raw = await settingsRepo.get(ENABLED_SKILL_NAMES_KEY);
-  if (raw) {
-    try {
-      const arr = JSON.parse(raw) as unknown;
-      if (Array.isArray(arr)) {
-        const names = arr.filter((x): x is string => typeof x === "string");
-        const migrated = names.map((n) => SKILL_NAME_MIGRATIONS[n] ?? n);
-        if (JSON.stringify(migrated) !== JSON.stringify(names)) {
-          await settingsRepo.set(ENABLED_SKILL_NAMES_KEY, JSON.stringify(migrated));
-        }
-        return migrated;
-      }
-    } catch {
-      /* ignore */
+  const config = await readConfig<SkillsConfig>("skills");
+  const enabled = config.enabled;
+  if (Array.isArray(enabled) && enabled.length > 0) {
+    const migrated = enabled.map((n) => SKILL_NAME_MIGRATIONS[n] ?? n);
+    if (JSON.stringify(migrated) !== JSON.stringify(enabled)) {
+      await writeConfig("skills", { ...config, enabled: migrated });
     }
+    return migrated;
   }
   const defaultEnabled = listSkills().map((s) => s.name);
-  await settingsRepo.set(ENABLED_SKILL_NAMES_KEY, JSON.stringify(defaultEnabled));
+  await writeConfig("skills", { ...config, enabled: defaultEnabled });
   return defaultEnabled;
 }
 
 export async function setEnabledSkillNames(names: string[]): Promise<void> {
-  await settingsRepo.set(ENABLED_SKILL_NAMES_KEY, JSON.stringify(names));
+  const config = await readConfig<SkillsConfig>("skills");
+  await writeConfig("skills", { ...config, enabled: names });
 }
 
 interface SkillsState {
   externalSkills: ExternalSkillWithSource[];
   loaded: boolean;
   loading: boolean;
-  /** discover_external_skills 失败时的错误信息；null 表示正常 */
   scanError: string | null;
-  /** 勾选后才会发给模型的 skill 名称（与 UI 同步，由 loadEnabledSkillNames 加载） */
   enabledSkillNames: string[];
   loadExternalSkills: (workspacePath?: string | null) => Promise<void>;
   loadEnabledSkillNames: () => Promise<void>;
   toggleSkillEnabled: (name: string) => Promise<void>;
-  /** Create or update a skill: folderName for disk CRUD, skillName for enabledSkillNames */
   saveSkill: (folderName: string, content: string, workspacePath?: string | null, skillName?: string) => Promise<void>;
-  /** Delete a skill: folderName for disk CRUD, skillName for enabledSkillNames */
   deleteSkill: (folderName: string, workspacePath?: string | null, skillName?: string) => Promise<void>;
 }
 
@@ -114,7 +92,6 @@ export const useSkillsStore = create<SkillsState>()((set, get) => ({
       }));
       set({ externalSkills: withSource, loaded: true, scanError: null });
 
-      // Auto-enable bundled officellm skills (hidden from UI, users can't toggle)
       const bundledNames = withSource
         .filter((e) => e.source === "office-bundled")
         .map((e) => e.skill.meta.name);
@@ -148,7 +125,6 @@ export const useSkillsStore = create<SkillsState>()((set, get) => ({
 
   saveSkill: async (folderName, content, workspacePath, skillName) => {
     await invoke<string>("write_skill", { name: folderName, content });
-    // Auto-enable only if genuinely new (not already tracked in externalSkills)
     const enableKey = skillName ?? folderName;
     const isNew = !get().externalSkills.some(
       (e) => e.folderName === folderName || e.skill.meta.name === enableKey,
@@ -161,13 +137,11 @@ export const useSkillsStore = create<SkillsState>()((set, get) => ({
         set({ enabledSkillNames: next });
       }
     }
-    // Refresh external skills list
     await get().loadExternalSkills(workspacePath);
   },
 
   deleteSkill: async (folderName, workspacePath, skillName) => {
     await invoke<void>("delete_skill", { name: folderName });
-    // Remove by logical skill name (frontmatter name), fall back to folder name
     const enableKey = skillName ?? folderName;
     const prev = get().enabledSkillNames;
     if (prev.includes(enableKey)) {
@@ -175,7 +149,6 @@ export const useSkillsStore = create<SkillsState>()((set, get) => ({
       await setEnabledSkillNames(next);
       set({ enabledSkillNames: next });
     }
-    // Refresh external skills list
     await get().loadExternalSkills(workspacePath);
   },
 }));

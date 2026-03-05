@@ -1,4 +1,5 @@
 mod attachment_commands;
+mod config_commands;
 mod docx_commands;
 mod fetch_commands;
 mod fs_commands;
@@ -134,6 +135,8 @@ pub fn run() {
       soul_commands::write_soul_private,
       soul_commands::delete_soul_private,
       soul_commands::snapshot_soul,
+      config_commands::read_config,
+      config_commands::write_config,
       docx_commands::docx_to_pdf,
       docx_commands::qmd_to_pdf,
       docx_commands::pptx_to_pdf,
