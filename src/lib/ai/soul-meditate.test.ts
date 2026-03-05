@@ -194,6 +194,20 @@ describe("maybeMeditate", () => {
     expect(writeSoul).toHaveBeenCalled();
   });
 
+  it("preserves soul-format marker through meditation", async () => {
+    mockSoul("- a\n- b\n- c");
+    const soulWithFormat = PUBLIC_SOUL + "\n<!-- soul-format:1 -->";
+    generateFn.mockResolvedValue(
+      `=== SOUL.md ===\n${soulWithFormat}\n\n=== PRIVATE:observations.md ===\n- obs\n`,
+    );
+    await maybeMeditate(generateFn);
+    const written = vi.mocked(writeSoul).mock.calls[0]?.[0] ?? "";
+    expect(written).toContain("<!-- soul-format:1 -->");
+    // Only one format marker
+    const markers = written.match(/<!-- soul-format:\d+ -->/g) ?? [];
+    expect(markers.length).toBe(1);
+  });
+
   it("aborts without writing when parse fails", async () => {
     mockSoul("- a\n- b\n- c");
     generateFn.mockResolvedValue("Rambling text without markers");

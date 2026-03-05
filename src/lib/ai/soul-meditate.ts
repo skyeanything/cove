@@ -80,10 +80,13 @@ export async function maybeMeditate(
 
     console.info("[SOUL] integrity checks: PASS");
 
-    // Write updated SOUL.md with meditation timestamp (strip old marker first)
-    const cleaned = result.soulMd.replace(/\n<!-- last-meditation:\S+ -->/g, "");
+    // Write updated SOUL.md with meditation timestamp (strip old markers first)
+    const cleaned = result.soulMd
+      .replace(/\n<!-- last-meditation:\S+ -->/g, "")
+      .replace(/\n<!-- soul-format:\d+ -->/g, "");
     const tsMarker = `\n<!-- last-meditation:${new Date().toISOString()} -->`;
-    await writeSoul(cleaned.trimEnd() + tsMarker + "\n");
+    const fmtMarker = "\n<!-- soul-format:1 -->";
+    await writeSoul(cleaned.trimEnd() + tsMarker + fmtMarker + "\n");
 
     // Write private files
     for (const file of result.privateFiles) {

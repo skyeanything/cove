@@ -6,7 +6,8 @@
       "skills": "Skills",
       "tools": "Tools",
       "appearance": "Appearance",
-      "workspaces": "Workspaces"
+      "workspaces": "Workspaces",
+      "soul": "Soul"
     },
     "general": {
       "language": "Interface Language",
@@ -283,5 +284,34 @@
     "addWorkspace": "Add Workspace",
     "setDefault": "Set as default",
     "renameWorkspace": "Click to rename"
+  },
+  "soul": {
+    "status": "SOUL Status",
+    "loading": "Loading...",
+    "healthy": "Healthy",
+    "corrupted": "Corrupted",
+    "statusField": "Status",
+    "formatVersion": "Format version",
+    "lastMeditation": "Last meditation",
+    "privateFiles": "Private files",
+    "snapshots": "Snapshots",
+    "detail": "Detail",
+    "none": "N/A",
+    "never": "Never",
+    "exportLabel": "Export SOUL",
+    "exportDesc": "Export all SOUL data to a portable backup file.",
+    "export": "Export...",
+    "importLabel": "Import SOUL",
+    "importDesc": "Restore from a backup file. Current SOUL snapshotted before import.",
+    "import": "Import...",
+    "resetLabel": "Reset SOUL",
+    "resetDesc": "Reset to birth state. Snapshot created first.",
+    "reset": "Reset...",
+    "resetConfirmTitle": "Reset SOUL",
+    "resetConfirmDesc": "This will reset SOUL to its default state. A snapshot of the current SOUL will be created first. Continue?",
+    "cancel": "Cancel",
+    "exportSuccess": "Exported {{count}} files",
+    "importSuccess": "Restored {{count}} files",
+    "resetSuccess": "SOUL reset to default"
   }
 }

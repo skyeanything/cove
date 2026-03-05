@@ -6,7 +6,8 @@
       "skills": "技能",
       "tools": "工具",
       "appearance": "外观",
-      "workspaces": "工作区"
+      "workspaces": "工作区",
+      "soul": "灵魂"
     },
     "general": {
       "language": "界面语言",
@@ -283,5 +284,34 @@
     "addWorkspace": "添加工作区",
     "setDefault": "设为默认",
     "renameWorkspace": "点击重命名"
+  },
+  "soul": {
+    "status": "SOUL 状态",
+    "loading": "加载中...",
+    "healthy": "正常",
+    "corrupted": "已损坏",
+    "statusField": "状态",
+    "formatVersion": "格式版本",
+    "lastMeditation": "上次冥想",
+    "privateFiles": "私有文件",
+    "snapshots": "快照数",
+    "detail": "详情",
+    "none": "无",
+    "never": "从未",
+    "exportLabel": "导出 SOUL",
+    "exportDesc": "将所有 SOUL 数据导出为便携备份文件。",
+    "export": "导出...",
+    "importLabel": "导入 SOUL",
+    "importDesc": "从备份文件恢复。导入前会自动创建当前 SOUL 的快照。",
+    "import": "导入...",
+    "resetLabel": "重置 SOUL",
+    "resetDesc": "重置为初始状态。重置前会自动创建快照。",
+    "reset": "重置...",
+    "resetConfirmTitle": "重置 SOUL",
+    "resetConfirmDesc": "将重置 SOUL 为默认状态。当前 SOUL 会先创建快照。确认继续？",
+    "cancel": "取消",
+    "exportSuccess": "已导出 {{count}} 个文件",
+    "importSuccess": "已恢复 {{count}} 个文件",
+    "resetSuccess": "SOUL 已重置为默认状态"
   }
 }
