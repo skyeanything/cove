@@ -154,6 +154,7 @@ pub fn run() {
       soul_backup::export_soul,
       soul_backup::import_soul,
       soul_backup::soul_health,
+      soul_backup::reset_soul,
       config_commands::read_config,
       config_commands::write_config,
       docx_commands::docx_to_pdf,

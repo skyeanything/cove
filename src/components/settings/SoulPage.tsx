@@ -74,10 +74,7 @@ export function SoulPage() {
   const handleReset = async () => {
     setLoading(true);
     try {
-      await invoke("snapshot_soul");
-      await invoke("write_soul", { fileName: "SOUL.md", content: "" });
-      // Deleting triggers re-init with default on next read
-      await invoke("read_soul", { fileName: "SOUL.md" });
+      await invoke("reset_soul");
       showMessage(t("soul.resetSuccess"));
       await refresh();
     } catch (e) {

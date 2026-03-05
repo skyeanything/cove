@@ -20,6 +20,7 @@ vi.mock("@/lib/ai/soul-backup", () => ({
   getSoulHealth: vi.fn(),
 }));
 
+import { invoke } from "@tauri-apps/api/core";
 import { exportSoul, importSoul, getSoulHealth } from "@/lib/ai/soul-backup";
 
 const healthyState = {
@@ -90,6 +91,21 @@ describe("SoulPage", () => {
     const user = userEvent.setup();
     await user.click(screen.getByText("soul.import"));
     expect(importSoul).toHaveBeenCalled();
+  });
+
+  it("calls reset_soul on reset confirm", async () => {
+    vi.mocked(invoke).mockResolvedValue(undefined);
+    render(<SoulPage />);
+    await waitFor(() => {
+      expect(screen.getByText("soul.healthy")).toBeTruthy();
+    });
+    const user = userEvent.setup();
+    // Click the reset trigger button to open AlertDialog
+    await user.click(screen.getByText("soul.reset"));
+    // Confirm in the dialog (AlertDialogAction also shows "soul.reset" text)
+    const buttons = screen.getAllByText("soul.reset");
+    await user.click(buttons[buttons.length - 1]);
+    expect(invoke).toHaveBeenCalledWith("reset_soul");
   });
 
   it("displays format version and private file count", async () => {

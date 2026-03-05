@@ -195,6 +195,20 @@ pub fn soul_health() -> Result<SoulHealth, String> {
     })
 }
 
+#[tauri::command]
+pub fn reset_soul() -> Result<(), String> {
+    snapshot_soul().map_err(|se| format!("Snapshot before reset failed: {se}"))?;
+    let cove = cove_dir()?;
+    let soul = cove.join("soul");
+    let _ = fs::remove_file(soul.join("SOUL.md"));
+    if let Ok(entries) = fs::read_dir(soul.join("private")) {
+        for e in entries.filter_map(|r| r.ok()) { let _ = fs::remove_file(e.path()); }
+    }
+    ensure_soul_files(&cove)?;
+    log::info!("[SOUL] reset to defaults");
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -251,20 +265,14 @@ mod tests {
     }
 
     #[test]
-    fn import_rejects_invalid_format() {
+    fn import_rejects_bad_manifest() {
         with_home(|home| {
-            let zp = home.join("bad.zip");
-            make_zip(&zp, br#"{"format":"wrong","version":1,"app_version":"0","soul_format_version":null,"exported_at":""}"#, &[]);
-            assert!(import_soul(zp.to_string_lossy().into()).unwrap_err().contains("Unknown archive format"));
-        });
-    }
-
-    #[test]
-    fn import_rejects_future_version() {
-        with_home(|home| {
-            let zp = home.join("v99.zip");
-            make_zip(&zp, br#"{"format":"cove-soul-backup","version":99,"app_version":"0","soul_format_version":null,"exported_at":""}"#, &[]);
-            assert!(import_soul(zp.to_string_lossy().into()).unwrap_err().contains("Unsupported archive version"));
+            let z1 = home.join("bad.zip");
+            make_zip(&z1, br#"{"format":"wrong","version":1,"app_version":"0","soul_format_version":null,"exported_at":""}"#, &[]);
+            assert!(import_soul(z1.to_string_lossy().into()).unwrap_err().contains("Unknown archive format"));
+            let z2 = home.join("v99.zip");
+            make_zip(&z2, br#"{"format":"cove-soul-backup","version":99,"app_version":"0","soul_format_version":null,"exported_at":""}"#, &[]);
+            assert!(import_soul(z2.to_string_lossy().into()).unwrap_err().contains("Unsupported archive version"));
         });
     }
 
@@ -273,14 +281,10 @@ mod tests {
         with_home(|home| {
             read_soul("SOUL.md".into()).unwrap();
             let zp = home.join("escape.zip");
-            make_zip(&zp, VALID_MF, &[
-                ("soul/SOUL.md", b"# Who I Am\n\n## My DNA\n\n## My Disposition\n\n## My Style\n"),
-                ("soul/private/..\\evil.md", b"pwned"),
-                ("soul/private/../escape.md", b"pwned"),
-                ("soul/private/.hidden.md", b"pwned"),
-            ]);
-            let ir = import_soul(zp.to_string_lossy().into()).unwrap();
-            assert_eq!(ir.files_restored, 1); // only SOUL.md, all private entries rejected
+            let soul = b"# Who I Am\n\n## My DNA\n\n## My Disposition\n\n## My Style\n";
+            make_zip(&zp, VALID_MF, &[("soul/SOUL.md", soul), ("soul/private/..\\evil.md", b"x"),
+                ("soul/private/../escape.md", b"x"), ("soul/private/.hidden.md", b"x")]);
+            assert_eq!(import_soul(zp.to_string_lossy().into()).unwrap().files_restored, 1);
         });
     }
 
