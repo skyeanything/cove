@@ -38,7 +38,8 @@ export function UnsupportedFallback({ path, workspaceRoot, onOpenExternal }: Uns
   const iconClass = getClassWithColor(`file.${ext || "txt"}`) || "text-icon";
 
   useEffect(() => {
-    if (!workspaceRoot) return;
+    // stat_file requires workspace-relative paths; skip for absolute paths
+    if (!workspaceRoot || path.startsWith("/")) return;
     invoke<StatResult>("stat_file", { args: { workspaceRoot, path } })
       .then(setStat)
       .catch(() => {});

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ChevronDown, ExternalLink } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
+import { openPath } from "@tauri-apps/plugin-opener";
 import { useTranslation } from "react-i18next";
 import { BreadcrumbNav } from "./BreadcrumbNav";
 
@@ -28,7 +29,15 @@ export function useDetectOfficeApps() {
 export function useOpenExternally(workspaceRoot: string | null, path: string | null) {
   return useCallback(
     (openWith?: string) => {
-      if (!workspaceRoot || !path) return;
+      if (!path) return;
+      // Absolute paths (e.g. attachments) bypass workspace-gated Tauri command
+      if (path.startsWith("/")) {
+        openPath(path, openWith).catch((e) => {
+          console.error("openPath failed:", e);
+        });
+        return;
+      }
+      if (!workspaceRoot) return;
       invoke("open_with_app", {
         args: { workspaceRoot, path, openWith: openWith ?? null },
       }).catch((e) => {

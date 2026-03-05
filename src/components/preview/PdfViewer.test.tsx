@@ -118,6 +118,20 @@ describe("PdfViewer", () => {
     });
   });
 
+  describe("NaN guard", () => {
+    it("does not set page to NaN when input is non-numeric", () => {
+      render(<PdfViewer dataUrl={DUMMY_DATA_URL} />);
+      const input = screen.getByRole("textbox") as HTMLInputElement;
+      // Simulate typing a non-numeric value
+      input.value = "abc";
+      // Click prev button — goToPage(NaN - 1) should be guarded
+      const buttons = screen.getAllByRole("button");
+      buttons[0]!.click();
+      // Page input should NOT be "NaN"
+      expect(input.value).not.toBe("NaN");
+    });
+  });
+
   describe("toolbar structure", () => {
     it("renders all five toolbar buttons: prev, next, zoom-, zoom+, fit", () => {
       render(<PdfViewer dataUrl={DUMMY_DATA_URL} />);

@@ -139,4 +139,10 @@ describe("CsvViewer summary stats", () => {
     // truncation key should not appear
     expect(screen.queryByText(/preview\.csvTruncated/)).toBeNull();
   });
+
+  it("shows 0 rows for empty CSV, not negative", () => {
+    renderCsv("");
+    // Should show "0 preview.csvRows", not "-1 preview.csvRows"
+    expect(screen.queryByText(/-1/)).toBeNull();
+  });
 });

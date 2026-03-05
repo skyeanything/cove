@@ -166,6 +166,14 @@ describe("UnsupportedFallback file stat display", () => {
     expect(vi.mocked(invoke)).not.toHaveBeenCalled();
   });
 
+  it("does not call stat_file for absolute paths", async () => {
+    renderFallback("/Users/data/attachments/archive.zip", "/workspace");
+
+    await new Promise((r) => setTimeout(r, 20));
+
+    expect(vi.mocked(invoke)).not.toHaveBeenCalled();
+  });
+
   it("does not crash when invoke rejects", async () => {
     vi.mocked(invoke).mockRejectedValue(new Error("Permission denied"));
 

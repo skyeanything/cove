@@ -76,6 +76,7 @@ export function PdfViewer({ dataUrl, className }: PdfViewerProps) {
   };
 
   const goToPage = (num: number) => {
+    if (isNaN(num)) return;
     const clamped = Math.max(1, Math.min(pageCount, num));
     setPageInput(String(clamped));
     scrollToPage(clamped);

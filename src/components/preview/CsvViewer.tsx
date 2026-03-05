@@ -33,7 +33,7 @@ export function CsvViewer({ text, className }: CsvViewerProps) {
       rows: limitedRows.map((row) => row.slice(0, limitedCols)),
       truncatedRows: dataRows.length > MAX_ROWS,
       truncatedCols: rawTotalCols > MAX_COLS,
-      totalRows: rawTotalRows - 1,
+      totalRows: Math.max(0, rawTotalRows - 1),
       totalCols: rawTotalCols,
     };
   }, [text]);
