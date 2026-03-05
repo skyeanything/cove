@@ -11,6 +11,7 @@ mod sidecar;
 mod shell_commands;
 mod skill_commands;
 mod skill_discovery;
+mod skill_resource_commands;
 mod soul_commands;
 mod soul_defaults;
 mod soul_migrate;
@@ -142,6 +143,7 @@ pub fn run() {
       skill_commands::write_skill,
       skill_commands::delete_skill,
       skill_commands::read_skill,
+      skill_resource_commands::read_skill_resource,
       soul_commands::read_soul,
       soul_commands::write_soul,
       soul_commands::read_soul_private,

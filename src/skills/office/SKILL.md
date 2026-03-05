@@ -15,7 +15,7 @@ Run `doctor` first — the response includes a `home` field. For the complete co
 
 - `<home>/skills/resources/*.md` — detailed guides
 - `<home>/skills/quickjs-examples/*.js` — scripting examples
-- Use the `read` tool to load a specific guide on demand.
+- Use the `skill_resource` tool to load a specific guide on demand.
 
 Do NOT guess command names — read the resource guides first.
 

@@ -1,5 +1,6 @@
 import { tool } from "ai";
 import { z } from "zod/v4";
+import { invoke } from "@tauri-apps/api/core";
 import type { Skill, SkillMeta } from "@/lib/ai/skills/types";
 import {
   loadSkill,
@@ -94,22 +95,56 @@ export const skillTool = tool({
   },
 });
 
+interface ResourceEntry {
+  skillName: string;
+  path: string;
+  /** Bundled resources have content in memory; external ones need Tauri IPC */
+  content?: string;
+  /** For external resources: the skill directory to read from */
+  skillDir?: string;
+}
+
 /**
- * 创建 skill_resource 工具：按需加载 skill 中的 resource 文件（如 TABLE_OPERATIONS_GUIDE.md）。
- * 避免将整个 96KB SKILL.md + 所有 resource 一次性注入上下文。
+ * Collect all available resources from both bundled and external skills.
+ * Bundled resources take priority when a skill name exists in both.
+ */
+function collectAllResources(enabledSet: Set<string>): ResourceEntry[] {
+  const entries: ResourceEntry[] = [];
+  const seen = new Set<string>(); // "skillName:path" dedup key
+
+  // Bundled resources (in-memory content)
+  for (const skill of getAllBundledSkills()) {
+    if (!enabledSet.has(skill.meta.name) || !skill.resources?.length) continue;
+    for (const r of skill.resources) {
+      const key = `${skill.meta.name}:${r.path}`;
+      seen.add(key);
+      entries.push({ skillName: skill.meta.name, path: r.path, content: r.content });
+    }
+  }
+
+  // External resources (paths only, loaded on demand)
+  for (const ext of useSkillsStore.getState().externalSkills) {
+    if (!enabledSet.has(ext.skill.meta.name) || ext.resourcePaths.length === 0) continue;
+    for (const rp of ext.resourcePaths) {
+      const key = `${ext.skill.meta.name}:${rp}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      entries.push({ skillName: ext.skill.meta.name, path: rp, skillDir: ext.skillDir });
+    }
+  }
+
+  return entries;
+}
+
+/**
+ * Create skill_resource tool: on-demand loading of resource files from both
+ * bundled and external skills.
  */
 export function createSkillResourceTool(enabledNames: string[]) {
   const enabledSet = new Set(enabledNames);
-  const allSkills = getAllBundledSkills();
-  const skillsWithResources = allSkills.filter(
-    (s) => enabledSet.has(s.meta.name) && s.resources && s.resources.length > 0,
-  );
+  const allResources = collectAllResources(enabledSet);
 
-  // Build resource listing for description
-  const resourceLines = skillsWithResources.flatMap((s) =>
-    (s.resources ?? []).map((r) => `  - ${s.meta.name}: ${r.path}`),
-  );
-
+  const resourceLines = allResources.map((r) => `  - ${r.skillName}: ${r.path}`);
   const description =
     resourceLines.length > 0
       ? [
@@ -132,19 +167,31 @@ export function createSkillResourceTool(enabledNames: string[]) {
       if (!enabledSet.has(skillName)) {
         return `Skill "${skillName}" is not enabled. Enable it in the Skills panel first.`;
       }
-      const skill = allSkills.find((s) => s.meta.name === skillName);
-      if (!skill) return `Skill "${skillName}" not found.`;
-      if (!skill.resources || skill.resources.length === 0) {
-        return `Skill "${skillName}" has no bundled resources.`;
+      const matching = allResources.filter((r) => r.skillName === skillName);
+      if (matching.length === 0) {
+        return `Skill "${skillName}" has no available resources.`;
       }
-      const resource = skill.resources.find((r) => r.path === resourcePath);
+      const resource = matching.find((r) => r.path === resourcePath);
       if (!resource) {
-        const available = skill.resources.map((r) => r.path).join(", ");
+        const available = matching.map((r) => r.path).join(", ");
         return `Resource "${resourcePath}" not found in skill "${skillName}". Available: ${available}`;
       }
+
+      let content: string;
+      if (resource.content !== undefined) {
+        content = resource.content;
+      } else if (resource.skillDir) {
+        content = await invoke<string>("read_skill_resource", {
+          skillDir: resource.skillDir,
+          resourcePath: resource.path,
+        });
+      } else {
+        return `Cannot load resource "${resourcePath}" — no content source available.`;
+      }
+
       return [
         `<skill_resource skill="${skillName}" path="${resourcePath}">`,
-        resource.content.trim(),
+        content.trim(),
         "</skill_resource>",
       ].join("\n");
     },

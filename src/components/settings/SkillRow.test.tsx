@@ -37,6 +37,8 @@ function makeExternal(
     source: "cove",
     path: "/home/user/.cove/skills/test-skill/SKILL.md",
     folderName: "test-skill",
+    skillDir: "/home/user/.cove/skills/test-skill",
+    resourcePaths: [],
     ...overrides,
   };
 }
