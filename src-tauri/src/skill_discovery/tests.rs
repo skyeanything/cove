@@ -238,3 +238,49 @@ fn discover_custom_roots_with_tilde() {
         assert_eq!(entry.unwrap().content, "tilde content");
     });
 }
+
+// --- scan_resource_paths ---
+
+#[test]
+fn scan_discovers_resource_paths() {
+    let td = tempfile::TempDir::new().unwrap();
+    let skill = td.path().join("my-skill");
+    write_md(&skill, "skill content");
+    let res_dir = skill.join("resources");
+    fs::create_dir_all(&res_dir).unwrap();
+    fs::write(res_dir.join("GUIDE.md"), "guide").unwrap();
+    fs::write(res_dir.join("schema.json"), "{}").unwrap();
+
+    let found = scan_skill_root(td.path(), "test");
+    assert_eq!(found.len(), 1);
+    let entry = &found[0];
+    assert!(!entry.skill_dir.is_empty());
+    assert!(entry.resource_paths.contains(&"resources/GUIDE.md".to_string()));
+    assert!(entry.resource_paths.contains(&"resources/schema.json".to_string()));
+}
+
+#[test]
+fn scan_ignores_skill_md_in_resource_paths() {
+    let td = tempfile::TempDir::new().unwrap();
+    let skill = td.path().join("s");
+    write_md(&skill, "content");
+
+    let found = scan_skill_root(td.path(), "test");
+    assert_eq!(found.len(), 1);
+    // SKILL.md is not a resource — it has no allowed extension match under resources/
+    assert!(!found[0].resource_paths.iter().any(|p| p.contains("SKILL.md")));
+}
+
+#[test]
+fn scan_nested_resources() {
+    let td = tempfile::TempDir::new().unwrap();
+    let skill = td.path().join("deep");
+    write_md(&skill, "content");
+    let nested = skill.join("resources").join("sub");
+    fs::create_dir_all(&nested).unwrap();
+    fs::write(nested.join("bar.json"), "{}").unwrap();
+
+    let found = scan_skill_root(td.path(), "test");
+    assert_eq!(found.len(), 1);
+    assert!(found[0].resource_paths.contains(&"resources/sub/bar.json".to_string()));
+}

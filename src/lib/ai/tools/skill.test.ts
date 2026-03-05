@@ -1,6 +1,9 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { Skill, SkillMeta } from "@/lib/ai/skills/types";
 
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: vi.fn(),
+}));
 vi.mock("@/stores/skillsStore", () => ({
   useSkillsStore: { getState: vi.fn() },
 }));
@@ -13,6 +16,7 @@ vi.mock("@/lib/ai/skills/loader", () => ({
   getSkillToolDescriptionForSkills: vi.fn(),
 }));
 
+import { invoke } from "@tauri-apps/api/core";
 import { useSkillsStore } from "@/stores/skillsStore";
 import {
   loadSkill,
@@ -24,6 +28,7 @@ import {
 } from "@/lib/ai/skills/loader";
 import { sourcePriority, createSkillTool, skillTool, createSkillResourceTool } from "./skill";
 
+const mockInvoke = vi.mocked(invoke);
 const mockGetState = vi.mocked(useSkillsStore.getState);
 const mockLoadSkill = vi.mocked(loadSkill);
 const mockListSkills = vi.mocked(listSkills);
@@ -112,7 +117,10 @@ describe("createSkillTool", () => {
     const bundledSkill = makeSkill("my-skill", "bundled-content");
 
     mockGetState.mockReturnValue({
-      externalSkills: [{ skill: externalSkill, source: "cove", path: "/p", folderName: "my-skill" }],
+      externalSkills: [{
+        skill: externalSkill, source: "cove", path: "/p", folderName: "my-skill",
+        skillDir: "/skills/my-skill", resourcePaths: [],
+      }],
     } as ReturnType<typeof mockGetState>);
     mockListSkills.mockReturnValue([makeMeta("my-skill")]);
     mockLoadSkill.mockReturnValue(bundledSkill);
@@ -187,8 +195,7 @@ describe("createSkillResourceTool", () => {
   });
 
   it("returns no-resources message when skill has none", async () => {
-    const skill = makeSkill("bare-skill");
-    mockGetAllBundled.mockReturnValue([skill]);
+    mockGetAllBundled.mockReturnValue([]);
 
     const t = createSkillResourceTool(["bare-skill"]);
     const result = await t.execute(
@@ -196,7 +203,7 @@ describe("createSkillResourceTool", () => {
       {} as never,
     );
 
-    expect(result).toContain("no bundled resources");
+    expect(result).toContain("no available resources");
   });
 
   it("returns not-found with available list for wrong resource path", async () => {
@@ -215,5 +222,65 @@ describe("createSkillResourceTool", () => {
     expect(result).toContain("not found");
     expect(result).toContain("resources/GUIDE.md");
     expect(result).toContain("resources/FAQ.md");
+  });
+
+  it("lists both bundled and external resources in description", () => {
+    const bundledSkill = makeSkill("bundled-s", "content", [
+      { path: "resources/A.md", content: "a" },
+    ]);
+    mockGetAllBundled.mockReturnValue([bundledSkill]);
+    mockGetState.mockReturnValue({
+      externalSkills: [{
+        skill: makeSkill("ext-s"), source: "office", path: "/p", folderName: "ext-s",
+        skillDir: "/skills/ext-s", resourcePaths: ["resources/B.md"],
+      }],
+    } as ReturnType<typeof mockGetState>);
+
+    const t = createSkillResourceTool(["bundled-s", "ext-s"]);
+    expect(t.description).toContain("bundled-s: resources/A.md");
+    expect(t.description).toContain("ext-s: resources/B.md");
+  });
+
+  it("loads external resource via invoke", async () => {
+    mockGetAllBundled.mockReturnValue([]);
+    mockGetState.mockReturnValue({
+      externalSkills: [{
+        skill: makeSkill("ext-skill"), source: "office", path: "/p", folderName: "ext-skill",
+        skillDir: "/skills/ext-skill", resourcePaths: ["resources/GUIDE.md"],
+      }],
+    } as ReturnType<typeof mockGetState>);
+    mockInvoke.mockResolvedValue("External guide content");
+
+    const t = createSkillResourceTool(["ext-skill"]);
+    const result = await t.execute(
+      { skillName: "ext-skill", resourcePath: "resources/GUIDE.md" },
+      {} as never,
+    );
+
+    expect(mockInvoke).toHaveBeenCalledWith("read_skill_resource", {
+      skillDir: "/skills/ext-skill",
+      resourcePath: "resources/GUIDE.md",
+    });
+    expect(result).toContain("External guide content");
+    expect(result).toContain("<skill_resource");
+  });
+
+  it("rejects disabled external skill", async () => {
+    mockGetAllBundled.mockReturnValue([]);
+    mockGetState.mockReturnValue({
+      externalSkills: [{
+        skill: makeSkill("ext-skill"), source: "office", path: "/p", folderName: "ext-skill",
+        skillDir: "/skills/ext-skill", resourcePaths: ["resources/X.md"],
+      }],
+    } as ReturnType<typeof mockGetState>);
+
+    const t = createSkillResourceTool(["other-skill"]);
+    const result = await t.execute(
+      { skillName: "ext-skill", resourcePath: "resources/X.md" },
+      {} as never,
+    );
+
+    expect(result).toContain("not enabled");
+    expect(mockInvoke).not.toHaveBeenCalled();
   });
 });

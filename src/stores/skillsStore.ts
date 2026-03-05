@@ -20,6 +20,8 @@ interface ExternalSkillEntry {
   name: string;
   path: string;
   content: string;
+  skillDir: string;
+  resourcePaths: string[];
 }
 
 export interface ExternalSkillWithSource {
@@ -27,6 +29,8 @@ export interface ExternalSkillWithSource {
   source: string;
   path: string;
   folderName: string;
+  skillDir: string;
+  resourcePaths: string[];
 }
 
 const SKILL_NAME_MIGRATIONS: Record<string, string> = {
@@ -90,6 +94,8 @@ export const useSkillsStore = create<SkillsState>()((set, get) => ({
         source: e.source,
         path: e.path,
         folderName: e.name,
+        skillDir: e.skillDir ?? "",
+        resourcePaths: e.resourcePaths ?? [],
       }));
       set({ externalSkills: withSource, loaded: true, scanError: null });
 

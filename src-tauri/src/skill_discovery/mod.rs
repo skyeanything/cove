@@ -30,6 +30,12 @@ pub struct ExternalSkillEntry {
     pub path: String,
     /// 文件内容（原始，前端解析 frontmatter）
     pub content: String,
+    /// Absolute path to the skill directory (parent of SKILL.md)
+    #[serde(default)]
+    pub skill_dir: String,
+    /// Relative resource paths (e.g. "resources/GUIDE.md"), scanned at discovery time
+    #[serde(default)]
+    pub resource_paths: Vec<String>,
 }
 
 fn home_dir() -> Option<PathBuf> {
@@ -60,6 +66,54 @@ fn expand_path(p: &str) -> PathBuf {
     PathBuf::from(s)
 }
 
+const RESOURCE_DIRS: &[&str] = &["resources", "quickjs-examples"];
+const RESOURCE_EXTENSIONS: &[&str] = &["md", "json", "js", "txt", "yaml", "yml"];
+const MAX_RESOURCE_ENTRIES: usize = 100;
+const MAX_RESOURCE_DEPTH: usize = 3;
+
+/// Walk resource subdirectories and collect relative paths (paths only, no content).
+fn scan_resource_paths(skill_dir: &Path) -> Vec<String> {
+    let mut paths = Vec::new();
+    for &subdir in RESOURCE_DIRS {
+        let dir = skill_dir.join(subdir);
+        if dir.is_dir() {
+            walk_resources(&dir, skill_dir, 0, &mut paths);
+        }
+        if paths.len() >= MAX_RESOURCE_ENTRIES {
+            break;
+        }
+    }
+    paths.truncate(MAX_RESOURCE_ENTRIES);
+    paths
+}
+
+fn walk_resources(dir: &Path, base: &Path, depth: usize, out: &mut Vec<String>) {
+    if depth >= MAX_RESOURCE_DEPTH || out.len() >= MAX_RESOURCE_ENTRIES {
+        return;
+    }
+    let entries = match fs::read_dir(dir) {
+        Ok(d) => d,
+        Err(_) => return,
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.is_dir() {
+            walk_resources(&path, base, depth + 1, out);
+        } else if path.is_file() {
+            let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+            if RESOURCE_EXTENSIONS.contains(&ext) {
+                if let Ok(rel) = path.strip_prefix(base) {
+                    // Normalize to forward slashes so TS lookup works on all platforms
+                    out.push(rel.to_string_lossy().replace('\\', "/"));
+                }
+            }
+        }
+        if out.len() >= MAX_RESOURCE_ENTRIES {
+            return;
+        }
+    }
+}
+
 fn scan_skill_root(root: &Path, source: &str) -> Vec<ExternalSkillEntry> {
     let mut out = Vec::new();
 
@@ -71,11 +125,14 @@ fn scan_skill_root(root: &Path, source: &str) -> Vec<ExternalSkillEntry> {
                 .file_name()
                 .map(|n| n.to_string_lossy().into_owned())
                 .unwrap_or_else(|| source.to_string());
+            let resource_paths = scan_resource_paths(root);
             out.push(ExternalSkillEntry {
                 source: source.to_string(),
                 name,
                 path: flat_md.to_string_lossy().into_owned(),
                 content,
+                skill_dir: root.to_string_lossy().into_owned(),
+                resource_paths,
             });
         }
     }
@@ -99,11 +156,14 @@ fn scan_skill_root(root: &Path, source: &str) -> Vec<ExternalSkillEntry> {
             Ok(c) => c,
             Err(_) => continue,
         };
+        let resource_paths = scan_resource_paths(&path);
         out.push(ExternalSkillEntry {
             source: source.to_string(),
             name,
             path: skill_md.to_string_lossy().into_owned(),
             content,
+            skill_dir: path.to_string_lossy().into_owned(),
+            resource_paths,
         });
     }
     out
