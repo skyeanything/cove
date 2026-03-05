@@ -93,7 +93,7 @@ buildSystemPrompt()
 
 | 文件 | 职责 |
 |------|------|
-| `src/skills/office/SKILL.md` | 内置 bootstrap skill（always-on） |
+| `src/skills/office/SKILL.md` | 内置 bootstrap skill（默认启用，用户可关闭） |
 | `src/lib/ai/tools/office.ts` | `office` Tauri tool 定义 |
 | `src/lib/ai/tools/diagram.ts` | `diagram` 工具定义（Mermaid 渲染） |
 | `src/lib/ai/context.ts` | System prompt 构建（注入 always skills） |
