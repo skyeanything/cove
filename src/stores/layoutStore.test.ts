@@ -15,7 +15,7 @@ vi.mock("@/lib/config", () => ({
 }));
 
 import { useLayoutStore } from "./layoutStore";
-import { readConfig } from "@/lib/config";
+import { readConfig, writeConfig } from "@/lib/config";
 
 const resetStore = createStoreReset(useLayoutStore);
 afterEach(() => {
@@ -87,6 +87,15 @@ describe("layoutStore", () => {
       const s = useLayoutStore.getState();
       expect(s.filePanelOpen).toBe(false);
       expect(s.filePanelClosing).toBe(false);
+    });
+
+    it("persists filePanelOpen=false to config", () => {
+      useLayoutStore.setState({ filePanelClosing: true });
+      useLayoutStore.getState().confirmFilePanelClosed();
+      expect(writeConfig).toHaveBeenCalledWith(
+        "layout",
+        expect.objectContaining({ filePanelOpen: false }),
+      );
     });
   });
 

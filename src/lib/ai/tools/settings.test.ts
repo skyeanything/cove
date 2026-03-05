@@ -56,11 +56,15 @@ vi.mock("@/lib/ai/model-verify", () => ({
 vi.mock("@/i18n", () => ({
   i18n: { changeLanguage: vi.fn() },
 }));
+vi.mock("@tauri-apps/api/event", () => ({
+  emit: vi.fn().mockResolvedValue(undefined),
+}));
 
 import { readConfig } from "@/lib/config";
 import { useThemeStore } from "@/stores/themeStore";
 import { useLayoutStore } from "@/stores/layoutStore";
 import { useDataStore } from "@/stores/dataStore";
+import { emit } from "@tauri-apps/api/event";
 import { handleSettings } from "./settings-handlers";
 
 beforeEach(() => vi.clearAllMocks());
@@ -167,6 +171,32 @@ describe("handleSettings - provider", () => {
     });
     const result = await handleSettings({ action: "list", category: "provider" });
     expect(result).toContain("No providers");
+  });
+
+  it("disabling a provider emits provider-disabled event", async () => {
+    vi.mocked(useDataStore.getState).mockReturnValue({
+      ...useDataStore.getState(),
+      providers: [
+        { id: "p1", name: "OpenAI", type: "openai", enabled: 1, created_at: "", updated_at: "" },
+      ],
+    });
+    await handleSettings({
+      action: "set", category: "provider", provider_type: "openai", key: "enabled", value: "false",
+    });
+    expect(emit).toHaveBeenCalledWith("provider-disabled", { providerId: "p1" });
+  });
+
+  it("enabling a provider does not emit provider-disabled event", async () => {
+    vi.mocked(useDataStore.getState).mockReturnValue({
+      ...useDataStore.getState(),
+      providers: [
+        { id: "p1", name: "OpenAI", type: "openai", enabled: 0, created_at: "", updated_at: "" },
+      ],
+    });
+    await handleSettings({
+      action: "set", category: "provider", provider_type: "openai", key: "enabled", value: "true",
+    });
+    expect(emit).not.toHaveBeenCalled();
   });
 
   it("get returns not found for unknown provider", async () => {

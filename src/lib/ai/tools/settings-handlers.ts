@@ -16,6 +16,7 @@ import {
 import { useDataStore } from "@/stores/dataStore";
 import { assistantRepo } from "@/db/repos/assistantRepo";
 import { verifyApiKey } from "@/lib/ai/model-verify";
+import { emit } from "@tauri-apps/api/event";
 import { i18n } from "@/i18n";
 
 interface SettingsInput {
@@ -274,6 +275,7 @@ async function handleProvider(input: SettingsInput): Promise<string> {
       await useDataStore.getState().updateProvider(provider.id, {
         enabled: enabled ? 1 : 0,
       });
+      if (!enabled) await emit("provider-disabled", { providerId: provider.id });
       return `Provider ${provider.name} ${enabled ? "enabled" : "disabled"}.`;
     }
     if (input.key === "api_key") {

@@ -88,8 +88,10 @@ export const useLayoutStore = create<LayoutState>()((set, get) => ({
     set({ filePanelOpen: open });
     persistLayout(get());
   },
-  confirmFilePanelClosed: () =>
-    set({ filePanelOpen: false, filePanelClosing: false }),
+  confirmFilePanelClosed: () => {
+    set({ filePanelOpen: false, filePanelClosing: false });
+    persistLayout(get());
+  },
   confirmFilePanelOpened: () => set({ filePanelOpening: false }),
   setFileTreeWidth: (width) => {
     set({

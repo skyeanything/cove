@@ -36,6 +36,11 @@ export function App() {
       }
       await useSettingsStore.getState().loadAppSettings();
       await init();
+    }).catch((err) => {
+      console.error("Config initialization failed:", err);
+      useDataStore.setState({
+        initError: err instanceof Error ? err.message : String(err),
+      });
     });
   }, [init]);
 
