@@ -10,3 +10,4 @@ src-tauri/gen/
 src-tauri/binaries/officellm-*
 src-tauri/binaries/.officellm-version
 coverage/
+.claude/
