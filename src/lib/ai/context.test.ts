@@ -86,6 +86,11 @@ describe("buildSystemPrompt", () => {
     expect(prompt).toContain("spawn_agent");
   });
 
+  it("includes tools-first principle", () => {
+    const prompt = buildSystemPrompt({});
+    expect(prompt).toContain("Use dedicated tools over writing code");
+  });
+
   it("prepends soulPrompt at the very start when provided", () => {
     const soulPrompt = "[SOUL]\n# Who I Am\nTest soul content";
     const prompt = buildSystemPrompt({ soulPrompt });

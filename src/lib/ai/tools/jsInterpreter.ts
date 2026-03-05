@@ -15,8 +15,9 @@ export const jsInterpreterTool = tool({
     "Execute JavaScript code in a sandboxed interpreter (QuickJS). " +
     "No network access. Available APIs: console.log(), Math.*, JSON.*, " +
     "workspace.readFile(path), workspace.writeFile(path, content), workspace.listDir(path). " +
-    "Use this for calculations, data transformations, JSON processing, " +
-    "or reading/writing workspace files without needing an external runtime.",
+    "Use this for computation and data processing: math, JSON transforms, string manipulation, " +
+    "aggregation, or multi-step logic. Do NOT use this as a wrapper when a dedicated tool " +
+    "(office, read, write, bash) can accomplish the task directly.",
   inputSchema: z.object({
     code: z.string().describe("JavaScript code to execute"),
     description: z

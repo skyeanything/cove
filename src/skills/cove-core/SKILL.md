@@ -5,20 +5,25 @@ emoji: "🏠"
 always: true
 ---
 
-You have a **built-in QuickJS JavaScript interpreter** available via the `cove_interpreter` tool. You CAN execute JavaScript code directly — no external runtime or installation required.
+## Principle: use dedicated tools first, write code only when tools are insufficient
 
-## Rule: prefer `cove_interpreter` over `bash` for JS-capable tasks
+When a dedicated tool can accomplish a task, call the tool directly. Write code (cove_interpreter) only when tools cannot do the job alone — e.g., data processing, multi-step transformations, combining multiple tool results programmatically.
 
-**ALWAYS use `cove_interpreter` (not bash) for:**
+You have a built-in QuickJS JavaScript interpreter via `cove_interpreter`. Use it for computation and data processing, not as a wrapper around dedicated tools.
+
+Use `cove_interpreter` for:
 - Math calculations and numeric analysis
 - JSON parsing, transforming, and formatting
 - String processing and regex matching
-- Reading workspace files and processing their content
-- Quick data aggregation (sum, average, filter, sort)
-- Any task expressible in pure JavaScript
-- Office document operations: extract text, replace text, convert to PDF, apply formatting
+- Data aggregation (sum, average, filter, sort)
+- Multi-step logic combining results from multiple tool calls
+- Complex programmatic workflows that no single tool can handle
 
-**Use `bash` only when `cove_interpreter` cannot help:**
+Use `cove_interpreter` over `bash` when:
+- The task is pure computation (math, JSON, string processing) with no system interaction
+- You need to process or transform data returned by tool calls
+
+Use `bash` for system interaction:
 - System commands: `git`, `npm`, `cargo`, `pnpm`, etc.
 - Shell features: pipes, redirects, environment variables
 - Network access: `curl`, `wget`
@@ -37,7 +42,11 @@ You have a **built-in QuickJS JavaScript interpreter** available via the `cove_i
 
 **Not available**: `fetch`, `require`, `import`, `process`, `fs`, `XMLHttpRequest`.
 
-## Using `workspace.officellm`
+## workspace.officellm API (advanced: multi-step programmatic workflows)
+
+When you need to combine multiple office operations in a single programmatic sequence
+(e.g., open -> multiple transforms -> save), use `workspace.officellm()` inside `cove_interpreter`.
+For single operations, prefer the `office` Tauri tool directly.
 
 ### CLI mode (stateless, good for single operations)
 
@@ -82,18 +91,25 @@ All paths are relative to workspace root.
 
 ## Tool Selection Priority
 
+### General rule
+
+1. **Dedicated tool** — if a registered tool can do it, call the tool
+2. **`cove_interpreter`** — for computation, data processing, or multi-step programmatic workflows
+3. **`bash`** — for system interaction (git, npm, shell commands)
+
 ### Document operations (DOCX/PPTX/XLSX)
 
-1. **`cove_interpreter` + `workspace.officellm()`** -- preferred for most operations (stateless CLI or persistent server mode)
-2. **`office` Tauri tool** -- when `cove_interpreter` is insufficient (e.g. complex session management)
+1. **`office` Tauri tool** — preferred for all single operations
+2. **`cove_interpreter` + `workspace.officellm()`** — for multi-step programmatic workflows
 3. MUST load OfficeLLM skill (via the `skill` tool) before calling any command by name
 
 ### Common mistakes to avoid
 
-- Do NOT call `office` tool with `action:"call"` before loading the OfficeLLM skill -- you will guess wrong command names
-- Do NOT use `bash` to run officellm CLI when `cove_interpreter` or the `office` Tauri tool is available
-- Do NOT use `bash` for JSON parsing or math -- use `cove_interpreter`
-- Do NOT guess command parameters -- load the skill first, then use exact names from the reference
+- Do NOT call `office` tool with `action:"call"` before loading the OfficeLLM skill — you will guess wrong command names
+- Do NOT wrap a single office operation in `cove_interpreter` when the `office` tool can do it directly
+- Do NOT use `bash` to run officellm CLI when the `office` Tauri tool is available
+- Do NOT use `bash` for JSON parsing or math — use `cove_interpreter`
+- Do NOT guess command parameters — load the skill first
 
 ## Boundaries
 
@@ -123,4 +139,4 @@ Rules:
 - Do NOT mix paths 1/2 with path 3 for server-mode operations
 - Always check status before open. Always close when done.
 - If open fails with "session already active", close first, then retry
-- Prefer path 1 for most operations
+- Prefer path 2 (office Tauri tool) for single operations; path 1 for multi-step programmatic workflows
