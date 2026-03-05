@@ -24,7 +24,7 @@ export function buildSystemPrompt(options: {
 
   if (options.officeAvailable) {
     parts.push(
-      "The office tool is available. Use the office tool for document operations (DOCX/PPTX/XLSX). Load the 'office' skill for detailed usage instructions.",
+      "The office tool is available. Use the office tool for document operations (DOCX/PPTX/XLSX). Load the 'OfficeLLM' skill for detailed usage instructions.",
     );
   }
 

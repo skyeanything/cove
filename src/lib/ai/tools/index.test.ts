@@ -58,33 +58,33 @@ describe("getAgentTools", () => {
     expect(Object.keys(tools)).not.toContain("write_skill");
   });
 
-  it("includes office and diagram when office skill enabled and runtime available", () => {
-    const tools = getAgentTools(["office"], { runtimeAvailability: { office: true } });
+  it("includes office and diagram when OfficeLLM skill enabled and runtime available", () => {
+    const tools = getAgentTools(["OfficeLLM"], { runtimeAvailability: { office: true } });
     const keys = Object.keys(tools);
     expect(keys).toContain("office");
     expect(keys).toContain("diagram");
   });
 
   it("does not include office or diagram when runtime not available", () => {
-    const tools = getAgentTools(["office"], { runtimeAvailability: { office: false } });
+    const tools = getAgentTools(["OfficeLLM"], { runtimeAvailability: { office: false } });
     expect(Object.keys(tools)).not.toContain("office");
     expect(Object.keys(tools)).not.toContain("diagram");
   });
 
-  it("does not include office or diagram when office skill not enabled", () => {
+  it("does not include office or diagram when OfficeLLM skill not enabled", () => {
     const tools = getAgentTools([], { runtimeAvailability: { office: true } });
     expect(Object.keys(tools)).not.toContain("office");
     expect(Object.keys(tools)).not.toContain("diagram");
   });
 
   it("does not include office or diagram when runtimeAvailability omitted", () => {
-    const tools = getAgentTools(["office"]);
+    const tools = getAgentTools(["OfficeLLM"]);
     expect(Object.keys(tools)).not.toContain("office");
     expect(Object.keys(tools)).not.toContain("diagram");
   });
 
   it("includes all skill-bundled tools when all conditions met", () => {
-    const tools = getAgentTools(["skill-creator", "office"], {
+    const tools = getAgentTools(["skill-creator", "OfficeLLM"], {
       runtimeAvailability: { office: true },
     });
     const keys = Object.keys(tools);

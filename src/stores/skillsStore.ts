@@ -30,7 +30,8 @@ export interface ExternalSkillWithSource {
 }
 
 const SKILL_NAME_MIGRATIONS: Record<string, string> = {
-  officellm: "office",
+  officellm: "OfficeLLM",
+  office: "OfficeLLM",
   "code-interpreter": "cove-core",
   cove: "cove-core",
 };
