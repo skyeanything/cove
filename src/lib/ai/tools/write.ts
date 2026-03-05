@@ -5,6 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { useDataStore } from "@/stores/dataStore";
 import { assertReadBeforeWrite, recordRead } from "../file-time";
+import { isOfficeWritable } from "./office-extensions";
 
 interface FsErrorPayload {
   kind: string;
@@ -30,7 +31,7 @@ function resolvePath(workspaceRoot: string, filePath: string): string {
 
 export const writeTool = tool({
   description:
-    "Write or overwrite a file in the workspace. You must have read the file in this conversation before overwriting. Path is relative to workspace root.",
+    "Write or overwrite a file in the workspace. Can create Office documents (DOCX) via officellm. You must have read the file in this conversation before overwriting. Path is relative to workspace root.",
   inputSchema: z.object({
     filePath: z.string().describe("Relative path to the file from workspace root"),
     content: z.string().describe("Full new content of the file"),
@@ -44,7 +45,41 @@ export const writeTool = tool({
     const conversationId = useDataStore.getState().activeConversationId;
     const resolvedPath = resolvePath(workspaceRoot, filePath);
 
-    // Phase 5: read/write/edit 默认允许，仅保留 read-before-write 校验
+    if (isOfficeWritable(filePath)) {
+      try {
+        const st = await invoke<{ mtime_secs: number }>("stat_file", {
+          args: { workspaceRoot, path: filePath },
+        });
+        const assert = assertReadBeforeWrite(conversationId ?? "", resolvedPath, st.mtime_secs);
+        if (!assert.ok) {
+          return assert.message ?? "无法写入：未通过读后写校验。";
+        }
+      } catch (err) {
+        if (isFsError(err) && err.kind === "NotFound") {
+          // new file, no assert needed
+        } else if (isFsError(err)) {
+          if (err.kind === "OutsideWorkspace") return "该路径不在当前工作区内。";
+          return err.message ? `错误：${err.message}` : `错误：${err.kind}`;
+        } else {
+          return `写入前检查失败：${err instanceof Error ? err.message : String(err)}`;
+        }
+      }
+      try {
+        const absPath = await invoke<string>("write_office_text", {
+          args: { workspaceRoot, path: filePath, content },
+        });
+        if (conversationId) recordRead(conversationId, resolvedPath);
+        return `已创建 Office 文档：${absPath}`;
+      } catch (err) {
+        if (isFsError(err)) {
+          if (err.kind === "OutsideWorkspace") return "该路径不在当前工作区内。";
+          if (err.kind === "NotAllowed") return err.message ?? "无法创建该文档。";
+          return err.message ? `错误：${err.message}` : `错误：${err.kind}`;
+        }
+        return `创建 Office 文档失败：${err instanceof Error ? err.message : String(err)}`;
+      }
+    }
+
     let existingRaw = "";
     try {
       const st = await invoke<{ mtime_secs: number; is_dir: boolean }>("stat_file", {
@@ -79,7 +114,6 @@ export const writeTool = tool({
       if (conversationId) {
         recordRead(conversationId, resolvedPath);
       }
-      // 新文件或覆盖都返回 diff，便于界面统一以 diff 展示
       const diff = createPatch(filePath, existingRaw, content);
       const intro = existingRaw !== "" ? `已写入 ${filePath}。` : `已创建并写入 ${filePath}。`;
       return `${intro}\n\n--- Diff ---\n${diff}`;

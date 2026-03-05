@@ -1,12 +1,15 @@
 import { useThemeStore } from "@/stores/themeStore";
 import { useDataStore } from "@/stores/dataStore";
 import { useChatStore } from "@/stores/chatStore";
+import { useLayoutStore } from "@/stores/layoutStore";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { SettingsWindow } from "@/components/settings/SettingsWindow";
 import { useTauriDrag } from "@/hooks/useTauriDrag";
 import { useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
-import { settingsRepo } from "@/db/repos/settingsRepo";
+import { readConfig } from "@/lib/config";
+import type { GeneralConfig } from "@/lib/config/types";
+import { migrateConfigIfNeeded } from "@/lib/config/migration";
 import { i18n } from "@/i18n";
 import { useSettingsStore } from "@/stores/settingsStore";
 
@@ -20,18 +23,26 @@ export function App() {
   const initError = useDataStore((s) => s.initError);
   useTauriDrag();
 
-  // Initialize data store (loads providers, assistants, etc. from SQLite)
+  // Migrate config files + initialize stores
   useEffect(() => {
-    init();
-  }, [init]);
-
-  // 从持久化恢复界面语言与发送快捷键
-  useEffect(() => {
-    settingsRepo.get("locale").then((l) => {
-      if (l === "zh" || l === "en") i18n.changeLanguage(l);
+    migrateConfigIfNeeded().then(async () => {
+      await Promise.all([
+        useThemeStore.getState().init(),
+        useLayoutStore.getState().init(),
+      ]);
+      const config = await readConfig<GeneralConfig>("general");
+      if (config.locale === "zh" || config.locale === "en") {
+        i18n.changeLanguage(config.locale);
+      }
+      await useSettingsStore.getState().loadAppSettings();
+      await init();
+    }).catch((err) => {
+      console.error("Config initialization failed:", err);
+      useDataStore.setState({
+        initError: err instanceof Error ? err.message : String(err),
+      });
     });
-    useSettingsStore.getState().loadAppSettings();
-  }, []);
+  }, [init]);
 
   // 主窗口初始化完成后恢复上次使用的模型
   useEffect(() => {

@@ -311,13 +311,21 @@ metadata:                 # 可选，额外元数据
   - Bug 修复：`fix/issue-<id>-<desc>`
   - 文档：`docs/issue-<id>-<desc>`
   - 重构：`refactor/issue-<id>-<desc>`
-- PR body MUST 包含 `Closes #<id>` 关联 Issue
 - PR 标题格式：`feat: ...`、`fix: ...`、`docs: ...`、`refactor: ...`、`chore: ...`
+- PR 到 `dev`（集成验证）时，body 使用 `Related to #<id>`，不关闭 issue
+- PR 到 `main`（正式合入）时，body 使用 `Closes #<id>` 关闭 issue
 
 **MUST NOT**:
 - MUST NOT 在主仓库目录（`/Users/lizc/code/cove/`）直接开发功能分支
 - MUST NOT 创建不含 Issue 编号的分支
-- MUST NOT 直接推送到 main 分支
+- MUST NOT 直接推送到 main 或 dev 分支
+
+### dev 分支规范
+
+- `dev` 是集成验证分支，用于多人协作时的功能验证
+- 所有功能分支仍从 `main` 创建（main 是稳定基线）
+- `dev` 验证通过后，由人工合并到 `main` 并打 tag 发版
+- issue 只在合入 `main` 时关闭
 
 ### Issue 拆分规范（Hard Constraint）
 

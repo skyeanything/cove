@@ -10,6 +10,12 @@ vi.mock("@/stores/dataStore", () => ({
   },
 }));
 
+vi.mock("@/stores/workspaceStore", () => ({
+  useWorkspaceStore: {
+    getState: vi.fn(() => ({ activeWorkspace: { id: "ws-1", path: "/workspace" } })),
+  },
+}));
+
 vi.mock("@/db/repos/attachmentRepo", () => ({
   attachmentRepo: {
     getById: vi.fn(),
@@ -23,10 +29,12 @@ vi.mock("@/db/repos/messageRepo", () => ({
 }));
 
 import { useDataStore } from "@/stores/dataStore";
+import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { attachmentRepo } from "@/db/repos/attachmentRepo";
 import { messageRepo } from "@/db/repos/messageRepo";
 
 const mockDataStore = vi.mocked(useDataStore.getState);
+const mockWsGetState = vi.mocked(useWorkspaceStore.getState);
 const mockGetAttachment = vi.mocked(attachmentRepo.getById);
 const mockGetMessage = vi.mocked(messageRepo.getById);
 
@@ -58,6 +66,9 @@ function defaultParseResult(content = "Hello document content") {
 beforeEach(() => {
   vi.clearAllMocks();
   mockDataStore.mockReturnValue({ activeConversationId: "conv-1" } as ReturnType<typeof mockDataStore>);
+  mockWsGetState.mockReturnValue({
+    activeWorkspace: { id: "ws-1", path: "/workspace" },
+  } as ReturnType<typeof mockWsGetState>);
 });
 
 // ── Error path tests ──────────────────────────────────────────────────────────
@@ -270,5 +281,71 @@ describe("parseDocumentTool – success paths", () => {
 
     expect(result.mode).toBe("full");
     expect(result.chunkCount).toBe(1);
+  });
+});
+
+// ── filePath routing tests ───────────────────────────────────────────────────
+
+async function execFilePath(filePath: string, opts: Record<string, unknown> = {}) {
+  return parseDocumentTool.execute!(
+    { filePath, ...opts } as ExecInput,
+    {} as ExecOptions,
+  );
+}
+
+describe("parseDocumentTool – filePath routing", () => {
+  it("parses workspace file via read_office_text", async () => {
+    setupTauriMocks({
+      read_office_text: () => ({
+        fileType: "xlsx",
+        content: "Sheet1\nA1\tB1",
+        truncated: false,
+        warnings: [],
+      }),
+    });
+
+    const raw = await execFilePath("data.xlsx");
+    const result = JSON.parse(raw as string);
+
+    expect(result.filePath).toBe("data.xlsx");
+    expect(result.name).toBe("data.xlsx");
+    expect(result.fileType).toBe("xlsx");
+    expect(result.mode).toBe("full");
+    expect(result.chunkCount).toBe(1);
+  });
+
+  it("returns error when both attachmentId and filePath provided", async () => {
+    const result = await parseDocumentTool.execute!(
+      { attachmentId: "att-1", filePath: "data.xlsx" } as ExecInput,
+      {} as ExecOptions,
+    );
+    expect(result).toContain("either");
+  });
+
+  it("returns error when neither attachmentId nor filePath provided", async () => {
+    const result = await parseDocumentTool.execute!(
+      {} as ExecInput,
+      {} as ExecOptions,
+    );
+    expect(result).toContain("provide");
+  });
+
+  it("returns error when no active workspace for filePath", async () => {
+    mockWsGetState.mockReturnValue({
+      activeWorkspace: null,
+    } as unknown as ReturnType<typeof mockWsGetState>);
+
+    const result = await execFilePath("data.xlsx");
+    expect(result).toContain("workspace");
+  });
+
+  it("handles read_office_text failure for filePath", async () => {
+    setupTauriMocks({
+      read_office_text: () => { throw new Error("parse failed"); },
+    });
+
+    const result = await execFilePath("broken.docx");
+    expect(result).toContain("Failed to parse file");
+    expect(result).toContain("parse failed");
   });
 });

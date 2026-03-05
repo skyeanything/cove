@@ -23,6 +23,8 @@ import { invoke } from "@tauri-apps/api/core";
 import type { ToolCallInfo, DraftAttachment, MessagePart } from "./chat-types";
 import { cancelAllActiveCommands } from "@/lib/ai/tools/bash";
 import { runPostConversationTasks } from "@/lib/ai/post-conversation";
+import { i18n } from "@/i18n";
+import type { UserContent } from "ai";
 
 export type { ToolCallInfo, DraftAttachment, MessagePart };
 
@@ -140,14 +142,14 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     try {
       const { providerId, modelId, providerType } = JSON.parse(raw) as { providerId: string; modelId: string; providerType: string };
       if (providerId && modelId && providerType) set({ providerId, modelId, providerType });
-    } catch { /* 忽略无效或旧格式 */ }
+    } catch { /* ignore invalid or legacy format */ }
   },
 
   async sendMessage(content: string) {
     const { modelId, providerId, providerType, messages, draftAttachments } = get();
     const trimmedContent = content.trim();
     const titleSource = trimmedContent || (draftAttachments.length > 0
-      ? `附件：${draftAttachments.map((a) => a.name || "未命名文件").slice(0, 3).join("、")}`
+      ? i18n.t("chat.attachmentTitle", { names: draftAttachments.map((a) => a.name || i18n.t("chat.unnamedFile")).slice(0, 3).join(", ") })
       : "");
     if (!trimmedContent && draftAttachments.length === 0) return;
     if (!modelId) { set({ error: "Please select a model first." }); return; }
@@ -231,11 +233,12 @@ export const useChatStore = create<ChatState>()((set, get) => ({
           const pdfAttachments = draftAttachments.filter((a) => isPdfAttachment(a));
           const otherText = draftAttachments.filter((a) => !isImageAttachment(a) && !isPdfAttachment(a));
           const textForManifest = modelSupportsPdfNative ? otherText : draftAttachments.filter((a) => !isImageAttachment(a));
+          const attachmentList = textForManifest.map((a) => `- attachmentId=${a.id} name=${a.name ?? "unknown"}`).join("\n");
           const manifest = textForManifest.length > 0
-            ? `\n\n可用附件（按需读取）：\n${textForManifest.map((a) => `- attachmentId=${a.id} name=${a.name ?? "unknown"}`).join("\n")}\n如需读取附件内容，请调用 parse_document 工具并传入 attachmentId。可按需设置 mode=summary/chunks/full，以及 pageRange（仅 PDF）。`
+            ? i18n.t("chat.attachmentManifest", { list: attachmentList })
             : "";
           const userText = `${trimmedContent}${manifest}${fetchBlock}`.trim();
-          const nextContent: Array<Record<string, unknown>> = [];
+          const nextContent: UserContent = [];
           if (userText) nextContent.push({ type: "text", text: userText });
           for (const a of imageAttachments) {
             if (a.content?.startsWith("data:image/")) nextContent.push({ type: "image", image: a.content });
@@ -247,12 +250,11 @@ export const useChatStore = create<ChatState>()((set, get) => ({
                   ? a.content
                   : await invoke<{ data_url: string }>("read_attachment_as_data_url", { args: { path: a.path } }).then((r) => r.data_url);
                 nextContent.push({ type: "file", data: dataUrl, mediaType: "application/pdf" });
-              } catch { /* 单 PDF 读取失败时跳过 */ }
+              } catch { /* skip failed PDF read */ }
             }
           }
           if (nextContent.length > 0) {
-            const original = modelMessages[index] as Record<string, unknown>;
-            modelMessages[index] = { ...original, content: nextContent } as (typeof modelMessages)[number];
+            modelMessages[index] = { role: "user", content: nextContent };
           }
         }
       } else {
@@ -261,7 +263,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 
       const { streamResult, finalError } = await runStreamLoop(
         { provider, modelId, modelMessages, workspacePath: useWorkspaceStore.getState().activeWorkspace?.path, abortSignal: abortController.signal, runMetrics, labelBase: `send:${provider.type}/${modelId}` },
-        { onUpdate: (s) => set(s), onRateLimitRetry: (attempt) => set({ error: `请求过于频繁，正在自动重试（${attempt}/2）...` }) },
+        { onUpdate: (s) => set(s), onRateLimitRetry: (attempt) => set({ error: i18n.t("chat.rateLimitRetry", { attempt }) }) },
       );
       if (finalError) { set({ error: finalError, ...STREAM_RESET }); return; }
 
@@ -344,7 +346,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 
       const { streamResult, finalError } = await runStreamLoop(
         { provider, modelId, modelMessages, workspacePath: useWorkspaceStore.getState().activeWorkspace?.path, abortSignal: abortController.signal, runMetrics, labelBase: `regenerate:${provider.type}/${modelId}` },
-        { onUpdate: (s) => set(s), onRateLimitRetry: (attempt) => set({ error: `请求过于频繁，正在自动重试（${attempt}/2）...` }) },
+        { onUpdate: (s) => set(s), onRateLimitRetry: (attempt) => set({ error: i18n.t("chat.rateLimitRetry", { attempt }) }) },
       );
       if (finalError) { set({ error: finalError, ...STREAM_RESET }); return; }
 
@@ -414,7 +416,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 
       const { streamResult, finalError } = await runStreamLoop(
         { provider, modelId, modelMessages, workspacePath: useWorkspaceStore.getState().activeWorkspace?.path, abortSignal: abortController.signal, runMetrics, labelBase: `edit_resend:${provider.type}/${modelId}` },
-        { onUpdate: (s) => set(s), onRateLimitRetry: (attempt) => set({ error: `请求过于频繁，正在自动重试（${attempt}/2）...` }) },
+        { onUpdate: (s) => set(s), onRateLimitRetry: (attempt) => set({ error: i18n.t("chat.rateLimitRetry", { attempt }) }) },
       );
       if (finalError) { set({ error: finalError, ...STREAM_RESET }); return; }
 

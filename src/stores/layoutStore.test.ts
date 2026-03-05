@@ -1,9 +1,27 @@
-import { describe, it, expect, afterEach } from "vitest";
-import { useLayoutStore } from "./layoutStore";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { createStoreReset } from "@/test-utils/mock-store";
 
+vi.mock("@/lib/config", () => ({
+  readConfig: vi.fn().mockResolvedValue({
+    leftSidebarOpen: true,
+    leftSidebarWidth: 260,
+    chatWidth: 640,
+    filePanelOpen: true,
+    fileTreeWidth: 260,
+    filePreviewWidth: 360,
+    fileTreeShowHidden: true,
+  }),
+  writeConfig: vi.fn().mockResolvedValue(undefined),
+}));
+
+import { useLayoutStore } from "./layoutStore";
+import { readConfig, writeConfig } from "@/lib/config";
+
 const resetStore = createStoreReset(useLayoutStore);
-afterEach(() => resetStore());
+afterEach(() => {
+  resetStore();
+  vi.clearAllMocks();
+});
 
 describe("layoutStore", () => {
   describe("toggleLeftSidebar", () => {
@@ -50,7 +68,7 @@ describe("layoutStore", () => {
       useLayoutStore.getState().toggleFilePanel();
       const s = useLayoutStore.getState();
       expect(s.filePanelClosing).toBe(true);
-      expect(s.filePanelOpen).toBe(true); // still open during animation
+      expect(s.filePanelOpen).toBe(true);
     });
 
     it("starts opening animation when panel is closed", () => {
@@ -69,6 +87,15 @@ describe("layoutStore", () => {
       const s = useLayoutStore.getState();
       expect(s.filePanelOpen).toBe(false);
       expect(s.filePanelClosing).toBe(false);
+    });
+
+    it("persists filePanelOpen=false to config", () => {
+      useLayoutStore.setState({ filePanelClosing: true });
+      useLayoutStore.getState().confirmFilePanelClosed();
+      expect(writeConfig).toHaveBeenCalledWith(
+        "layout",
+        expect.objectContaining({ filePanelOpen: false }),
+      );
     });
   });
 
@@ -129,6 +156,29 @@ describe("layoutStore", () => {
       expect(useLayoutStore.getState().filePanelOpen).toBe(false);
       useLayoutStore.getState().setFilePanelOpen(true);
       expect(useLayoutStore.getState().filePanelOpen).toBe(true);
+    });
+  });
+
+  describe("init", () => {
+    it("loads state from config", async () => {
+      vi.mocked(readConfig).mockResolvedValue({
+        leftSidebarOpen: false,
+        leftSidebarWidth: 200,
+        chatWidth: 500,
+        filePanelOpen: false,
+        fileTreeWidth: 300,
+        filePreviewWidth: 400,
+        fileTreeShowHidden: false,
+      });
+      await useLayoutStore.getState().init();
+      const s = useLayoutStore.getState();
+      expect(s.leftSidebarOpen).toBe(false);
+      expect(s.leftSidebarWidth).toBe(200);
+      expect(s.chatWidth).toBe(500);
+      expect(s.filePanelOpen).toBe(false);
+      expect(s.fileTreeWidth).toBe(300);
+      expect(s.filePreviewWidth).toBe(400);
+      expect(s.fileTreeShowHidden).toBe(false);
     });
   });
 });

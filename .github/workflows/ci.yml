@@ -2,18 +2,48 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
     paths-ignore:
-      - '*.md'
+      - '**/*.md'
+      - '**/*.txt'
+      - '**/*.doc'
+      - '**/*.docx'
+      - '**/*.ppt'
+      - '**/*.pptx'
+      - '**/*.xls'
+      - '**/*.xlsx'
+      - '**/*.pdf'
+      - '**/*.png'
+      - '**/*.jpg'
+      - '**/*.jpeg'
+      - '**/*.gif'
+      - '**/*.svg'
+      - '**/*.ico'
       - 'docs/**'
+      - '.agent/**'
       - 'LICENSE'
       - '.github/ISSUE_TEMPLATE/**'
       - '.github/PULL_REQUEST_TEMPLATE/**'
   pull_request:
-    branches: [main]
+    branches: [main, dev]
     paths-ignore:
-      - '*.md'
+      - '**/*.md'
+      - '**/*.txt'
+      - '**/*.doc'
+      - '**/*.docx'
+      - '**/*.ppt'
+      - '**/*.pptx'
+      - '**/*.xls'
+      - '**/*.xlsx'
+      - '**/*.pdf'
+      - '**/*.png'
+      - '**/*.jpg'
+      - '**/*.jpeg'
+      - '**/*.gif'
+      - '**/*.svg'
+      - '**/*.ico'
       - 'docs/**'
+      - '.agent/**'
       - 'LICENSE'
       - '.github/ISSUE_TEMPLATE/**'
       - '.github/PULL_REQUEST_TEMPLATE/**'

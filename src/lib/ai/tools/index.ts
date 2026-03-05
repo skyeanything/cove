@@ -12,6 +12,7 @@ import { jsInterpreterTool } from "./jsInterpreter";
 import { diagramTool } from "./diagram";
 import { createSpawnAgentTool } from "./spawn-agent";
 import { recallTool, recallDetailTool } from "./recall";
+import { settingsTool } from "./settings";
 import { ALL_TOOL_INFOS } from "./tool-meta";
 import type { SubAgentContext } from "../sub-agent";
 
@@ -32,6 +33,7 @@ const TOOL_IMPLS: Record<string, AnyTool> = {
   diagram: diagramTool,
   recall: recallTool,
   recall_detail: recallDetailTool,
+  settings: settingsTool,
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

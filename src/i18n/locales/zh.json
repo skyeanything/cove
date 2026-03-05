@@ -61,7 +61,12 @@
     "send": "发送",
     "contextCompressed": "上下文摘要 — {{count}} 条消息已压缩",
     "contextCompressing": "正在压缩上下文...",
-    "summaryLabel": "上下文摘要"
+    "summaryLabel": "上下文摘要",
+    "attachmentTitle": "附件：{{names}}",
+    "unnamedFile": "未命名文件",
+    "attachmentManifest": "\n\n可用附件（按需读取）：\n{{list}}\n如需读取附件内容，请调用 parse_document 工具并传入 attachmentId。可按需设置 mode=summary/chunks/full，以及 pageRange（仅 PDF）。",
+    "rateLimitRetry": "请求过于频繁，正在自动重试（{{attempt}}/2）...",
+    "invalidFormat": "忽略无效或旧格式"
   },
   "sidebar": {
     "pinned": "置顶",

@@ -321,4 +321,61 @@ describe("editTool", () => {
       expect(result).toContain("write err");
     });
   });
+
+  // --- office file rejection ---
+
+  describe("office file rejection", () => {
+    it("rejects editing .docx files", async () => {
+      const result = await exec({
+        filePath: "report.docx",
+        oldString: "old",
+        newString: "new",
+      });
+
+      expect(result).toContain("Office documents cannot be edited");
+      expect(result).toContain("report.docx");
+      expect(mockInvoke).not.toHaveBeenCalledWith("read_file", expect.anything());
+    });
+
+    it("rejects editing .xlsx files", async () => {
+      const result = await exec({
+        filePath: "data.xlsx",
+        oldString: "a",
+        newString: "b",
+      });
+
+      expect(result).toContain("Office documents cannot be edited");
+    });
+
+    it("rejects editing .pptx files", async () => {
+      const result = await exec({
+        filePath: "slides.pptx",
+        oldString: "a",
+        newString: "b",
+      });
+
+      expect(result).toContain("Office documents cannot be edited");
+    });
+
+    it("rejects editing .pdf files (case insensitive)", async () => {
+      const result = await exec({
+        filePath: "doc.PDF",
+        oldString: "a",
+        newString: "b",
+      });
+
+      expect(result).toContain("Office documents cannot be edited");
+    });
+
+    it("rejects office file even when oldString is empty (create mode)", async () => {
+      const result = await exec({
+        filePath: "new.docx",
+        oldString: "",
+        newString: "content",
+      });
+
+      expect(result).toContain("Office documents cannot be edited");
+      expect(mockInvoke).not.toHaveBeenCalledWith("write_file", expect.anything());
+    });
+  });
 });

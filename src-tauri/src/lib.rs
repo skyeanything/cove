@@ -1,5 +1,7 @@
 mod attachment_commands;
+mod config_commands;
 mod docx_commands;
+mod document_parsers;
 mod fetch_commands;
 mod fs_commands;
 mod js_interpreter;
@@ -117,6 +119,8 @@ pub fn run() {
       fs_commands::remove_entry,
       fs_commands::copy_entry,
       fs_commands::reveal_in_finder,
+      fs_commands::read_office_text,
+      fs_commands::write_office_text,
       workspace_watcher::watch_workspace_command,
       shell_commands::run_command,
       shell_commands::cancel_command,
@@ -134,6 +138,8 @@ pub fn run() {
       soul_commands::write_soul_private,
       soul_commands::delete_soul_private,
       soul_commands::snapshot_soul,
+      config_commands::read_config,
+      config_commands::write_config,
       docx_commands::docx_to_pdf,
       docx_commands::docx_to_html,
       docx_commands::qmd_to_pdf,

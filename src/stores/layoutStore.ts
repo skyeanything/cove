@@ -1,14 +1,9 @@
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { readConfig, writeConfig } from "@/lib/config";
+import type { LayoutConfig } from "@/lib/config/types";
+import type { ActivePage, SidebarMode } from "@/lib/config/types";
 
-export type ActivePage = "chat" | "workspace" | "extensions";
-
-/** Three sidebar display modes:
- * - "full"   → full-width sidebar with text labels (default)
- * - "mini"   → 52px icon-only strip (auto-collapses when entering workspace conversation)
- * - "hidden" → no sidebar (toggle with Cmd+B)
- */
-export type SidebarMode = "full" | "mini" | "hidden";
+export type { ActivePage, SidebarMode };
 
 interface LayoutState {
   /** --- Navigation & Page --- */
@@ -20,7 +15,7 @@ interface LayoutState {
   /** Backward-compat derived: true when sidebar is visible (full or mini) */
   leftSidebarOpen: boolean;
   leftSidebarWidth: number;
-  /** Cmd+B: toggle between full ↔ hidden (from mini → full) */
+  /** Cmd+B: toggle between full <-> hidden (from mini -> full) */
   toggleLeftSidebar: () => void;
   /** Auto-collapse to icon strip (triggered when entering workspace conversation) */
   setLeftSidebarMini: () => void;
@@ -42,17 +37,26 @@ interface LayoutState {
   setWsFileTreeWidth: (width: number) => void;
   setWsChatWidth: (width: number) => void;
 
-  /** --- File tree (shared between modes) --- */
+  /** --- File panel --- */
+  filePanelOpen: boolean;
+  filePanelClosing: boolean;
+  filePanelOpening: boolean;
   fileTreeWidth: number;
   filePreviewWidth: number;
   fileTreeShowHidden: boolean;
   setFileTreeShowHidden: (show: boolean) => void;
+  toggleFilePanel: () => void;
+  setFilePanelOpen: (open: boolean) => void;
+  confirmFilePanelClosed: () => void;
+  confirmFilePanelOpened: () => void;
   setFileTreeWidth: (width: number) => void;
   setFilePreviewWidth: (width: number) => void;
 
   /** --- Workspace selector overlay (session-only, not persisted) --- */
   workspaceSelectorOpen: boolean;
   setWorkspaceSelectorOpen: (open: boolean) => void;
+
+  init: () => Promise<void>;
 }
 
 /* ---------- Column width constraints ---------- */
@@ -82,100 +86,138 @@ export {
   WS_CHAT_MIN, WS_CHAT_MAX,
 };
 
-export const useLayoutStore = create<LayoutState>()(
-  persist(
-    (set) => ({
-      /* Navigation */
-      activePage: "chat" as ActivePage,
-      setActivePage: (page) => set({ activePage: page }),
+function persistLayout(state: LayoutState): void {
+  const config: LayoutConfig = {
+    leftSidebarMode: state.leftSidebarMode,
+    leftSidebarOpen: state.leftSidebarOpen,
+    leftSidebarWidth: state.leftSidebarWidth,
+    chatWidth: state.chatWidth,
+    filePanelOpen: state.filePanelOpen,
+    fileTreeWidth: state.fileTreeWidth,
+    filePreviewWidth: state.filePreviewWidth,
+    fileTreeShowHidden: state.fileTreeShowHidden,
+    activePage: state.activePage,
+    historyCollapsed: state.historyCollapsed,
+    wsFileTreeWidth: state.wsFileTreeWidth,
+    wsChatWidth: state.wsChatWidth,
+  };
+  void writeConfig("layout", config);
+}
 
-      /* Left sidebar */
-      leftSidebarMode: "full" as SidebarMode,
-      leftSidebarOpen: true,   // derived, kept for compat — updated in merge
-      leftSidebarWidth: 260,
-      toggleLeftSidebar: () =>
-        set((s) => {
-          const next: SidebarMode = s.leftSidebarMode === "hidden" ? "full" : "hidden";
-          return { leftSidebarMode: next, leftSidebarOpen: next !== "hidden" };
-        }),
-      setLeftSidebarMini: () =>
-        set({ leftSidebarMode: "mini", leftSidebarOpen: true }),
-      setLeftSidebarFull: () =>
-        set({ leftSidebarMode: "full", leftSidebarOpen: true }),
-      setLeftSidebarWidth: (width) => set({
-        leftSidebarWidth: Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, width)),
-      }),
+export const useLayoutStore = create<LayoutState>()((set, get) => ({
+  /* Navigation */
+  activePage: "chat" as ActivePage,
+  setActivePage: (page) => {
+    set({ activePage: page });
+    persistLayout(get());
+  },
 
-      /* History section */
-      historyCollapsed: false,
-      toggleHistory: () =>
-        set((s) => ({ historyCollapsed: !s.historyCollapsed })),
+  /* Left sidebar */
+  leftSidebarMode: "full" as SidebarMode,
+  leftSidebarOpen: true,
+  leftSidebarWidth: 260,
+  toggleLeftSidebar: () => {
+    set((s) => {
+      const next: SidebarMode = s.leftSidebarMode === "hidden" ? "full" : "hidden";
+      return { leftSidebarMode: next, leftSidebarOpen: next !== "hidden" };
+    });
+    persistLayout(get());
+  },
+  setLeftSidebarMini: () => {
+    set({ leftSidebarMode: "mini", leftSidebarOpen: true });
+    persistLayout(get());
+  },
+  setLeftSidebarFull: () => {
+    set({ leftSidebarMode: "full", leftSidebarOpen: true });
+    persistLayout(get());
+  },
+  setLeftSidebarWidth: (width) => {
+    set({ leftSidebarWidth: Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, width)) });
+    persistLayout(get());
+  },
 
-      /* Conversation mode chat width */
-      chatWidth: 640,
-      setChatWidth: (width) => set({
-        chatWidth: Math.min(CHAT_MAX, Math.max(CHAT_MIN, width)),
-      }),
+  /* History section */
+  historyCollapsed: false,
+  toggleHistory: () => {
+    set((s) => ({ historyCollapsed: !s.historyCollapsed }));
+    persistLayout(get());
+  },
 
-      /* Workspace mode column widths */
-      wsFileTreeWidth: 280,
-      wsChatWidth: 360,
-      setWsFileTreeWidth: (width) => set({
-        wsFileTreeWidth: Math.min(WS_FILE_TREE_MAX, Math.max(WS_FILE_TREE_MIN, width)),
-      }),
-      setWsChatWidth: (width) => set({
-        wsChatWidth: Math.min(WS_CHAT_MAX, Math.max(WS_CHAT_MIN, width)),
-      }),
+  /* Conversation mode chat width */
+  chatWidth: 640,
+  setChatWidth: (width) => {
+    set({ chatWidth: Math.min(CHAT_MAX, Math.max(CHAT_MIN, width)) });
+    persistLayout(get());
+  },
 
-      /* File tree (shared) */
-      fileTreeWidth: 260,
-      filePreviewWidth: 360,
-      fileTreeShowHidden: true,
-      setFileTreeShowHidden: (show) => set({ fileTreeShowHidden: show }),
-      setFileTreeWidth: (width) => set({
-        fileTreeWidth: Math.min(FILE_TREE_MAX, Math.max(FILE_TREE_MIN, width)),
-      }),
-      setFilePreviewWidth: (width) => set({
-        filePreviewWidth: Math.min(FILE_PREVIEW_MAX, Math.max(FILE_PREVIEW_MIN, width)),
-      }),
+  /* Workspace mode column widths */
+  wsFileTreeWidth: 280,
+  wsChatWidth: 360,
+  setWsFileTreeWidth: (width) => {
+    set({ wsFileTreeWidth: Math.min(WS_FILE_TREE_MAX, Math.max(WS_FILE_TREE_MIN, width)) });
+    persistLayout(get());
+  },
+  setWsChatWidth: (width) => {
+    set({ wsChatWidth: Math.min(WS_CHAT_MAX, Math.max(WS_CHAT_MIN, width)) });
+    persistLayout(get());
+  },
 
-      /* Workspace selector (session-only) */
-      workspaceSelectorOpen: false,
-      setWorkspaceSelectorOpen: (open) => set({ workspaceSelectorOpen: open }),
-    }),
-    {
-      name: "office-chat-layout",
-      version: 3,
-      migrate: (persisted, version) => {
-        const p = (persisted && typeof persisted === "object")
-          ? persisted as Record<string, unknown>
-          : {};
-        if (version < 3) {
-          // Migrate v1/v2: leftSidebarOpen (boolean) → leftSidebarMode (string)
-          const wasOpen = p.leftSidebarOpen !== false;
-          p.leftSidebarMode = wasOpen ? "full" : "hidden";
-          p.leftSidebarOpen = wasOpen;
-        }
-        return p;
-      },
-      merge: (persisted, current) => {
-        const p = (persisted && typeof persisted === "object")
-          ? persisted as Partial<LayoutState>
-          : {};
-        const mode: SidebarMode = p.leftSidebarMode ?? "full";
-        return {
-          ...current,
-          ...p,
-          leftSidebarMode: mode,
-          leftSidebarOpen: mode !== "hidden",
-          /* Ensure new fields have defaults */
-          activePage: p.activePage ?? (current as LayoutState).activePage,
-          historyCollapsed: p.historyCollapsed ?? false,
-          wsFileTreeWidth: p.wsFileTreeWidth ?? 280,
-          wsChatWidth: p.wsChatWidth ?? 360,
-          fileTreeShowHidden: p.fileTreeShowHidden ?? (current as LayoutState).fileTreeShowHidden,
-        };
-      },
-    },
-  ),
-);
+  /* File panel */
+  filePanelOpen: true,
+  filePanelClosing: false,
+  filePanelOpening: false,
+  fileTreeWidth: 260,
+  filePreviewWidth: 360,
+  fileTreeShowHidden: true,
+  setFileTreeShowHidden: (show) => {
+    set({ fileTreeShowHidden: show });
+    persistLayout(get());
+  },
+  toggleFilePanel: () => {
+    set((s) =>
+      s.filePanelOpen
+        ? { filePanelClosing: true }
+        : { filePanelOpen: true, filePanelOpening: true },
+    );
+    persistLayout(get());
+  },
+  setFilePanelOpen: (open) => {
+    set({ filePanelOpen: open });
+    persistLayout(get());
+  },
+  confirmFilePanelClosed: () => {
+    set({ filePanelOpen: false, filePanelClosing: false });
+    persistLayout(get());
+  },
+  confirmFilePanelOpened: () => set({ filePanelOpening: false }),
+  setFileTreeWidth: (width) => {
+    set({ fileTreeWidth: Math.min(FILE_TREE_MAX, Math.max(FILE_TREE_MIN, width)) });
+    persistLayout(get());
+  },
+  setFilePreviewWidth: (width) => {
+    set({ filePreviewWidth: Math.min(FILE_PREVIEW_MAX, Math.max(FILE_PREVIEW_MIN, width)) });
+    persistLayout(get());
+  },
+
+  /* Workspace selector (session-only) */
+  workspaceSelectorOpen: false,
+  setWorkspaceSelectorOpen: (open) => set({ workspaceSelectorOpen: open }),
+
+  init: async () => {
+    const config = await readConfig<LayoutConfig>("layout");
+    set({
+      leftSidebarMode: config.leftSidebarMode ?? "full",
+      leftSidebarOpen: (config.leftSidebarMode ?? "full") !== "hidden",
+      leftSidebarWidth: config.leftSidebarWidth,
+      chatWidth: config.chatWidth,
+      filePanelOpen: config.filePanelOpen,
+      fileTreeWidth: config.fileTreeWidth,
+      filePreviewWidth: config.filePreviewWidth,
+      fileTreeShowHidden: config.fileTreeShowHidden,
+      activePage: config.activePage ?? "chat",
+      historyCollapsed: config.historyCollapsed ?? false,
+      wsFileTreeWidth: config.wsFileTreeWidth ?? 280,
+      wsChatWidth: config.wsChatWidth ?? 360,
+    });
+  },
+}));

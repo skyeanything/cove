@@ -5,6 +5,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { useDataStore } from "@/stores/dataStore";
 import { assertReadBeforeWrite, recordRead } from "../file-time";
+import { isOfficeReadable } from "./office-extensions";
 
 interface FsErrorPayload {
   kind: string;
@@ -62,7 +63,15 @@ export const editTool = tool({
     const conversationId = useDataStore.getState().activeConversationId;
     const resolvedPath = resolvePath(workspaceRoot, filePath);
 
-    // Phase 5: write/edit 默认允许，仅保留 read-before-write
+    if (isOfficeReadable(filePath)) {
+      return [
+        "Office documents cannot be edited with string replacement. To modify this file:",
+        "- Use read('" + filePath + "') to see current content",
+        "- Use write('" + filePath + "', 'new content') to create a new version",
+        "- Or use the office tool for structured operations (replace-text, addSlide, etc.)",
+      ].join("\n");
+    }
+
     if (oldString === "") {
       try {
         await invoke("write_file", {
