@@ -7,12 +7,7 @@ always: false
 
 # Office (Bundled Tauri Tool)
 
-Use the `office` Tauri tool for document operations. Do NOT use bash to call office — it is accessed through dedicated Tauri IPC commands.
-
-## Calling Priority
-
-- If the external `OfficeLLM` skill is enabled, prefer `bash` + `officellm` CLI (version matches that skill's docs).
-- Otherwise use the `office` Tauri tool (bundled sidecar).
+ALWAYS use the `office` Tauri tool for document operations. Do NOT use `bash` to call `officellm` directly — the binary is not in PATH. All operations go through dedicated Tauri IPC commands via the `office` tool.
 
 ## Loading the Full Command Reference
 

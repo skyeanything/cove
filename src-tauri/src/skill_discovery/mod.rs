@@ -121,12 +121,19 @@ fn read_skill_file(path: &Path) -> Result<String, std::io::Error> {
 }
 
 /// Resolve the bundled officellm skills directory (if bundled sidecar exists).
+///
+/// Ensures `officellm init` has been run so that `skills/SKILL.md` exists
+/// before checking for the directory.  `ensure_initialized` is idempotent
+/// (returns immediately when `config.json` already exists).
 fn bundled_officellm_skills(app: &tauri::AppHandle) -> Option<PathBuf> {
-    let (_, is_bundled) = crate::officellm::resolve::resolve_bin()?;
+    let (bin, is_bundled) = crate::officellm::resolve::resolve_bin()?;
     if !is_bundled {
         return None;
     }
     let home = crate::officellm::resolve::officellm_home(app).ok()?;
+    if let Err(e) = crate::officellm::init::ensure_initialized(&bin, &home) {
+        log::warn!("[skill-discovery] bundled officellm init failed: {e}");
+    }
     let skills = home.join("skills");
     skills.is_dir().then_some(skills)
 }

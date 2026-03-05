@@ -20,6 +20,7 @@ Write like an INTJ engineer. Direct, precise, no filler. Say what the thing does
 - No emoji. Anywhere. Not in commit messages, not in PR titles, not in comments, not in docs.
 - No decorative markdown (excessive bold, horizontal rules everywhere, unnecessary headers for two-line sections).
 - Use tables and lists when they compress information. Use prose when they don't.
+- Diagrams (architecture, flow, sequence, state) MUST use Mermaid fenced blocks. GitHub renders them natively. No ASCII art boxes.
 
 ## Content
 

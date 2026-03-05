@@ -25,6 +25,9 @@ vi.mock("@/db/repos/providerRepo", () => ({
 vi.mock("@/db/repos/promptRepo", () => ({
   promptRepo: { getAll: vi.fn() },
 }));
+vi.mock("@/db/repos/summaryRepo", () => ({
+  summaryRepo: { deleteByConversation: vi.fn() },
+}));
 vi.mock("@/stores/workspaceStore", () => ({
   useWorkspaceStore: { getState: vi.fn(() => ({ init: vi.fn() })) },
 }));
@@ -35,6 +38,7 @@ import { conversationRepo } from "@/db/repos/conversationRepo";
 import { messageRepo } from "@/db/repos/messageRepo";
 import { providerRepo } from "@/db/repos/providerRepo";
 import { promptRepo } from "@/db/repos/promptRepo";
+import { summaryRepo } from "@/db/repos/summaryRepo";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { createStoreReset } from "@/test-utils/mock-store";
 import {
@@ -295,19 +299,22 @@ describe("dataStore", () => {
   });
 
   describe("deleteConversation", () => {
-    it("deletes messages and conversation from repos for non-active conversation", async () => {
+    it("deletes summaries, messages and conversation from repos for non-active conversation", async () => {
+      vi.mocked(summaryRepo.deleteByConversation).mockResolvedValue(undefined);
       vi.mocked(messageRepo.deleteByConversation).mockResolvedValue(undefined);
       vi.mocked(conversationRepo.delete).mockResolvedValue(undefined);
       vi.mocked(conversationRepo.getAll).mockResolvedValue([]);
 
       await useDataStore.getState().deleteConversation("conv-x");
 
+      expect(summaryRepo.deleteByConversation).toHaveBeenCalledWith("conv-x");
       expect(messageRepo.deleteByConversation).toHaveBeenCalledWith("conv-x");
       expect(conversationRepo.delete).toHaveBeenCalledWith("conv-x");
     });
 
     it("does NOT clear activeConversationId for non-active conversation", async () => {
       useDataStore.setState({ activeConversationId: "conv-other" });
+      vi.mocked(summaryRepo.deleteByConversation).mockResolvedValue(undefined);
       vi.mocked(messageRepo.deleteByConversation).mockResolvedValue(undefined);
       vi.mocked(conversationRepo.delete).mockResolvedValue(undefined);
       vi.mocked(conversationRepo.getAll).mockResolvedValue([]);
@@ -323,6 +330,7 @@ describe("dataStore", () => {
         activeConversationId: "conv-active",
         messages: [makeMessage()],
       });
+      vi.mocked(summaryRepo.deleteByConversation).mockResolvedValue(undefined);
       vi.mocked(messageRepo.deleteByConversation).mockResolvedValue(undefined);
       vi.mocked(conversationRepo.delete).mockResolvedValue(undefined);
       vi.mocked(conversationRepo.getAll).mockResolvedValue([]);
@@ -338,6 +346,7 @@ describe("dataStore", () => {
 
     it("reloads conversations after deletion", async () => {
       const remaining = makeConversation({ id: "conv-2" });
+      vi.mocked(summaryRepo.deleteByConversation).mockResolvedValue(undefined);
       vi.mocked(messageRepo.deleteByConversation).mockResolvedValue(undefined);
       vi.mocked(conversationRepo.delete).mockResolvedValue(undefined);
       vi.mocked(conversationRepo.getAll).mockResolvedValue([remaining]);

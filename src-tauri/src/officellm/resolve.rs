@@ -43,6 +43,17 @@ fn sidecar_path() -> Option<PathBuf> {
     if plain.exists() {
         return Some(plain);
     }
+    // Dev fallback: src-tauri/binaries/ (tauri dev does not copy externalBin
+    // to target/debug/, so look in the source tree directly).
+    #[cfg(debug_assertions)]
+    {
+        let dev_bin = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("binaries")
+            .join(format!("officellm-{TARGET_TRIPLE}"));
+        if dev_bin.exists() {
+            return Some(dev_bin);
+        }
+    }
     None
 }
 

@@ -13,7 +13,13 @@ let cached: DetectResult | null = null;
 export async function isOfficeAvailable(): Promise<boolean> {
   if (cached !== null) return cached.available;
   try {
-    await invoke("officellm_init");
+    // init failure should not block detection — the binary may still work
+    // for regular commands even if home-dir setup fails on first run.
+    try {
+      await invoke("officellm_init");
+    } catch {
+      console.warn("[office-detect] officellm_init failed, proceeding with detect");
+    }
     cached = await invoke<DetectResult>("officellm_detect");
     return cached.available;
   } catch {

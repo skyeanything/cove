@@ -77,7 +77,7 @@ export function SkillsPage() {
 
   // Separate user skills (cove source) from other discovered skills
   const userSkills = externalSkills.filter((e) => e.source === "cove");
-  const discoveredSkills = externalSkills.filter((e) => e.source !== "cove" && e.source !== "office-bundled");
+  const discoveredSkills = externalSkills.filter((e) => e.source !== "cove");
 
   const totalCount =
     bundledSkills.length + userSkills.length + discoveredSkills.length;

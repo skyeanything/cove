@@ -121,6 +121,8 @@ src/
 │   ├── chat/        # Chat-related components
 │   ├── sidebar/     # Sidebar components
 │   ├── settings/    # Settings panel (incl. SkillsPage)
+│   ├── common/      # Shared components (ErrorBoundary, icons, etc.)
+│   ├── preview/     # File/document preview components
 │   └── layout/      # Layout shells
 ├── hooks/           # Custom React hooks
 ├── stores/          # Zustand stores (one file per domain)
@@ -243,14 +245,14 @@ metadata:                 # 可选，额外元数据
 | `src/components/settings/SkillsPage.tsx` | 设置页 UI：列表、编辑（结构化表单）、删除 |
 | `src/components/chat/SkillsPopover.tsx` | 聊天中 Skill 选择弹窗 |
 | `src-tauri/src/skill_commands.rs` | Rust 端：`read_skill`、`write_skill`、`delete_skill` |
-| `src-tauri/src/skill_discovery.rs` | Rust 端：外部 Skill 目录扫描 |
+| `src-tauri/src/skill_discovery/mod.rs` | Rust 端：外部 Skill 目录扫描 |
 
 ### 工具门控（Tool Gating）
 
 `getAgentTools()` 根据 `enabledSkillNames` 动态构建工具集：
 - `skill` 工具始终注册，但内部仅暴露已启用的 Skill
 - `write_skill` 仅在 `skill-creator` 已启用时注册
-- `officellm` 通过 `options.officellm` 控制
+- `office` / `diagram` 通过通用 `skillName` + `runtimeCheck` 门控（Skill 启用 + 运行时可用性双重检查）
 
 ### Folder Name vs Frontmatter Name
 
@@ -286,8 +288,8 @@ metadata:                 # 可选，额外元数据
 ### 工具可见性（Tool Visibility）
 
 `ToolInfo.userVisible` 控制工具是否在 `@mention` 中显示：
-- **可见**：`read`, `write`, `edit`, `bash`, `fetch_url`, `parse_document`, `cove_interpreter`, `officellm`, `render_mermaid`
-- **隐藏**（agent 内部使用）：`skill`, `skill_resource`, `write_skill`
+- **可见**：`read`, `write`, `edit`, `bash`, `fetch_url`, `parse_document`, `cove_interpreter`, `office`, `diagram`
+- **隐藏**（agent 内部使用）：`skill`, `skill_resource`, `write_skill`, `spawn_agent`, `recall`, `recall_detail`
 
 ## Development Workflow
 
@@ -380,7 +382,12 @@ INTJ engineer voice. 直接、精确、无废话。
 | `AGENTS.md` | AI 工具必读顺序、命令速查表 |
 | `.agent/workflows/*.md` | 10 个工作流文件：worktree、issue 拆分、构建测试、PR 提交、发版、测试质量、写作风格等 |
 | `docs/architecture.md` | 前端 → Zustand → lib/ai + lib/db → Tauri IPC 数据流 |
-| `docs/tools.md` | 8 个 AI 工具的参数与使用场景 |
+| `docs/tools.md` | 15 个 AI 工具的参数与使用场景 |
 | `docs/agent-tool-skill-architecture.md` | 工具分类、Skill 门控、命名迁移 |
-| `docs/officellm-dual-track.md` | 内嵌 vs 外部 officellm 双轨体系（修改 officellm 代码前必读） |
+| `docs/officellm-dual-track.md` | 内嵌 vs 外部 office 双轨体系（修改 office 代码前必读） |
 | `docs/providers.md` | 20+ LLM 供应商配置 |
+| `docs/getting-started.md` | 开发环境搭建指南 |
+| `docs/soul-system.md` | Soul 人格系统设计文档 |
+| `docs/soul-implementation.md` | Soul 系统实现细节 |
+| `docs/soul-conversation-log.md` | Soul 对话日志设计 |
+| `docs/agent-design.md` | Agent 设计理念：工具门控、Skill 生命周期、安全模型 |

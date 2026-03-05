@@ -115,6 +115,9 @@ export function CodeBlock({
   const renderPreview = useCallback(() => {
     if (isHtml) {
       try {
+        // WARNING: unsanitized AI-generated HTML. Script tags hidden via CSS but
+        // event handlers and javascript: URLs are NOT stripped. Acceptable for
+        // local-only preview of model output; not safe for untrusted user content.
         return (
           <div
             className="mt-2 rounded-lg border border-border bg-background p-3 min-h-[80px] overflow-auto [&_script]:hidden"
@@ -136,6 +139,8 @@ export function CodeBlock({
           surface: "var(--background-secondary)",
           transparent: true,
         });
+        // WARNING: SVG from renderMermaidSVG(). Diagram text is user/model-controlled;
+        // Mermaid's own sanitizer runs but output is not additionally sanitized here.
         return (
           <div
             className="mt-2 flex justify-center rounded-lg border border-border bg-background p-3 overflow-auto"

@@ -85,4 +85,25 @@ describe("buildSystemPrompt", () => {
     const prompt = buildSystemPrompt({});
     expect(prompt).toContain("spawn_agent");
   });
+
+  it("prepends soulPrompt at the very start when provided", () => {
+    const soulPrompt = "[SOUL]\n# Who I Am\nTest soul content";
+    const prompt = buildSystemPrompt({ soulPrompt });
+    expect(prompt).toContain("[SOUL]");
+    expect(prompt).toContain("Test soul content");
+    // SOUL must appear before Time
+    const soulIdx = prompt.indexOf("[SOUL]");
+    const timeIdx = prompt.indexOf("Time:");
+    expect(soulIdx).toBeLessThan(timeIdx);
+  });
+
+  it("omits SOUL section when soulPrompt is empty", () => {
+    const prompt = buildSystemPrompt({ soulPrompt: "" });
+    expect(prompt).not.toContain("[SOUL]");
+  });
+
+  it("omits SOUL section when soulPrompt is undefined", () => {
+    const prompt = buildSystemPrompt({});
+    expect(prompt).not.toContain("[SOUL]");
+  });
 });

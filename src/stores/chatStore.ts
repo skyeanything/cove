@@ -22,6 +22,7 @@ import { runStreamLoop } from "./chat-stream-runner";
 import { invoke } from "@tauri-apps/api/core";
 import type { ToolCallInfo, DraftAttachment, MessagePart } from "./chat-types";
 import { cancelAllActiveCommands } from "@/lib/ai/tools/bash";
+import { runPostConversationTasks } from "@/lib/ai/post-conversation";
 
 export type { ToolCallInfo, DraftAttachment, MessagePart };
 
@@ -272,6 +273,8 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       };
       await messageRepo.create(assistantMsg);
       set((state) => ({ messages: [...state.messages, { ...assistantMsg, created_at: new Date().toISOString() }], ...STREAM_RESET }));
+      // SOUL: fire-and-forget post-conversation tasks (summary + observation)
+      runPostConversationTasks(conversationId, get().messages, getModel(provider, modelId));
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") {
         reportAgentRunMetrics(runMetrics, { aborted: true });

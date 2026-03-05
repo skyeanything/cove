@@ -29,6 +29,7 @@ CLAUDE.md Hard Constraints
 | 开始新 Issue | `./scripts/start-worktree.sh <type> <id> <desc>` |
 | Hotfix worktree | `./scripts/start-worktree.sh fix <id> <desc> --base release/x.y` |
 | 同步版本号 | `./scripts/bump-version.sh <major> <minor> <patch>` |
+| 提交前检查 | `./scripts/dev-check.sh` |
 | 发版前检查 | `./scripts/pre-release-check.sh` |
 | 前端构建+类型检查 | `pnpm run build` |
 | 运行测试 | `pnpm test` |
@@ -38,6 +39,9 @@ CLAUDE.md Hard Constraints
 | 创建 PR | `gh pr create --title "type: desc" --body "..."` |
 | 审查 PR 并回写评论 | `gh pr review <id> --comment ...` / `gh pr comment <id> ...` |
 
+> `dev-check.sh` 是日常提交前的快速检查（无覆盖率）；`pre-release-check.sh` 是发版前的完整检查（含覆盖率）。
+> CI 在 PR 提交后自动运行全部检查（见 `.github/workflows/ci.yml`），无需手动触发。
+
 ## 文件大小限制（Hard Constraint）
 
 - `.ts` / `.tsx` 代码文件：**400 行**上限
@@ -46,11 +50,11 @@ CLAUDE.md Hard Constraints
 - 超出时在文件顶部添加 `// FILE_SIZE_EXCEPTION: <原因>`
 - `src/components/ui/` 下的 shadcn 原语文件豁免
 
-## officellm 双轨体系
+## office 双轨体系
 
-Cove 中有两套独立的 officellm：内嵌（Tauri tool）和外部安装（bash CLI）。
+Cove 中有两套独立的 office 工具：内嵌（Tauri tool）和外部安装（bash CLI）。
 
-- 内置 `officellm` skill 是 bootstrap（默认启用，用户可关闭），提供 Tauri tool 基本指引
+- 内置 `office` skill 是 bootstrap（默认启用，用户可关闭），提供 Tauri tool 基本指引
 - 外部 `OfficeLLM` skill 由 skill discovery 扫描发现，用户可启用/禁用
 - 两者可共存、版本独立，各自 skill 匹配各自 CLI 版本
 - 修改相关代码前 **必读** [`docs/officellm-dual-track.md`](docs/officellm-dual-track.md)

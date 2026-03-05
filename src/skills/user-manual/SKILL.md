@@ -39,6 +39,8 @@ All tools are available by default. Category determines gating.
 | Fetch URL | Fetch content from a URL as text |
 | Parse Document | Parse document files into structured text |
 | Cove Interpreter | Run JS in a sandboxed QuickJS interpreter |
+| Recall | Search conversation archive by topic (internal, not user-visible) |
+| Recall Detail | Retrieve original messages from a past conversation (internal, not user-visible) |
 
 ### Skill-bundled (available when parent skill is enabled)
 

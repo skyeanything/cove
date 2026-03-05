@@ -143,6 +143,14 @@ export interface Workspace {
   created_at: string;
 }
 
+export interface ConversationSummary {
+  id: string;
+  conversation_id: string;
+  summary: string;
+  keywords?: string;
+  created_at: string;
+}
+
 export interface Prompt {
   id: string;
   name: string;

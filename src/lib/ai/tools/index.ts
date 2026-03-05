@@ -11,6 +11,7 @@ import { officeTool } from "./office";
 import { jsInterpreterTool } from "./jsInterpreter";
 import { diagramTool } from "./diagram";
 import { createSpawnAgentTool } from "./spawn-agent";
+import { recallTool, recallDetailTool } from "./recall";
 import { ALL_TOOL_INFOS } from "./tool-meta";
 import type { SubAgentContext } from "../sub-agent";
 
@@ -29,6 +30,8 @@ const TOOL_IMPLS: Record<string, AnyTool> = {
   write_skill: writeSkillTool,
   office: officeTool,
   diagram: diagramTool,
+  recall: recallTool,
+  recall_detail: recallDetailTool,
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
