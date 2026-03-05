@@ -61,7 +61,12 @@
     "send": "Send",
     "contextCompressed": "Context Summary — {{count}} messages compressed",
     "contextCompressing": "Compressing context...",
-    "summaryLabel": "Context Summary"
+    "summaryLabel": "Context Summary",
+    "attachmentTitle": "Attachments: {{names}}",
+    "unnamedFile": "unnamed file",
+    "attachmentManifest": "\n\nAvailable attachments (read on demand):\n{{list}}\nTo read attachment content, call the parse_document tool with the attachmentId. You can set mode=summary/chunks/full and pageRange (PDF only) as needed.",
+    "rateLimitRetry": "Rate limited, auto-retrying ({{attempt}}/2)...",
+    "invalidFormat": "ignore invalid or legacy format"
   },
   "sidebar": {
     "pinned": "Pinned",
