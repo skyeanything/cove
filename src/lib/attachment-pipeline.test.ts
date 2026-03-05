@@ -164,4 +164,18 @@ describe("processAttachmentFromBase64", () => {
     expect(result.content).toBe("data:application/pdf;base64,pdfbase64data");
     expect(result.status).toBe("ready");
   });
+
+  it("skips PDF data URL when base64 exceeds 25 MB cap", async () => {
+    // 25 MB decoded ~ 33.33 MB base64 chars. Create a string slightly over.
+    const oversizedBase64 = "A".repeat(Math.ceil(25 * 1024 * 1024 / 0.75) + 100);
+    mockInvoke
+      .mockResolvedValueOnce({ path: "/ws/huge_123.pdf", name: "huge.pdf", size: 30_000_000, relativePath: "huge_123.pdf" })
+      .mockResolvedValueOnce({ fileType: "pdf", content: "text", summary: "text", charCount: 4, truncated: false, warnings: [], metadata: {} });
+
+    const result = await processAttachmentFromBase64("huge.pdf", oversizedBase64, "/ws");
+
+    expect(result.content).toBeUndefined();
+    expect(result.status).toBe("ready");
+    expect(result.parsed_content).toBe("text");
+  });
 });

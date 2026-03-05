@@ -2,6 +2,9 @@ import { invoke } from "@tauri-apps/api/core";
 import type { DraftAttachment } from "@/stores/chat-types";
 import { detectAttachmentType, detectMimeType } from "@/lib/attachment-utils";
 
+/** Must match READ_DATA_URL_MAX_BYTES / MAX_DATA_URL_BYTES in Rust (25 MB). */
+const MAX_DATA_URL_BYTES = 25 * 1024 * 1024;
+
 type SaveToWorkspaceResult = {
   path: string;
   name: string;
@@ -133,10 +136,14 @@ export async function processAttachmentFromBase64(
     draft.content = saved.previewDataUrl;
     draft.status = "processing";
 
-    // For PDFs, construct data URL from the original base64 for native PDF support
+    // For PDFs, construct data URL from the original base64 for native PDF support.
+    // Enforce same 25 MB cap as the Rust read_*_as_data_url commands.
     const resolvedMime = draft.mime_type;
     if (!draft.content && resolvedMime === "application/pdf" && base64) {
-      draft.content = `data:application/pdf;base64,${base64}`;
+      const rawBytes = base64.length * 0.75; // approximate decoded size
+      if (rawBytes <= MAX_DATA_URL_BYTES) {
+        draft.content = `data:application/pdf;base64,${base64}`;
+      }
     }
 
     const preprocessed = await preprocess(saved.path);
