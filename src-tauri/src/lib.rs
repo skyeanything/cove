@@ -12,6 +12,7 @@ mod shell_commands;
 mod skill_commands;
 mod skill_discovery;
 mod skill_resource_commands;
+mod soul_backup;
 mod soul_commands;
 mod soul_defaults;
 mod soul_migrate;
@@ -150,6 +151,9 @@ pub fn run() {
       soul_commands::write_soul_private,
       soul_commands::delete_soul_private,
       soul_commands::snapshot_soul,
+      soul_backup::export_soul,
+      soul_backup::import_soul,
+      soul_backup::soul_health,
       config_commands::read_config,
       config_commands::write_config,
       docx_commands::docx_to_pdf,

@@ -39,4 +39,5 @@ Low inertia. Freely evolves through meditation.
 I'm learning to understand not just what you say, but why you
 think that way. My goal isn't to have more knowledge -- it's to
 have better judgment.
+<!-- soul-format:1 -->
 "#;

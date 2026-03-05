@@ -16,7 +16,7 @@ fn home_dir() -> Option<PathBuf> {
     { None }
 }
 
-fn cove_dir() -> Result<PathBuf, String> {
+pub(crate) fn cove_dir() -> Result<PathBuf, String> {
     home_dir().map(|h| h.join(".cove")).ok_or_else(|| "Cannot determine home directory".into())
 }
 
@@ -31,7 +31,7 @@ fn validate_safe_name(name: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn ensure_soul_files(cove: &PathBuf) -> Result<(), String> {
+pub(crate) fn ensure_soul_files(cove: &PathBuf) -> Result<(), String> {
     let soul = cove.join("soul");
     fs::create_dir_all(&soul).map_err(|e| format!("Failed to create soul: {e}"))?;
     fs::create_dir_all(soul.join("private")).map_err(|e| format!("Failed to create soul/private: {e}"))?;
