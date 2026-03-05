@@ -43,5 +43,11 @@ gh pr create --title "type: description" --body "Description of changes"
 
 > **规范提示**：
 > - PR 标题格式：`feat: ...`、`fix: ...`、`docs: ...`、`refactor: ...`、`chore: ...`
-> - 每个 PR 应对应一个 Issue（在 body 中写 `Closes #<id>`）
-> - 不允许直接推送到 main 分支
+> - 每个 PR 应对应一个 Issue
+> - 不允许直接推送到 main 或 dev 分支
+>
+> **dev 分支规范**：
+> - `dev` 是集成验证分支，用于多人协作时的功能验证
+> - PR 到 `dev` 时，body 中使用 `Related to #<id>`，**不要**使用 `Closes #<id>`（避免提前关闭 issue）
+> - PR 到 `main` 时，body 中使用 `Closes #<id>` 关闭 issue
+> - 所有功能分支仍从 `main` 创建（main 是稳定基线）
