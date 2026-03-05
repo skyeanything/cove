@@ -1,3 +1,4 @@
+// FILE_SIZE_EXCEPTION: FileTreePanel handles complex workspace file tree logic (navigation, search, context menus, drag-drop); scheduled for modular refactor.
 import { useCallback, useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -16,10 +17,29 @@ import {
   EyeOff,
   RefreshCw,
   FolderPlus,
+  FolderOpen,
   Search,
   Clipboard,
+  ChevronDown,
+  ChevronLeft,
+  Check,
+  Trash2,
 } from "lucide-react";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
+import { useDataStore } from "@/stores/dataStore";
+import { useChatStore } from "@/stores/chatStore";
 import { useLayoutStore } from "@/stores/layoutStore";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import type { Workspace } from "@/db/types";
 import { useFileTreeDialogs } from "@/hooks/useFileTreeDialogs";
 import { useFileTreeDnD } from "@/hooks/useFileTreeDnD";
 import { useFileTreeSearch } from "@/hooks/useFileTreeSearch";
@@ -49,6 +69,10 @@ function toAbsolutePath(workspaceRoot: string, path: string): string {
 export function FileTreePanel() {
   const { t } = useTranslation();
   const activeWorkspace = useWorkspaceStore((s) => s.activeWorkspace);
+  const workspaces = useWorkspaceStore((s) => s.workspaces);
+  const selectWorkspace = useWorkspaceStore((s) => s.select);
+  const addWorkspace = useWorkspaceStore((s) => s.add);
+  const removeWorkspace = useWorkspaceStore((s) => s.remove);
   const workspaceRoot = activeWorkspace?.path ?? null;
   const selectedPath = useFilePreviewStore((s) => s.selectedPath);
   const lastOpenedDirPath = useFilePreviewStore((s) => s.lastOpenedDirPath);
@@ -57,6 +81,12 @@ export function FileTreePanel() {
   const setPendingExpandPath = useFilePreviewStore((s) => s.setPendingExpandPath);
   const fileTreeShowHidden = useLayoutStore((s) => s.fileTreeShowHidden);
   const setFileTreeShowHidden = useLayoutStore((s) => s.setFileTreeShowHidden);
+  const workspaceSelectorOpen = useLayoutStore((s) => s.workspaceSelectorOpen);
+  const setWorkspaceSelectorOpen = useLayoutStore((s) => s.setWorkspaceSelectorOpen);
+  const setActiveConversation = useDataStore((s) => s.setActiveConversation);
+
+  const [wsDropdownOpen, setWsDropdownOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Workspace | null>(null);
 
   const [rootEntries, setRootEntries] = useState<ListDirEntry[] | null>(null);
   const [rootLoaded, setRootLoaded] = useState(false);
@@ -240,17 +270,113 @@ export function FileTreePanel() {
   );
   const onRenameCancel = useCallback(() => setEditingPath(null), []);
 
-  if (!workspaceRoot) {
+  const needSelector = workspaceSelectorOpen || !workspaceRoot;
+
+  const handleAddWorkspace = async () => {
+    try {
+      const selected = await openDialog({ directory: true, multiple: false });
+      if (typeof selected === "string" && selected) {
+        const ws = await addWorkspace(selected);
+        setActiveConversation(null);
+        useChatStore.getState().reset();
+        await selectWorkspace(ws.id, null);
+        setWorkspaceSelectorOpen(false);
+      }
+    } catch {
+      // cancelled
+    }
+  };
+
+  if (needSelector) {
     return (
-      <div className="flex h-full flex-col overflow-hidden bg-background">
-        <div className="flex flex-1 items-center justify-center p-4 text-center text-sm text-muted-foreground">
-          {t("preview.selectWorkspace")}
+      <>
+        <div className="flex h-full flex-col overflow-hidden bg-background">
+          <div className="flex h-8 shrink-0 items-center border-b border-border px-3">
+            <span className="text-[12px] font-medium text-foreground-secondary">
+              {t("workspace.selectWorkspace", "选择工作区")}
+            </span>
+          </div>
+          <ScrollArea className="min-h-0 flex-1">
+            <div className="p-2 space-y-0.5">
+              {workspaces.map((ws) => (
+                <div key={ws.id} className="group flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      setActiveConversation(null);
+                      useChatStore.getState().reset();
+                      await selectWorkspace(ws.id, null);
+                      setWorkspaceSelectorOpen(false);
+                    }}
+                    className="flex flex-1 items-center gap-2.5 rounded-lg px-3 py-2 text-[13px] text-foreground hover:bg-accent"
+                  >
+                    <FolderOpen className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.5} />
+                    <span className="truncate">{ws.name}</span>
+                    {ws.is_default === 1 && (
+                      <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">
+                        {t("workspace.default", "默认")}
+                      </span>
+                    )}
+                  </button>
+                  {ws.is_default !== 1 && (
+                    <button
+                      type="button"
+                      onClick={() => setDeleteTarget(ws)}
+                      className="mr-1 hidden rounded p-1 text-muted-foreground hover:text-destructive group-hover:block"
+                      title={t("workspace.delete", "删除工作区")}
+                    >
+                      <Trash2 className="size-3.5" strokeWidth={1.5} />
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="mx-3 my-1 border-t border-border" />
+            <button
+              type="button"
+              onClick={handleAddWorkspace}
+              className="flex w-full items-center gap-2.5 px-5 py-2 text-[13px] text-muted-foreground hover:bg-accent hover:text-foreground"
+            >
+              <FolderPlus className="size-4 shrink-0" strokeWidth={1.5} />
+              {t("workspace.addFolder", "添加工作区文件夹")}
+            </button>
+          </ScrollArea>
         </div>
-      </div>
+
+        {/* Delete confirmation dialog */}
+        <AlertDialog open={!!deleteTarget} onOpenChange={(o) => { if (!o) setDeleteTarget(null); }}>
+          <AlertDialogContent size="sm">
+            <AlertDialogHeader>
+              <AlertDialogTitle>{t("workspace.deleteTitle", "删除工作区")}</AlertDialogTitle>
+              <AlertDialogDescription>
+                {t("workspace.deleteDesc", "删除工作区「{{name}}」后，相关的历史会话记录也会被删除，此操作不可撤销。", { name: deleteTarget?.name ?? "" })}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>{t("common.cancel", "取消")}</AlertDialogCancel>
+              <AlertDialogAction
+                variant="destructive"
+                onClick={async () => {
+                  if (deleteTarget) {
+                    await removeWorkspace(deleteTarget.id);
+                    setActiveConversation(null);
+                    useChatStore.getState().reset();
+                    await useDataStore.getState().loadConversations();
+                    setDeleteTarget(null);
+                  }
+                }}
+              >
+                {t("common.delete", "删除")}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </>
     );
   }
 
   return (
+    <>
     <div
       className="file-preview-tree flex h-full min-h-0 flex-col overflow-hidden bg-background"
       tabIndex={-1}
@@ -274,10 +400,104 @@ export function FileTreePanel() {
         }
       }}
     >
-      <div className="flex h-10 shrink-0 items-center justify-between gap-2 border-b border-border bg-background px-3">
-        <span className="text-[12px] font-medium uppercase tracking-wider text-foreground-secondary">
-          {t("preview.explorer")}
-        </span>
+      <div
+        className="relative flex h-8 shrink-0 items-center justify-between gap-2 border-b border-border bg-background px-3"
+      >
+        {/* 返回按钮 + 工作区选择器 */}
+        <div className="flex min-w-0 items-center gap-0.5">
+          <button
+            type="button"
+            onClick={() => setWorkspaceSelectorOpen(true)}
+            className="shrink-0 rounded p-0.5 text-muted-foreground hover:bg-background-tertiary hover:text-foreground"
+            title={t("workspace.backToList", "返回工作区列表")}
+          >
+            <ChevronLeft className="size-3.5" strokeWidth={1.5} />
+          </button>
+          <button
+            type="button"
+            onClick={() => setWsDropdownOpen((o) => !o)}
+            className="flex min-w-0 items-center gap-1 rounded px-1 py-0.5 hover:bg-background-tertiary"
+            title={t("workspace.switchWorkspace", "切换工作区")}
+          >
+            <span className="max-w-[120px] truncate text-[12px] font-medium text-foreground-secondary">
+              {activeWorkspace?.name ?? t("preview.explorer")}
+            </span>
+            <ChevronDown className="size-3 shrink-0 text-muted-foreground" strokeWidth={1.5} />
+          </button>
+        </div>
+
+        {/* 工作区下拉菜单 */}
+        {wsDropdownOpen && (
+          <>
+            {/* 点击外部关闭 */}
+            <div
+              className="fixed inset-0 z-40"
+              onClick={() => setWsDropdownOpen(false)}
+            />
+            <div className="absolute left-2 top-10 z-50 min-w-[200px] rounded-lg border border-border bg-popover py-1 shadow-lg">
+              {workspaces.map((ws) => {
+                const isActive = activeWorkspace?.id === ws.id;
+                return (
+                  <div key={ws.id} className="group flex items-center">
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setActiveConversation(null);
+                        useChatStore.getState().reset();
+                        await selectWorkspace(ws.id, null);
+                        setWsDropdownOpen(false);
+                      }}
+                      className="flex flex-1 items-center gap-2 px-3 py-2 text-[13px] hover:bg-accent"
+                    >
+                      {isActive ? (
+                        <Check className="size-3.5 text-brand" strokeWidth={2} />
+                      ) : (
+                        <span className="size-3.5" />
+                      )}
+                      <span className="flex-1 truncate text-left">{ws.name}</span>
+                    </button>
+                    {!ws.is_default && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDeleteTarget(ws);
+                          setWsDropdownOpen(false);
+                        }}
+                        className="mr-2 hidden rounded p-1 text-muted-foreground hover:text-destructive group-hover:block"
+                        title={t("workspace.delete", "删除")}
+                      >
+                        <Trash2 className="size-3.5" strokeWidth={1.5} />
+                      </button>
+                    )}
+                  </div>
+                );
+              })}
+              <div className="mx-2 my-1 border-t border-border" />
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    const selected = await openDialog({ directory: true, multiple: false });
+                    if (typeof selected === "string" && selected) {
+                      const ws = await addWorkspace(selected);
+                      setActiveConversation(null);
+                      useChatStore.getState().reset();
+                      await selectWorkspace(ws.id, null);
+                    }
+                  } catch {
+                    // cancelled
+                  }
+                  setWsDropdownOpen(false);
+                }}
+                className="flex w-full items-center gap-2 px-3 py-2 text-[13px] text-muted-foreground hover:bg-accent hover:text-foreground"
+              >
+                <FolderPlus className="size-3.5" strokeWidth={1.5} />
+                {t("workspace.addFolder", "添加工作区文件夹")}
+              </button>
+            </div>
+          </>
+        )}
+
         <div className="flex items-center gap-0.5">
           <button
             type="button"
@@ -395,5 +615,35 @@ export function FileTreePanel() {
         t={t}
       />
     </div>
+
+    {/* Workspace delete confirmation dialog (also used from header dropdown) */}
+    <AlertDialog open={!!deleteTarget} onOpenChange={(o) => { if (!o) setDeleteTarget(null); }}>
+      <AlertDialogContent size="sm">
+        <AlertDialogHeader>
+          <AlertDialogTitle>{t("workspace.deleteTitle", "删除工作区")}</AlertDialogTitle>
+          <AlertDialogDescription>
+            {t("workspace.deleteDesc", "删除工作区「{{name}}」后，相关的历史会话记录也会被删除，此操作不可撤销。", { name: deleteTarget?.name ?? "" })}
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>{t("common.cancel", "取消")}</AlertDialogCancel>
+          <AlertDialogAction
+            variant="destructive"
+            onClick={async () => {
+              if (deleteTarget) {
+                await removeWorkspace(deleteTarget.id);
+                setActiveConversation(null);
+                useChatStore.getState().reset();
+                await useDataStore.getState().loadConversations();
+                setDeleteTarget(null);
+              }
+            }}
+          >
+            {t("common.delete", "删除")}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }

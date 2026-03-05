@@ -96,7 +96,7 @@ export function PreviewFileHeader({
   }, [dropdownOpen]);
 
   return (
-    <div className="flex h-10 shrink-0 items-center justify-between gap-2 border-b border-border bg-background px-3">
+    <div className="flex h-8 shrink-0 items-center justify-between gap-2 border-b border-border bg-background px-3">
       <div className="file-preview-header-path min-w-0 text-[13px]">
         <BreadcrumbNav path={path} />
       </div>
@@ -108,11 +108,11 @@ export function PreviewFileHeader({
               type="button"
               onClick={() => openExternally(matchingApps[0]!.id)}
               className="flex items-center gap-1 rounded-md px-2 py-1 text-[11px] text-muted-foreground hover:bg-background-tertiary hover:text-foreground"
-              title={t("preview.openInApp", { app: matchingApps[0]!.name })}
+              title={t("preview.openLocal")}
             >
               <ExternalLink className="size-3" strokeWidth={1.5} />
               <span className="whitespace-nowrap">
-                {t("preview.openInApp", { app: matchingApps[0]!.name })}
+                {t("preview.openLocal")}
               </span>
             </button>
             {/* 有多个 app 时显示下拉箭头 */}

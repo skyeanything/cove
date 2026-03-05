@@ -10,6 +10,8 @@ export interface ExtensionCardProps {
   name: string;
   description: string;
   badge: ExtensionBadge;
+  /** Override the displayed badge text (for i18n). Falls back to badge value. */
+  badgeLabel?: string;
   enabled: boolean;
   onToggle: (enabled: boolean) => void;
   onEdit?: () => void;
@@ -27,6 +29,7 @@ export function ExtensionCard({
   name,
   description,
   badge,
+  badgeLabel,
   enabled,
   onToggle,
   onEdit,
@@ -55,7 +58,7 @@ export function ExtensionCard({
                 BADGE_STYLES[badge],
               )}
             >
-              {badge}
+              {badgeLabel ?? badge}
             </span>
           </div>
           <p className="mt-0.5 line-clamp-2 text-[12px] leading-relaxed text-muted-foreground">
@@ -66,7 +69,7 @@ export function ExtensionCard({
 
       {/* Footer: actions + toggle */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+        <div className="flex items-center gap-1 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
           {onEdit && (
             <Button variant="ghost" size="icon-sm" onClick={onEdit} className="size-6">
               <Pencil className="size-3.5" strokeWidth={1.5} />

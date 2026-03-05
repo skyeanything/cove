@@ -1,8 +1,3 @@
-import {
-  CornerDownRight,
-  Box,
-  Copy,
-} from "lucide-react";
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useChatStore } from "@/stores/chatStore";
@@ -12,12 +7,10 @@ import { useSettingsStore } from "@/stores/settingsStore";
 import { useSkillsStore } from "@/stores/skillsStore";
 import { getModelOption } from "@/lib/ai/model-service";
 import { estimateNextTurnTokens } from "@/lib/ai/context-compression";
-import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { listSkills } from "@/lib/ai/skills/loader";
 import { USER_VISIBLE_TOOLS } from "@/lib/ai/tools/tool-meta";
 import { useMentionDetect } from "@/hooks/useMentionDetect";
 import { useMentionFiles } from "@/hooks/useMentionFiles";
-import { WorkspacePopover } from "./WorkspacePopover";
 import { AttachmentBar } from "./AttachmentBar";
 import { MentionPopover, buildMentionItems } from "./MentionPopover";
 import { ChatToolbar } from "./ChatToolbar";
@@ -197,9 +190,6 @@ export function ChatInput({
     }
   };
 
-  const handleRevealWorkspace = async () => { if (activeWorkspace) await revealItemInDir(activeWorkspace.path); };
-  const handleCopyWorkspacePath = () => { if (activeWorkspace) navigator.clipboard.writeText(activeWorkspace.path); };
-
   return (
     <div className="shrink-0 px-4 pb-3 pt-1">
       <div className="mx-auto max-w-[896px]">
@@ -212,25 +202,6 @@ export function ChatInput({
 
         <div className="rounded-lg border border-border transition-colors focus-within:border-ring" onDrop={handleDrop} onDragOver={handleDragOver}>
           <AttachmentBar attachments={draftAttachments} onRemove={removeDraftAttachment} />
-          {activeWorkspace && (
-            <div className="flex items-center gap-1.5 border-b border-border/50 px-3 py-1">
-              <WorkspacePopover trigger={
-                <button type="button" className="flex shrink-0 cursor-pointer items-center gap-1 rounded px-0.5 py-0.5 text-muted-foreground/70 hover:bg-background-tertiary hover:text-foreground" title={t("chat.workspace")}>
-                  <Box className="size-3.5" strokeWidth={2.5} />
-                  <span className="text-[10px] font-medium tracking-wide uppercase">{t("chat.workspace")}</span>
-                </button>
-              } />
-              <span className="min-w-0 truncate text-[11px] text-muted-foreground">{activeWorkspace.path}</span>
-              <div className="ml-auto flex shrink-0 items-center gap-0.5">
-                <button type="button" onClick={handleCopyWorkspacePath} className="cursor-pointer rounded p-0.5 text-muted-foreground hover:bg-background-tertiary hover:text-foreground" title={t("chat.copyPath")}>
-                  <Copy className="size-3" strokeWidth={1.5} />
-                </button>
-                <button type="button" onClick={handleRevealWorkspace} className="cursor-pointer rounded p-0.5 text-muted-foreground hover:bg-background-tertiary hover:text-foreground" title={t("chat.revealInFolder")}>
-                  <CornerDownRight className="size-3" strokeWidth={1.5} />
-                </button>
-              </div>
-            </div>
-          )}
 
           <textarea
             ref={textareaRef} value={message} onChange={handleChange}

@@ -125,6 +125,7 @@
     "codeTab": "Code",
     "openDefault": "Open with default app",
     "openInApp": "Open in {{app}}",
+    "openLocal": "Open Locally",
     "openInNativeWindow": "Open in system preview window",
     "docxUseSystemPreview": "Open DOCX in system preview for correct pagination",
     "docxLoading": "Loading DOCX…",
@@ -275,6 +276,21 @@
       "mcp": "MCP",
       "plugin": "Plugin",
       "subagent": "Sub-Agent"
+    },
+    "filter": {
+      "all": "All",
+      "builtIn": "Built-in",
+      "public": "Public",
+      "personal": "Personal",
+      "category": "Category",
+      "status": "Status",
+      "installed": "Installed",
+      "notInstalled": "Not Installed"
+    },
+    "badge": {
+      "built-in": "Built-in",
+      "public": "Public",
+      "personal": "Personal"
     },
     "noMcp": "No MCP servers configured yet. Click Create to add one.",
     "noSubAgents": "No sub-agents created yet. Click Create to add one.",

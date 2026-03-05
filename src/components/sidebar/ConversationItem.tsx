@@ -1,3 +1,4 @@
+import { useTranslation } from "react-i18next";
 import { cn } from "@/lib/utils";
 import {
   ContextMenu,
@@ -9,6 +10,7 @@ import {
 import { Pin, Pencil, Trash2, MoreHorizontal } from "lucide-react";
 import { useRef, useEffect } from "react";
 import type { Conversation } from "@/db/types";
+import { ProviderIcon } from "@/components/common/ProviderIcon";
 
 interface ConversationItemProps {
   conversation: Conversation;
@@ -22,7 +24,6 @@ interface ConversationItemProps {
   onRename: () => void;
   onRenameSubmit: () => void;
   onRenameCancel: () => void;
-  t: (key: string) => string;
 }
 
 export function ConversationItem({
@@ -37,8 +38,8 @@ export function ConversationItem({
   onRename,
   onRenameSubmit,
   onRenameCancel,
-  t,
 }: ConversationItemProps) {
+  const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -81,6 +82,9 @@ export function ConversationItem({
               : "text-sidebar-foreground/80 hover:bg-sidebar-accent/50",
           )}
         >
+          {conversation.provider_type && (
+            <ProviderIcon type={conversation.provider_type} className="size-3.5 shrink-0 opacity-60" />
+          )}
           <span className="truncate">{conversation.title || t("sidebar.untitled")}</span>
           <div className="ml-auto opacity-0 transition-opacity group-hover:opacity-100">
             <MoreHorizontal className="size-3.5 text-muted-foreground" />

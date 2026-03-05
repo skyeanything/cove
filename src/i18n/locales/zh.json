@@ -125,6 +125,7 @@
     "codeTab": "Code",
     "openDefault": "使用默认应用打开",
     "openInApp": "在 {{app}} 中打开",
+    "openLocal": "本地打开",
     "openInNativeWindow": "在新窗口用系统预览打开",
     "docxUseSystemPreview": "DOCX 请使用系统预览查看正确分页",
     "docxLoading": "加载 DOCX…",
@@ -275,6 +276,21 @@
       "mcp": "MCP",
       "plugin": "插件",
       "subagent": "子智能体"
+    },
+    "filter": {
+      "all": "全部",
+      "builtIn": "内置",
+      "public": "公共",
+      "personal": "个人",
+      "category": "分类",
+      "status": "状态",
+      "installed": "已安装",
+      "notInstalled": "未安装"
+    },
+    "badge": {
+      "built-in": "内置",
+      "public": "公共",
+      "personal": "个人"
     },
     "noMcp": "暂无 MCP 服务器，点击创建添加。",
     "noSubAgents": "暂无子智能体，点击创建添加。",

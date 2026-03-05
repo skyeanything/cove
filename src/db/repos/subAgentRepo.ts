@@ -23,6 +23,11 @@ export const subAgentRepo = {
   },
 
   async update(id: string, data: Partial<SubAgentDef>): Promise<void> {
+    const ALLOWED_COLUMNS = [
+      "name", "description", "icon", "system_prompt",
+      "skill_names", "tool_ids", "enabled"
+    ] as const;
+
     const db = await getDb();
     const fields: string[] = [];
     const values: unknown[] = [];
@@ -30,11 +35,14 @@ export const subAgentRepo = {
 
     for (const [key, value] of Object.entries(data)) {
       if (key === "id" || key === "created_at") continue;
+      if (!ALLOWED_COLUMNS.includes(key as typeof ALLOWED_COLUMNS[number])) continue;
       if (value === undefined) continue;
       fields.push(`${key} = $${idx}`);
       values.push(value);
       idx++;
     }
+
+    if (fields.length === 0) return;
 
     fields.push(`updated_at = datetime('now')`);
     values.push(id);

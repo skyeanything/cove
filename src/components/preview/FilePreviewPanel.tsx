@@ -98,7 +98,7 @@ export function FilePreviewPanel() {
   if (kind === "md" && cached?.type === "text" && cached.text !== undefined) {
     return (
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
-        <div className="flex h-10 shrink-0 items-center justify-between gap-2 border-b border-border bg-background px-3">
+        <div className="flex h-8 shrink-0 items-center justify-between gap-2 border-b border-border bg-background px-3">
           <div className="min-w-0 truncate text-[12px] text-foreground-secondary" title={selectedPath}>
             {selectedPath}
           </div>

@@ -10,10 +10,14 @@ export function McpTabContent() {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     mcpServerRepo.getAll().then((list) => {
-      setServers(list);
-      setLoaded(true);
+      if (!cancelled) {
+        setServers(list);
+        setLoaded(true);
+      }
     });
+    return () => { cancelled = true; };
   }, []);
 
   const handleToggle = async (server: McpServer) => {

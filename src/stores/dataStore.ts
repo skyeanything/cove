@@ -103,6 +103,8 @@ export const useDataStore = create<DataState>()((set, get) => ({
     set({ activeConversationId: id, messages: [] });
     if (id) {
       get().loadMessages(id);
+      // 切换对话时自动同步对话关联的工作区
+      useWorkspaceStore.getState().loadFromConversation(id);
     }
   },
 

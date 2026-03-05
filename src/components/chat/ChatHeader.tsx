@@ -5,11 +5,7 @@ import { useTranslation } from "react-i18next";
 import { useThemeStore } from "@/stores/themeStore";
 import { useDataStore } from "@/stores/dataStore";
 
-interface ChatHeaderProps {
-  leftSidebarOpen: boolean;
-}
-
-export function ChatHeader({ leftSidebarOpen }: ChatHeaderProps) {
+export function ChatHeader() {
   const { t } = useTranslation();
   const theme = useThemeStore((s) => s.theme);
   const setTheme = useThemeStore((s) => s.setTheme);
@@ -28,12 +24,10 @@ export function ChatHeader({ leftSidebarOpen }: ChatHeaderProps) {
   return (
     <div className="shrink-0">
       <div
-        data-tauri-drag-region
-        className="no-select flex h-[52px] items-center px-3"
+        className="no-select flex h-8 items-center px-3"
       >
         <div
-          className="ml-3 flex min-w-0 max-w-[50%] items-center transition-[padding] duration-300 ease-out"
-          style={{ paddingLeft: leftSidebarOpen ? 0 : 148 }}
+          className="ml-3 flex min-w-0 max-w-[50%] items-center"
         >
           <span className="truncate text-[13px] font-semibold text-foreground">
             {title}

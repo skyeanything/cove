@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { settingsRepo } from "@/db/repos/settingsRepo";
 import { workspaceRepo } from "@/db/repos/workspaceRepo";
 import { conversationRepo } from "@/db/repos/conversationRepo";
+import { messageRepo } from "@/db/repos/messageRepo";
 import { appDataDir } from "@tauri-apps/api/path";
 import type { Workspace } from "@/db/types";
 
@@ -114,6 +115,13 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
   async remove(workspaceId: string) {
     const ws = get().workspaces.find((w) => w.id === workspaceId);
     if (!ws || ws.is_default) return; // Cannot remove default
+
+    // Delete all conversations (and their messages) associated with this workspace
+    const relatedConvs = await conversationRepo.getByWorkspacePath(ws.path);
+    for (const conv of relatedConvs) {
+      await messageRepo.deleteByConversation(conv.id);
+      await conversationRepo.delete(conv.id);
+    }
 
     await workspaceRepo.delete(workspaceId);
 

@@ -42,19 +42,22 @@ export default function ExtensionMarketPage() {
 
   return (
     <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-background">
-      {/* Header drag region */}
-      <div data-tauri-drag-region className="flex h-[52px] shrink-0 items-center px-6">
-        <h1 className="text-[15px] font-semibold text-foreground">
+      {/* Page header */}
+      <div className="flex h-8 shrink-0 items-center border-b border-border px-6">
+        <h1 className="text-[13px] font-semibold text-foreground">
           {t("extensions.title", "Extension Market")}
         </h1>
       </div>
 
       {/* Tab bar + Create button */}
       <div className="flex items-center justify-between border-b px-6 pb-0">
-        <div className="flex gap-0.5">
+        <div className="flex gap-0.5" role="tablist">
           {TABS.map((tab) => (
             <button
               key={tab.id}
+              role="tab"
+              aria-selected={activeTab === tab.id}
+              aria-controls={`tabpanel-${tab.id}`}
               onClick={() => setActiveTab(tab.id)}
               className={cn(
                 "relative px-3 py-2 text-[13px] font-medium transition-colors",
@@ -74,9 +77,10 @@ export default function ExtensionMarketPage() {
           <Button
             size="sm"
             className="h-7 gap-1.5 text-[12px]"
+            disabled
             onClick={() => setCreateDialogType(activeTab === "subagent" ? "subagent" : activeTab === "mcp" ? "mcp" : "skill")}
           >
-            <Plus className="size-3.5" strokeWidth={2} />
+            <Plus className="size-3.5" strokeWidth={1.5} />
             {t("extensions.create", "Create")}
           </Button>
         )}
@@ -84,7 +88,7 @@ export default function ExtensionMarketPage() {
 
       {/* Tab content */}
       <ScrollArea className="min-h-0 flex-1">
-        <div className="p-6">
+        <div className="p-6" role="tabpanel" id={`tabpanel-${activeTab}`}>
           {activeTab === "skills" && <SkillsTabContent />}
           {activeTab === "mcp" && <McpTabContent />}
           {activeTab === "plugin" && <PluginTabContent />}

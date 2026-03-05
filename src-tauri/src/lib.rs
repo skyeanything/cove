@@ -135,6 +135,7 @@ pub fn run() {
       soul_commands::delete_soul_private,
       soul_commands::snapshot_soul,
       docx_commands::docx_to_pdf,
+      docx_commands::docx_to_html,
       docx_commands::qmd_to_pdf,
       docx_commands::pptx_to_pdf,
       officellm::officellm_detect,

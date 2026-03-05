@@ -10,13 +10,17 @@ export function SubAgentTabContent() {
   const [loaded, setLoaded] = useState(false);
 
   const loadAgents = () => {
+    let cancelled = false;
     subAgentRepo.getAll().then((list) => {
-      setAgents(list);
-      setLoaded(true);
+      if (!cancelled) {
+        setAgents(list);
+        setLoaded(true);
+      }
     });
+    return () => { cancelled = true; };
   };
 
-  useEffect(() => { loadAgents(); }, []);
+  useEffect(() => { const cleanup = loadAgents(); return cleanup; }, []);
 
   const handleToggle = async (agent: SubAgentDef) => {
     const next = agent.enabled ? 0 : 1;

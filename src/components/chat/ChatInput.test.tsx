@@ -56,9 +56,6 @@ vi.mock("@/lib/ai/model-service", () => ({
 vi.mock("@/lib/ai/context-compression", () => ({
   estimateNextTurnTokens: () => 100,
 }));
-vi.mock("@tauri-apps/plugin-opener", () => ({
-  revealItemInDir: vi.fn(),
-}));
 vi.mock("@/lib/ai/skills/loader", () => ({
   listSkills: () => [],
 }));
@@ -83,9 +80,6 @@ vi.mock("react-i18next", () => ({
 }));
 
 // --- Mock child components ---
-vi.mock("./WorkspacePopover", () => ({
-  WorkspacePopover: () => null,
-}));
 vi.mock("./AttachmentBar", () => ({
   AttachmentBar: () => null,
 }));

@@ -41,9 +41,11 @@ function groupConversations(conversations: Conversation[]): Record<string, Conve
 
 interface ConversationListProps {
   searchQuery: string;
+  /** 传入工作区路径时，只显示该工作区的对话 */
+  workspacePath?: string;
 }
 
-export function ConversationList({ searchQuery }: ConversationListProps) {
+export function ConversationList({ searchQuery, workspacePath }: ConversationListProps) {
   const { t } = useTranslation();
   const conversations = useDataStore((s) => s.conversations);
   const activeConversationId = useDataStore((s) => s.activeConversationId);
@@ -59,10 +61,15 @@ export function ConversationList({ searchQuery }: ConversationListProps) {
   const [editingTitle, setEditingTitle] = useState("");
 
   const filteredConversations = useMemo(() => {
-    if (!searchQuery.trim()) return conversations;
+    let list = conversations;
+    // 工作区过滤：只显示属于该工作区的对话
+    if (workspacePath) {
+      list = list.filter((c) => c.workspace_path === workspacePath);
+    }
+    if (!searchQuery.trim()) return list;
     const q = searchQuery.toLowerCase();
-    return conversations.filter((c) => c.title?.toLowerCase().includes(q));
-  }, [conversations, searchQuery]);
+    return list.filter((c) => c.title?.toLowerCase().includes(q));
+  }, [conversations, searchQuery, workspacePath]);
 
   const grouped = useMemo(
     () => groupConversations(filteredConversations),
@@ -81,7 +88,10 @@ export function ConversationList({ searchQuery }: ConversationListProps) {
   const handleSelectConversation = (id: string) => {
     setActiveConversation(id);
     loadMessages(id);
-    setActivePage("chat");
+    // 工作区模式下不切换页面，保持在工作区视图
+    if (!workspacePath) {
+      setActivePage("chat");
+    }
   };
 
   const handleDelete = async (id: string) => {
@@ -97,10 +107,12 @@ export function ConversationList({ searchQuery }: ConversationListProps) {
     setEditingTitle(conv.title?.trim() || "");
   };
 
-  const handleRenameSubmit = async () => {
+const handleRenameSubmit = async () => {
     if (!editingId) return;
-    const title = editingTitle.trim() || undefined;
-    await updateConversation(editingId, { title: title ?? "" });
+    const title = editingTitle.trim();
+    if (title) {
+      await updateConversation(editingId, { title });
+    }
     setEditingId(null);
     setEditingTitle("");
   };
@@ -147,7 +159,6 @@ export function ConversationList({ searchQuery }: ConversationListProps) {
                     onRename={() => handleRenameStart(conv)}
                     onRenameSubmit={handleRenameSubmit}
                     onRenameCancel={() => { setEditingId(null); setEditingTitle(""); }}
-                    t={t}
                   />
                 ))}
             </div>

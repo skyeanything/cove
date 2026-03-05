@@ -3,15 +3,29 @@ import { persist } from "zustand/middleware";
 
 export type ActivePage = "chat" | "workspace" | "extensions";
 
+/** Three sidebar display modes:
+ * - "full"   → full-width sidebar with text labels (default)
+ * - "mini"   → 52px icon-only strip (auto-collapses when entering workspace conversation)
+ * - "hidden" → no sidebar (toggle with Cmd+B)
+ */
+export type SidebarMode = "full" | "mini" | "hidden";
+
 interface LayoutState {
   /** --- Navigation & Page --- */
   activePage: ActivePage;
   setActivePage: (page: ActivePage) => void;
 
-  /** Left nav sidebar open/collapsed */
+  /** Left nav sidebar mode */
+  leftSidebarMode: SidebarMode;
+  /** Backward-compat derived: true when sidebar is visible (full or mini) */
   leftSidebarOpen: boolean;
   leftSidebarWidth: number;
+  /** Cmd+B: toggle between full ↔ hidden (from mini → full) */
   toggleLeftSidebar: () => void;
+  /** Auto-collapse to icon strip (triggered when entering workspace conversation) */
+  setLeftSidebarMini: () => void;
+  /** Expand back to full sidebar */
+  setLeftSidebarFull: () => void;
   setLeftSidebarWidth: (width: number) => void;
 
   /** History section in sidebar collapsed */
@@ -35,6 +49,10 @@ interface LayoutState {
   setFileTreeShowHidden: (show: boolean) => void;
   setFileTreeWidth: (width: number) => void;
   setFilePreviewWidth: (width: number) => void;
+
+  /** --- Workspace selector overlay (session-only, not persisted) --- */
+  workspaceSelectorOpen: boolean;
+  setWorkspaceSelectorOpen: (open: boolean) => void;
 }
 
 /* ---------- Column width constraints ---------- */
@@ -72,10 +90,18 @@ export const useLayoutStore = create<LayoutState>()(
       setActivePage: (page) => set({ activePage: page }),
 
       /* Left sidebar */
-      leftSidebarOpen: true,
+      leftSidebarMode: "full" as SidebarMode,
+      leftSidebarOpen: true,   // derived, kept for compat — updated in merge
       leftSidebarWidth: 260,
       toggleLeftSidebar: () =>
-        set((s) => ({ leftSidebarOpen: !s.leftSidebarOpen })),
+        set((s) => {
+          const next: SidebarMode = s.leftSidebarMode === "hidden" ? "full" : "hidden";
+          return { leftSidebarMode: next, leftSidebarOpen: next !== "hidden" };
+        }),
+      setLeftSidebarMini: () =>
+        set({ leftSidebarMode: "mini", leftSidebarOpen: true }),
+      setLeftSidebarFull: () =>
+        set({ leftSidebarMode: "full", leftSidebarOpen: true }),
       setLeftSidebarWidth: (width) => set({
         leftSidebarWidth: Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, width)),
       }),
@@ -112,18 +138,37 @@ export const useLayoutStore = create<LayoutState>()(
       setFilePreviewWidth: (width) => set({
         filePreviewWidth: Math.min(FILE_PREVIEW_MAX, Math.max(FILE_PREVIEW_MIN, width)),
       }),
+
+      /* Workspace selector (session-only) */
+      workspaceSelectorOpen: false,
+      setWorkspaceSelectorOpen: (open) => set({ workspaceSelectorOpen: open }),
     }),
     {
       name: "office-chat-layout",
-      version: 2,
+      version: 3,
+      migrate: (persisted, version) => {
+        const p = (persisted && typeof persisted === "object")
+          ? persisted as Record<string, unknown>
+          : {};
+        if (version < 3) {
+          // Migrate v1/v2: leftSidebarOpen (boolean) → leftSidebarMode (string)
+          const wasOpen = p.leftSidebarOpen !== false;
+          p.leftSidebarMode = wasOpen ? "full" : "hidden";
+          p.leftSidebarOpen = wasOpen;
+        }
+        return p;
+      },
       merge: (persisted, current) => {
         const p = (persisted && typeof persisted === "object")
           ? persisted as Partial<LayoutState>
           : {};
+        const mode: SidebarMode = p.leftSidebarMode ?? "full";
         return {
           ...current,
           ...p,
-          /* Ensure new fields have defaults when upgrading from v1 */
+          leftSidebarMode: mode,
+          leftSidebarOpen: mode !== "hidden",
+          /* Ensure new fields have defaults */
           activePage: p.activePage ?? (current as LayoutState).activePage,
           historyCollapsed: p.historyCollapsed ?? false,
           wsFileTreeWidth: p.wsFileTreeWidth ?? 280,

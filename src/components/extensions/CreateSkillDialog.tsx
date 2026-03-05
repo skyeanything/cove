@@ -40,7 +40,7 @@ export function CreateSkillDialog({ open, onOpenChange }: Props) {
   const handleSave = async () => {
     const trimmed = name.trim();
     if (!trimmed) { setError(t("skills.nameHint")); return; }
-    if (!description.trim()) { setError(t("skills.descriptionPlaceholder")); return; }
+    if (!description.trim()) { setError(t("skills.descriptionRequired", "Description is required")); return; }
     setSaving(true);
     setError("");
     try {
@@ -63,8 +63,9 @@ export function CreateSkillDialog({ open, onOpenChange }: Props) {
         </DialogHeader>
         <div className="flex flex-col gap-3 py-2">
           <div>
-            <Label className="mb-1.5 text-[12px]">{t("skills.nameLabel")}</Label>
+            <Label htmlFor="skill-name" className="mb-1.5 text-[12px]">{t("skills.nameLabel")}</Label>
             <Input
+              id="skill-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder={t("skills.namePlaceholder")}
@@ -72,12 +73,13 @@ export function CreateSkillDialog({ open, onOpenChange }: Props) {
             />
           </div>
           <div>
-            <Label className="mb-1.5 text-[12px]">{t("skills.emojiLabel")}</Label>
-            <Input value={emoji} onChange={(e) => setEmoji(e.target.value)} placeholder={t("skills.emojiPlaceholder")} className="text-[13px]" />
+            <Label htmlFor="skill-emoji" className="mb-1.5 text-[12px]">{t("skills.emojiLabel")}</Label>
+            <Input id="skill-emoji" value={emoji} onChange={(e) => setEmoji(e.target.value)} placeholder={t("skills.emojiPlaceholder")} className="text-[13px]" />
           </div>
           <div>
-            <Label className="mb-1.5 text-[12px]">{t("skills.descriptionLabel")}</Label>
+            <Label htmlFor="skill-description" className="mb-1.5 text-[12px]">{t("skills.descriptionLabel")}</Label>
             <Textarea
+              id="skill-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder={t("skills.descriptionPlaceholder")}
@@ -86,8 +88,9 @@ export function CreateSkillDialog({ open, onOpenChange }: Props) {
             />
           </div>
           <div>
-            <Label className="mb-1.5 text-[12px]">{t("skills.instructionsLabel")}</Label>
+            <Label htmlFor="skill-instructions" className="mb-1.5 text-[12px]">{t("skills.instructionsLabel")}</Label>
             <Textarea
+              id="skill-instructions"
               value={instructions}
               onChange={(e) => setInstructions(e.target.value)}
               placeholder={t("skills.instructionsPlaceholder")}
