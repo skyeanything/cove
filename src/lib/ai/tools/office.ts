@@ -34,6 +34,11 @@ function toCliArgs(args?: Record<string, string> | string[]): string[] {
   ]);
 }
 
+/** Check if a path is absolute (Unix / or Windows drive letter / UNC). */
+function isAbsolutePath(p: string): boolean {
+  return p.startsWith("/") || /^[A-Za-z]:[\\/]/.test(p) || p.startsWith("\\\\");
+}
+
 /** Known arg keys that hold file paths (mirrors js_interpreter.rs logic). */
 const PATH_ARG_KEYS = new Set([
   "i", "input", "path", "o", "output", "from", "to", "base", "target",
@@ -48,7 +53,7 @@ function resolvePathArgs(
   if (Array.isArray(args)) return args;
   const resolved = { ...args };
   for (const [k, v] of Object.entries(resolved)) {
-    if (PATH_ARG_KEYS.has(k) && v && !v.startsWith("/")) {
+    if (PATH_ARG_KEYS.has(k) && v && !isAbsolutePath(v)) {
       resolved[k] = `${workspaceRoot}/${v}`;
     }
   }
@@ -107,7 +112,7 @@ export const officeTool = tool({
           }
           const workspaceRoot = useWorkspaceStore.getState().activeWorkspace?.path;
           const absPath =
-            workspaceRoot && !path.startsWith("/")
+            workspaceRoot && !isAbsolutePath(path)
               ? `${workspaceRoot}/${path}`
               : path;
           await invoke<void>("officellm_open", { path: absPath });
@@ -133,7 +138,7 @@ export const officeTool = tool({
         case "save": {
           const workspaceRoot = useWorkspaceStore.getState().activeWorkspace?.path;
           const absPath =
-            path && workspaceRoot && !path.startsWith("/")
+            path && workspaceRoot && !isAbsolutePath(path)
               ? `${workspaceRoot}/${path}`
               : path;
           const result = await invoke<CommandResult>("officellm_save", {
