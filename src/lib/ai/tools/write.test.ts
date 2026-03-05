@@ -198,4 +198,49 @@ describe("writeTool", () => {
     expect(result).toContain("写入失败");
     expect(result).toContain("io error");
   });
+
+  // --- office file routing ---
+
+  it("routes .docx to write_office_text", async () => {
+    mockInvoke.mockResolvedValue("/workspace/report.docx");
+
+    const result = await exec({ filePath: "report.docx", content: "Hello" });
+
+    expect(mockInvoke).toHaveBeenCalledWith("write_office_text", {
+      args: { workspaceRoot: "/workspace", path: "report.docx", content: "Hello" },
+    });
+    expect(result).toContain("Office");
+    expect(mockRecordRead).toHaveBeenCalledWith("conv-123", "/workspace/report.docx");
+  });
+
+  it("skips read-before-write for .docx", async () => {
+    mockInvoke.mockResolvedValue("/workspace/new.docx");
+
+    await exec({ filePath: "new.docx", content: "content" });
+
+    expect(mockAssert).not.toHaveBeenCalled();
+    expect(mockInvoke).not.toHaveBeenCalledWith("stat_file", expect.anything());
+  });
+
+  it("handles write_office_text error", async () => {
+    mockInvoke.mockRejectedValue({ kind: "NotAllowed", message: "officellm not installed" });
+
+    const result = await exec({ filePath: "out.docx", content: "x" });
+
+    expect(result).toContain("officellm not installed");
+  });
+
+  it("does not route .xlsx to write_office_text", async () => {
+    // xlsx is not writable, should fall through to normal write path
+    mockInvoke.mockImplementation(async (cmd: string) => {
+      if (cmd === "stat_file") throw { kind: "NotFound" };
+      if (cmd === "write_file") return undefined;
+      return undefined;
+    });
+
+    const result = await exec({ filePath: "data.xlsx", content: "x" });
+
+    expect(mockInvoke).not.toHaveBeenCalledWith("write_office_text", expect.anything());
+    expect(result).toContain("已创建并写入");
+  });
 });

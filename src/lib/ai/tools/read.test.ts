@@ -150,4 +150,73 @@ describe("readTool", () => {
     expect(result).toContain("读取失败");
     expect(result).toContain("network timeout");
   });
+
+  // --- office file routing ---
+
+  it("routes .docx to read_office_text", async () => {
+    mockInvoke.mockResolvedValue({
+      fileType: "docx",
+      content: "Hello World",
+      truncated: false,
+      warnings: [],
+    });
+
+    const result = await exec({ filePath: "report.docx" });
+
+    expect(mockInvoke).toHaveBeenCalledWith("read_office_text", {
+      args: { workspaceRoot: "/workspace", path: "report.docx" },
+    });
+    expect(result).toContain("[Office Document: report.docx (docx)]");
+    expect(result).toContain("00001| Hello World");
+    expect(mockRecordRead).toHaveBeenCalledWith("conv-123", "/workspace/report.docx");
+  });
+
+  it("routes .PDF (case insensitive) to read_office_text", async () => {
+    mockInvoke.mockResolvedValue({
+      fileType: "pdf",
+      content: "PDF content",
+      truncated: false,
+      warnings: [],
+    });
+
+    const result = await exec({ filePath: "notes.PDF" });
+
+    expect(mockInvoke).toHaveBeenCalledWith("read_office_text", {
+      args: { workspaceRoot: "/workspace", path: "notes.PDF" },
+    });
+    expect(result).toContain("[Office Document: notes.PDF (pdf)]");
+  });
+
+  it("routes .xlsx to read_office_text", async () => {
+    mockInvoke.mockResolvedValue({
+      fileType: "xlsx",
+      content: "Sheet1\nA1\tB1",
+      truncated: false,
+      warnings: [],
+    });
+
+    const result = await exec({ filePath: "data.xlsx" });
+
+    expect(mockInvoke).toHaveBeenCalledWith("read_office_text", {
+      args: { workspaceRoot: "/workspace", path: "data.xlsx" },
+    });
+    expect(result).toContain("[Office Document: data.xlsx (xlsx)]");
+  });
+
+  it("handles FsError from read_office_text", async () => {
+    mockInvoke.mockRejectedValue({ kind: "NotFound" });
+
+    const result = await exec({ filePath: "missing.docx" });
+
+    expect(result).toContain("文件不存在");
+    expect(result).toContain("missing.docx");
+  });
+
+  it("does not route .txt to read_office_text", async () => {
+    mockInvoke.mockResolvedValue("00001| text content");
+
+    await exec({ filePath: "readme.txt" });
+
+    expect(mockInvoke).toHaveBeenCalledWith("read_file", expect.anything());
+  });
 });

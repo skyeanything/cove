@@ -4,6 +4,8 @@ mod copy;
 mod detection;
 mod list;
 mod office;
+mod office_read;
+mod office_write;
 mod read;
 mod validation;
 mod write;
@@ -24,6 +26,8 @@ mod tests_validation;
 pub use copy::*;
 pub use list::*;
 pub use office::*;
+pub use office_read::*;
+pub use office_write::*;
 pub use read::*;
 pub use write::*;
 

@@ -12,12 +12,12 @@ export interface ToolInfo {
 }
 
 export const ALL_TOOL_INFOS: ToolInfo[] = [
-  { id: "read", name: "Read File", description: "Read file contents from the workspace.", category: "built-in", userVisible: true },
-  { id: "write", name: "Write File", description: "Create or overwrite a file in the workspace.", category: "built-in", userVisible: true },
+  { id: "read", name: "Read File", description: "Read file contents from the workspace. Supports text files and Office documents (DOCX/XLSX/PPTX/PDF).", category: "built-in", userVisible: true },
+  { id: "write", name: "Write File", description: "Create or overwrite a file in the workspace. Can create Office documents (DOCX) via officellm.", category: "built-in", userVisible: true },
   { id: "edit", name: "Edit File", description: "Apply targeted edits to an existing file.", category: "built-in", userVisible: true },
   { id: "bash", name: "Shell Command", description: "Execute a shell command in the workspace.", category: "built-in", userVisible: true },
   { id: "fetch_url", name: "Fetch URL", description: "Fetch content from a URL and return it as text.", category: "built-in", userVisible: true },
-  { id: "parse_document", name: "Parse Document", description: "Parse document files into structured text.", category: "built-in", userVisible: true },
+  { id: "parse_document", name: "Parse Document", description: "Parse document files into structured text. Accepts attachmentId or filePath (workspace-relative).", category: "built-in", userVisible: true },
   { id: "skill", name: "Load Skill", description: "Load a skill's instructions into the conversation.", category: "built-in", userVisible: false },
   { id: "skill_resource", name: "Skill Resource", description: "Load a specific resource guide from an enabled skill.", category: "built-in", userVisible: false },
   { id: "spawn_agent", name: "Spawn Agent", description: "Run a sub-agent for independent subtask execution.", category: "built-in", userVisible: false },
