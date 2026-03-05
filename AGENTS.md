@@ -11,7 +11,7 @@
 5. **`.agent/workflows/test-quality.md`** — 测试质量约束（覆盖率、组件测试、文档覆盖度）
 6. **`.agent/workflows/release-workflow.md`** — 双轨发版规则（Feature / Hotfix 并行）
 7. **`.agent/workflows/submit-pr.md`** — PR 提交规范与流程
-8. **`.agent/workflows/skill-maintenance.md`** — 内置 Skill 文档同步规则（功能变更时更新 user-manual/feedback）
+8. **`.agent/workflows/doc-review.md`** — 文档审计与 Skill 同步（含触发规则、全量审计流程）
 9. **`CLAUDE.md`** — 项目设计规范、技术栈、代码约定（Hard Constraints）
 
 ## 优先级
@@ -38,6 +38,7 @@ CLAUDE.md Hard Constraints
 | 文件大小校验 | `python3 scripts/check-file-size.py` |
 | 创建 PR | `gh pr create --title "type: desc" --body "..."` |
 | 审查 PR 并回写评论 | `gh pr review <id> --comment ...` / `gh pr comment <id> ...` |
+| 文档审计 | 按 `.agent/workflows/doc-review.md` 流程执行 |
 
 > `dev-check.sh` 是日常提交前的快速检查（无覆盖率）；`pre-release-check.sh` 是发版前的完整检查（含覆盖率）。
 > CI 在 PR 提交后自动运行全部检查（见 `.github/workflows/ci.yml`），无需手动触发。
