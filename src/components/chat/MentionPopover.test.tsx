@@ -17,8 +17,8 @@ const SKILLS: SkillMeta[] = [
 ];
 
 const FILES: MentionFileEntry[] = [
-  { name: "package.json", path: "package.json", isDir: false },
-  { name: "src", path: "src", isDir: true },
+  { name: "package.json", path: "package.json", isDir: false, parentDir: "" },
+  { name: "src", path: "src", isDir: true, parentDir: "" },
 ];
 
 afterEach(cleanup);
@@ -29,7 +29,7 @@ describe("buildMentionItems", () => {
     expect(items).toHaveLength(6);
     expect(items[0]).toEqual({ type: "tool", id: "bash", label: "bash", description: "Shell Command" });
     expect(items[2]).toEqual({ type: "skill", id: "officellm", label: "officellm", description: "Office integration", emoji: "📦" });
-    expect(items[4]).toEqual({ type: "file", id: "package.json", label: "package.json", isDir: false });
+    expect(items[4]).toEqual({ type: "file", id: "package.json", label: "package.json", isDir: false, description: undefined });
   });
 
   it("returns empty array when all inputs are empty", () => {
@@ -117,5 +117,22 @@ describe("MentionPopover", () => {
     render(<MentionPopover {...defaultProps} files={[]} />);
     expect(screen.queryByText("FILES")).toBeNull();
     expect(screen.getByText("TOOLS")).toBeTruthy();
+  });
+
+  it("shows parentDir as description for subdirectory files", () => {
+    const filesWithParent: MentionFileEntry[] = [
+      { name: "App.tsx", path: "src/components/App.tsx", isDir: false, parentDir: "src/components/" },
+    ];
+    render(<MentionPopover {...defaultProps} files={filesWithParent} />);
+    expect(screen.getByText("App.tsx")).toBeTruthy();
+    expect(screen.getByText("src/components/")).toBeTruthy();
+  });
+
+  it("does not show description for root-level files", () => {
+    render(<MentionPopover {...defaultProps} />);
+    // package.json has empty parentDir, so no description span
+    const items = buildMentionItems(TOOLS, SKILLS, FILES);
+    const fileItem = items.find((i) => i.id === "package.json");
+    expect(fileItem?.description).toBeUndefined();
   });
 });

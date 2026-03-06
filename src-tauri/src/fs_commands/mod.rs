@@ -8,10 +8,13 @@ mod office_read;
 mod office_write;
 mod read;
 mod validation;
+mod walk;
 mod write;
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod tests_walk;
 #[cfg(test)]
 mod tests_copy;
 #[cfg(test)]
@@ -29,6 +32,7 @@ pub use office::*;
 pub use office_read::*;
 pub use office_write::*;
 pub use read::*;
+pub use walk::*;
 pub use write::*;
 
 pub(crate) use validation::ensure_inside_workspace_exists;

@@ -123,6 +123,7 @@ pub fn run() {
       fs_commands::write_binary_file,
       fs_commands::stat_file,
       fs_commands::list_dir,
+      fs_commands::walk_files,
       fs_commands::read_file_as_data_url,
       fs_commands::open_with_app,
       fs_commands::detect_office_apps,
