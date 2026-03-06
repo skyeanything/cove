@@ -19,7 +19,7 @@ const BINARY_EXTENSIONS: &[&str] = &[
     "mp3", "wav", "ogg", "mp4", "webm", "mov", "avi", "mkv",
 ];
 
-pub(super) fn path_has_binary_extension(p: &Path) -> bool {
+pub(crate) fn path_has_binary_extension(p: &Path) -> bool {
     p.extension()
         .and_then(|e| e.to_str())
         .map(|e| BINARY_EXTENSIONS.iter().any(|ext| ext.eq_ignore_ascii_case(e)))
@@ -42,7 +42,7 @@ pub(super) fn path_has_text_extension(p: &Path) -> bool {
 }
 
 /// 读取前 8KB，若非 UTF-8 或可打印字节占比 < 70% 则视为二进制。
-pub(super) fn is_binary_content(mut reader: impl Read) -> Result<bool, std::io::Error> {
+pub(crate) fn is_binary_content(mut reader: impl Read) -> Result<bool, std::io::Error> {
     let mut buf = [0u8; 8192];
     let n = reader.read(&mut buf)?;
     let buf = &buf[..n];

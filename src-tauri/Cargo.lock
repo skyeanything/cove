@@ -110,6 +110,7 @@ dependencies = [
  "chrono",
  "dirs",
  "docx-lite",
+ "glob",
  "html2md",
  "ignore",
  "libc",

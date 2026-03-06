@@ -36,8 +36,16 @@ Use `bash` for system interaction:
 | `console.log/warn/error` | Output to result |
 | `workspace.readFile(path)` | Read a file (relative to workspace root) |
 | `workspace.writeFile(path, content)` | Write a file |
+| `workspace.appendFile(path, content)` | Append content to a file (creates if not exists) |
 | `workspace.listDir(path)` | List directory contents |
-| `workspace.officellm(cmd, args)` | Call office document CLI or Server mode (returns JSON string → use `JSON.parse()`). Note: the JS API name remains `officellm` for backward compatibility. |
+| `workspace.exists(path)` | Check if file/directory exists (returns boolean) |
+| `workspace.stat(path)` | Get file metadata: `{ size, mtime, isDir, isBinary }` |
+| `workspace.copyFile(src, dst)` | Copy a file (auto-creates parent directories) |
+| `workspace.moveFile(src, dst)` | Move/rename a file |
+| `workspace.remove(path)` | Delete a file or empty directory (safe: no recursive delete) |
+| `workspace.createDir(path)` | Create directory (including intermediate directories) |
+| `workspace.glob(pattern)` | Search files by glob pattern, returns relative paths (max 1000) |
+| `workspace.officellm(cmd, args)` | Call office document CLI or Server mode (returns JSON string). Note: the JS API name remains `officellm` for backward compatibility. |
 | `Math.*`, `JSON.*`, `Date`, `RegExp`, `Map`, `Set` | Standard JS built-ins |
 
 **Not available**: `fetch`, `require`, `import`, `process`, `fs`, `XMLHttpRequest`.

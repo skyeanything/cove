@@ -35,6 +35,7 @@ pub use read::*;
 pub use walk::*;
 pub use write::*;
 
+pub(crate) use detection::{is_binary_content, path_has_binary_extension};
 pub(crate) use validation::ensure_inside_workspace_exists;
 pub(crate) use validation::ensure_inside_workspace_may_not_exist;
 

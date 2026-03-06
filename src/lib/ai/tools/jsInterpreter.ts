@@ -14,7 +14,10 @@ export const jsInterpreterTool = tool({
   description:
     "Execute JavaScript code in a sandboxed interpreter (QuickJS). " +
     "No network access. Available APIs: console.log(), Math.*, JSON.*, " +
-    "workspace.readFile(path), workspace.writeFile(path, content), workspace.listDir(path). " +
+    "workspace.readFile(path), workspace.writeFile(path, content), workspace.listDir(path), " +
+    "workspace.exists(path), workspace.stat(path), workspace.copyFile(src, dst), " +
+    "workspace.moveFile(src, dst), workspace.remove(path), workspace.createDir(path), " +
+    "workspace.glob(pattern), workspace.appendFile(path, content). " +
     "Use this for computation and data processing: math, JSON transforms, string manipulation, " +
     "aggregation, or multi-step logic. Do NOT use this as a wrapper when a dedicated tool " +
     "(office, read, write, bash) can accomplish the task directly.",
