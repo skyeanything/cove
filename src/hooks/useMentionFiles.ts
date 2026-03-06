@@ -1,25 +1,34 @@
 import { useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { matchesPinyinOrSubstring } from "@/lib/pinyin-filter";
 
 export interface MentionFileEntry {
   name: string;
   path: string;
   isDir: boolean;
+  /** Parent directory path (e.g. "src/components/"), empty for root-level entries */
+  parentDir: string;
 }
 
-interface ListDirEntry {
+interface WalkFileEntry {
   name: string;
   path: string;
   isDir: boolean;
-  mtimeSecs: number;
 }
 
 const MAX_RESULTS = 10;
 
+/** Extract parent directory from a relative path. */
+function extractParentDir(path: string): string {
+  const lastSlash = path.lastIndexOf("/");
+  if (lastSlash <= 0) return "";
+  return path.slice(0, lastSlash + 1);
+}
+
 /**
- * Lists workspace files for @mention autocomplete.
- * Fetches the root directory listing on first enable, caches it,
- * and filters by query.
+ * Lists workspace files (recursively) for @mention autocomplete.
+ * Uses walk_files for subdirectory traversal and pinyin matching
+ * for Chinese filename search.
  */
 export function useMentionFiles(
   workspacePath: string | null,
@@ -38,15 +47,14 @@ export function useMentionFiles(
     let cancelled = false;
 
     const load = async () => {
-      // Use cache if workspace hasn't changed
       if (cacheRef.current?.path === workspacePath) {
         applyFilter(cacheRef.current.items);
         return;
       }
 
       try {
-        const raw = await invoke<ListDirEntry[]>("list_dir", {
-          args: { workspaceRoot: workspacePath, path: "", includeHidden: false },
+        const raw = await invoke<WalkFileEntry[]>("walk_files", {
+          args: { workspaceRoot: workspacePath, includeDirs: true },
         });
         if (cancelled) return;
 
@@ -54,6 +62,7 @@ export function useMentionFiles(
           name: e.name,
           path: e.path,
           isDir: e.isDir,
+          parentDir: extractParentDir(e.path),
         }));
         cacheRef.current = { path: workspacePath, items };
         applyFilter(items);
@@ -64,10 +73,15 @@ export function useMentionFiles(
 
     function applyFilter(items: MentionFileEntry[]) {
       if (cancelled) return;
-      const q = query.toLowerCase();
-      const filtered = q
-        ? items.filter((f) => f.name.toLowerCase().includes(q))
-        : items;
+      if (!query) {
+        setEntries(items.slice(0, MAX_RESULTS));
+        return;
+      }
+      const filtered = items.filter(
+        (f) =>
+          matchesPinyinOrSubstring(f.name, query) ||
+          matchesPinyinOrSubstring(f.path, query),
+      );
       setEntries(filtered.slice(0, MAX_RESULTS));
     }
 
