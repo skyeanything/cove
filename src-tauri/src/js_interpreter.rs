@@ -3,7 +3,7 @@
 //! 通过 rquickjs 嵌入 QuickJS 引擎，AI agent 可直接执行 JS 代码。
 //! 引擎天然沙箱：默认不暴露文件系统/网络/进程 API，仅注册受控的安全函数。
 
-use rquickjs::{Context, Function, Runtime};
+use rquickjs::{CaughtError, Context, Function, Runtime};
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -110,12 +110,15 @@ pub fn run_js(app: tauri::AppHandle, args: RunJsArgs) -> Result<JsExecutionResul
                     execution_ms,
                 })
             }
-            Err(e) => Ok(JsExecutionResult {
-                output: buf.borrow().join("\n"),
-                result: String::new(),
-                error: Some(format!("{e}")),
-                execution_ms,
-            }),
+            Err(e) => {
+                let caught = CaughtError::from_error(&ctx, e);
+                Ok(JsExecutionResult {
+                    output: buf.borrow().join("\n"),
+                    result: String::new(),
+                    error: Some(format!("{caught}")),
+                    execution_ms,
+                })
+            }
         }
     })
 }
