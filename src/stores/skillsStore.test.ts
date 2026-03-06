@@ -161,14 +161,23 @@ describe("skillsStore - loadExternalSkills", () => {
     expect(state.externalSkills).toEqual([]);
   });
 
-  it("skips if already loading (guard)", async () => {
+  it("concurrent call awaits inflight loading instead of skipping", async () => {
     mockConfig({});
-    vi.mocked(invoke).mockResolvedValue([]);
+    const skill = makeSkill("concurrent-skill");
+    vi.mocked(parseSkillFromRaw).mockReturnValue(skill);
+    vi.mocked(invoke).mockResolvedValue([
+      { source: "cove", name: "c", path: "/p", content: "md" },
+    ]);
 
-    useSkillsStore.setState({ loading: true });
-    await useSkillsStore.getState().loadExternalSkills();
+    // Start two concurrent loads — second should await the first, not skip
+    const p1 = useSkillsStore.getState().loadExternalSkills("/ws");
+    const p2 = useSkillsStore.getState().loadExternalSkills("/ws");
+    await Promise.all([p1, p2]);
 
-    expect(invoke).not.toHaveBeenCalled();
+    // invoke called only once (second call awaited the first)
+    expect(invoke).toHaveBeenCalledTimes(1);
+    expect(useSkillsStore.getState().loaded).toBe(true);
+    expect(useSkillsStore.getState().externalSkills).toHaveLength(1);
   });
 
   it("passes null customRoots when dirPaths is empty", async () => {
@@ -257,13 +266,12 @@ describe("skillsStore - saveSkill", () => {
 
 describe("skillsStore - loadExternalSkills auto-enables office-bundled", () => {
   it("auto-enables office-bundled skill names missing from enabledSkillNames", async () => {
-    mockConfig({});
+    mockConfig({ enabled: ["existing-skill"] });
     const bundledSkill = makeSkill("officellm-bundled");
     vi.mocked(parseSkillFromRaw).mockReturnValue(bundledSkill);
     vi.mocked(invoke).mockResolvedValue([
       { source: "office-bundled", name: "OfficeLLM", path: "/bundled/path", content: "bundled" },
     ]);
-    useSkillsStore.setState({ enabledSkillNames: ["existing-skill"] });
 
     await useSkillsStore.getState().loadExternalSkills();
 
@@ -274,13 +282,12 @@ describe("skillsStore - loadExternalSkills auto-enables office-bundled", () => {
   });
 
   it("does not duplicate already-enabled office-bundled skills", async () => {
-    mockConfig({});
+    mockConfig({ enabled: ["already-enabled"] });
     const bundledSkill = makeSkill("already-enabled");
     vi.mocked(parseSkillFromRaw).mockReturnValue(bundledSkill);
     vi.mocked(invoke).mockResolvedValue([
       { source: "office-bundled", name: "OfficeLLM", path: "/bundled/path", content: "bundled" },
     ]);
-    useSkillsStore.setState({ enabledSkillNames: ["already-enabled"] });
 
     await useSkillsStore.getState().loadExternalSkills();
 

@@ -24,7 +24,12 @@ vi.mock("ai", async (importOriginal) => {
   return { ...actual, generateText: vi.fn().mockResolvedValue({ text: "" }) };
 });
 vi.mock("@/lib/ai/tools", () => ({ getAgentTools: vi.fn().mockReturnValue({}) }));
-vi.mock("./skillsStore", () => ({ getEnabledSkillNames: vi.fn().mockResolvedValue([]) }));
+vi.mock("./skillsStore", () => ({
+  getEnabledSkillNames: vi.fn().mockResolvedValue([]),
+  useSkillsStore: {
+    getState: vi.fn().mockReturnValue({ loaded: true, loadExternalSkills: vi.fn() }),
+  },
+}));
 vi.mock("./chat-retry-utils", () => ({
   isRateLimitErrorMessage: vi.fn().mockReturnValue(false),
   backoffDelayMs: vi.fn().mockReturnValue(100),
@@ -42,7 +47,7 @@ import { handleAgentStream } from "@/lib/ai/stream-handler";
 import { buildSystemPrompt } from "@/lib/ai/context";
 import { isOfficeAvailable } from "@/lib/ai/office-detect";
 import { getAgentTools } from "@/lib/ai/tools";
-import { getEnabledSkillNames } from "./skillsStore";
+import { getEnabledSkillNames, useSkillsStore } from "./skillsStore";
 import { maybeMeditate } from "@/lib/ai/soul-meditate";
 import { isRateLimitErrorMessage, backoffDelayMs, sleep } from "./chat-retry-utils";
 import { runStreamLoop } from "./chat-stream-runner";
@@ -369,6 +374,38 @@ describe("runStreamLoop", () => {
       expect(runAgent).toHaveBeenCalledWith(
         expect.objectContaining({ maxOutputTokens: undefined }),
       );
+    });
+
+    it("calls loadExternalSkills when skills store is not yet loaded", async () => {
+      const loadExternalSkills = vi.fn().mockResolvedValue(undefined);
+      vi.mocked(useSkillsStore.getState).mockReturnValue({
+        loaded: false,
+        loadExternalSkills,
+      } as never);
+
+      const result = makeStreamResult();
+      vi.mocked(runAgent).mockReturnValue("s" as never);
+      vi.mocked(handleAgentStream).mockResolvedValue(result);
+
+      await runStreamLoop(makeOpts({ workspacePath: "/my-workspace" }), makeCallbacks());
+
+      expect(loadExternalSkills).toHaveBeenCalledWith("/my-workspace");
+    });
+
+    it("skips loadExternalSkills when skills store is already loaded", async () => {
+      const loadExternalSkills = vi.fn();
+      vi.mocked(useSkillsStore.getState).mockReturnValue({
+        loaded: true,
+        loadExternalSkills,
+      } as never);
+
+      const result = makeStreamResult();
+      vi.mocked(runAgent).mockReturnValue("s" as never);
+      vi.mocked(handleAgentStream).mockResolvedValue(result);
+
+      await runStreamLoop(makeOpts(), makeCallbacks());
+
+      expect(loadExternalSkills).not.toHaveBeenCalled();
     });
 
     it("triggers maybeMeditate at conversation start", async () => {

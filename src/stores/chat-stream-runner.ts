@@ -13,7 +13,7 @@ import { maybeMeditate } from "@/lib/ai/soul-meditate";
 import { generateText } from "ai";
 import { getAgentTools } from "@/lib/ai/tools";
 import type { SubAgentContext } from "@/lib/ai/sub-agent";
-import { getEnabledSkillNames } from "./skillsStore";
+import { getEnabledSkillNames, useSkillsStore } from "./skillsStore";
 import type { StreamUpdate } from "@/lib/ai/stream-types";
 import { isRateLimitErrorMessage, backoffDelayMs, sleep, RETRYABLE_ATTEMPTS } from "./chat-retry-utils";
 
@@ -51,6 +51,14 @@ export async function runStreamLoop(
   const model = getModel(provider, modelId);
   const modelOption = getModelOption(provider, modelId);
   const enabledSkillNames = await getEnabledSkillNames();
+
+  // Ensure external skills (and their resources) are loaded before building tools.
+  // Without this, collectAllResources() in skill_resource tool sees an empty store.
+  const skillsState = useSkillsStore.getState();
+  if (!skillsState.loaded) {
+    await skillsState.loadExternalSkills(workspacePath);
+  }
+
   const officeAvailable = await isOfficeAvailable();
   const soulPrompt = formatSoulPrompt(await readSoul());
 
