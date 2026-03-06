@@ -1,22 +1,15 @@
-//! First-use initialization: run `officellm init` when no config exists yet.
+//! Initialization: run `officellm init` to keep skills in sync with the binary.
 
 use std::path::Path;
 use std::process::Command;
 
-/// Marker file created by `officellm init`.
-const MARKER: &str = "config.json";
-
-/// Ensure the officellm home directory has been initialized.
+/// Ensure the officellm home directory is initialized and up-to-date.
 ///
-/// If `home/config.json` already exists the call is a no-op (idempotent).
-/// Otherwise it spawns `bin init` with `OFFICELLM_HOME=home`, checks the
-/// exit status, and verifies the marker file was created.
+/// Always runs `bin init` with `OFFICELLM_HOME=home` so that bundled
+/// skills stay in sync when the binary is upgraded. The init command
+/// itself is idempotent — it overwrites stale assets and no-ops for
+/// config that already exists.
 pub(crate) fn ensure_initialized(bin: &Path, home: &Path) -> Result<(), String> {
-    let marker = home.join(MARKER);
-    if marker.exists() {
-        return Ok(());
-    }
-
     let output = Command::new(bin)
         .arg("init")
         .env("OFFICELLM_HOME", home)
@@ -32,7 +25,7 @@ pub(crate) fn ensure_initialized(bin: &Path, home: &Path) -> Result<(), String> 
         ));
     }
 
-    if !marker.exists() {
+    if !home.join("config.json").exists() {
         return Err("officellm init succeeded but config.json was not created".into());
     }
 
@@ -42,18 +35,6 @@ pub(crate) fn ensure_initialized(bin: &Path, home: &Path) -> Result<(), String> 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
-
-    #[test]
-    fn skips_when_marker_exists() {
-        let dir = tempfile::TempDir::new().unwrap();
-        let home = dir.path();
-        std::fs::write(home.join(MARKER), "{}").unwrap();
-
-        // Binary doesn't need to exist — we never invoke it.
-        let fake_bin = PathBuf::from("/nonexistent/officellm");
-        assert!(ensure_initialized(&fake_bin, home).is_ok());
-    }
 
     #[cfg(unix)]
     #[test]
@@ -73,7 +54,29 @@ mod tests {
             .unwrap();
 
         assert!(ensure_initialized(&bin, home).is_ok());
-        assert!(home.join(MARKER).exists());
+        assert!(home.join("config.json").exists());
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn runs_init_even_when_config_exists() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let home = dir.path();
+        // Pre-create config.json to simulate a previous init.
+        std::fs::write(home.join("config.json"), "{}").unwrap();
+
+        // Binary that creates a marker file proving it was invoked.
+        let bin = dir.path().join("tracking-officellm");
+        std::fs::write(
+            &bin,
+            "#!/bin/sh\ntouch \"$OFFICELLM_HOME/init-was-called\"\n",
+        )
+        .unwrap();
+        std::fs::set_permissions(&bin, std::os::unix::fs::PermissionsExt::from_mode(0o755))
+            .unwrap();
+
+        assert!(ensure_initialized(&bin, home).is_ok());
+        assert!(home.join("init-was-called").exists(), "init must run even when config.json exists");
     }
 
     #[cfg(unix)]

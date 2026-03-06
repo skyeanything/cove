@@ -183,8 +183,8 @@ fn read_skill_file(path: &Path) -> Result<String, std::io::Error> {
 /// Resolve the bundled officellm skills directory (if bundled sidecar exists).
 ///
 /// Ensures `officellm init` has been run so that `skills/SKILL.md` exists
-/// before checking for the directory.  `ensure_initialized` is idempotent
-/// (returns immediately when `config.json` already exists).
+/// before checking for the directory.  `ensure_initialized` always runs
+/// `officellm init` (the init command itself is idempotent).
 fn bundled_officellm_skills(app: &tauri::AppHandle) -> Option<PathBuf> {
     let (bin, is_bundled) = crate::officellm::resolve::resolve_bin()?;
     if !is_bundled {
