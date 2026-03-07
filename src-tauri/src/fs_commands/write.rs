@@ -8,10 +8,7 @@ use serde::Deserialize;
 use super::validation::{ensure_inside_workspace_exists, ensure_inside_workspace_may_not_exist};
 use super::FsError;
 
-// ---------------------------------------------------------------------------
 // write_file
-// ---------------------------------------------------------------------------
-
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WriteFileArgs {
@@ -35,9 +32,34 @@ pub fn write_file(args: WriteFileArgs) -> Result<(), FsError> {
     Ok(())
 }
 
-// ---------------------------------------------------------------------------
+// create_new_file: atomic create-only, fails if file already exists
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateNewFileArgs {
+    pub workspace_root: String,
+    pub path: String,
+}
+
+#[tauri::command]
+pub fn create_new_file(args: CreateNewFileArgs) -> Result<(), FsError> {
+    let abs = ensure_inside_workspace_may_not_exist(&args.workspace_root, &args.path)?;
+    if abs.is_dir() {
+        return Err(FsError::NotAllowed("path is a directory".into()));
+    }
+    if let Some(p) = abs.parent().filter(|p| !p.exists()) {
+        fs::create_dir_all(p).map_err(FsError::from)?;
+    }
+    fs::File::options().write(true).create_new(true).open(&abs).map_err(|e| {
+        if e.kind() == std::io::ErrorKind::AlreadyExists {
+            FsError::NotAllowed("already exists".into())
+        } else {
+            FsError::from(e)
+        }
+    })?;
+    Ok(())
+}
+
 // create_dir
-// ---------------------------------------------------------------------------
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -82,9 +104,7 @@ pub fn create_dir(app: tauri::AppHandle, args: CreateDirArgs) -> Result<(), FsEr
     Ok(())
 }
 
-// ---------------------------------------------------------------------------
 // move_file (含重命名)
-// ---------------------------------------------------------------------------
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -137,9 +157,7 @@ pub fn move_file(app: tauri::AppHandle, args: MoveFileArgs) -> Result<(), FsErro
     Ok(())
 }
 
-// ---------------------------------------------------------------------------
 // remove_entry (文件或目录)
-// ---------------------------------------------------------------------------
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -168,9 +186,7 @@ pub fn remove_entry(app: tauri::AppHandle, args: RemoveEntryArgs) -> Result<(), 
     Ok(())
 }
 
-// ---------------------------------------------------------------------------
 // reveal_in_finder
-// ---------------------------------------------------------------------------
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -211,9 +227,7 @@ pub fn reveal_in_finder(args: RevealInFinderArgs) -> Result<(), FsError> {
     Ok(())
 }
 
-// ---------------------------------------------------------------------------
 // open_with_app
-// ---------------------------------------------------------------------------
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -239,9 +253,7 @@ pub fn open_with_app(args: OpenWithAppArgs) -> Result<(), FsError> {
     Ok(())
 }
 
-// ---------------------------------------------------------------------------
 // write_binary_file
-// ---------------------------------------------------------------------------
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]

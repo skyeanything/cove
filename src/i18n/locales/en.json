@@ -108,7 +108,8 @@
     "deleteConfirmDescription": "Are you sure you want to delete \"{{name}}\"? This cannot be undone.",
     "folderAlreadyExists": "A folder with this name already exists.",
     "newFile": "New File",
-    "fileAlreadyExists": "A file with this name already exists."
+    "fileAlreadyExists": "A file with this name already exists.",
+    "invalidFileName": "Invalid file name."
   },
   "preview": {
     "openFilePanel": "Open file panel",

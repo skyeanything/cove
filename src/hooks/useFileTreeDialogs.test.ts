@@ -57,7 +57,7 @@ describe("useFileTreeDialogs", () => {
       act(() => result.current.onNewFile("src"));
       act(() => result.current.setNewFileName("a/b"));
       act(() => result.current.handleNewFileConfirm());
-      expect(result.current.newFileError).toBe("explorer.fileAlreadyExists");
+      expect(result.current.newFileError).toBe("explorer.invalidFileName");
       expect(mockInvoke).not.toHaveBeenCalled();
     });
 
@@ -66,39 +66,35 @@ describe("useFileTreeDialogs", () => {
       act(() => result.current.onNewFile("src"));
       act(() => result.current.setNewFileName("a\\b"));
       act(() => result.current.handleNewFileConfirm());
-      expect(result.current.newFileError).toBe("explorer.fileAlreadyExists");
+      expect(result.current.newFileError).toBe("explorer.invalidFileName");
     });
 
-    it("calls stat_file then write_file with correct args on success", async () => {
-      mockInvoke
-        .mockRejectedValueOnce(new Error("not found"))
-        .mockResolvedValueOnce(undefined);
+    it("calls create_new_file with correct args on success", async () => {
+      mockInvoke.mockResolvedValueOnce(undefined);
 
       const { result, params } = renderDialogs();
       act(() => result.current.onNewFile("src"));
       act(() => result.current.setNewFileName("test.ts"));
       await act(async () => result.current.handleNewFileConfirm());
 
-      expect(mockInvoke).toHaveBeenCalledWith("stat_file", {
+      expect(mockInvoke).toHaveBeenCalledWith("create_new_file", {
         args: { workspaceRoot: "/workspace", path: "src/test.ts" },
       });
-      expect(mockInvoke).toHaveBeenCalledWith("write_file", {
-        args: { workspaceRoot: "/workspace", path: "src/test.ts", content: "" },
-      });
+      expect(mockInvoke).toHaveBeenCalledTimes(1);
       expect(result.current.newFileParentPath).toBeNull();
       expect(result.current.newFileName).toBe("");
       expect(params.setExpandedDirs).toHaveBeenCalled();
     });
 
-    it("sets file-already-exists error when stat_file succeeds", async () => {
-      mockInvoke.mockResolvedValueOnce({ size: 10 });
+    it("sets file-already-exists error when backend returns already exists", async () => {
+      mockInvoke.mockRejectedValueOnce({ message: "already exists" });
 
       const { result } = renderDialogs();
       act(() => result.current.onNewFile(""));
       act(() => result.current.setNewFileName("existing.txt"));
       await act(async () => result.current.handleNewFileConfirm());
 
-      expect(mockInvoke).toHaveBeenCalledWith("stat_file", {
+      expect(mockInvoke).toHaveBeenCalledWith("create_new_file", {
         args: { workspaceRoot: "/workspace", path: "existing.txt" },
       });
       expect(result.current.newFileError).toBe("explorer.fileAlreadyExists");
@@ -106,16 +102,14 @@ describe("useFileTreeDialogs", () => {
     });
 
     it("builds path correctly for root parent (empty string)", async () => {
-      mockInvoke
-        .mockRejectedValueOnce(new Error("not found"))
-        .mockResolvedValueOnce(undefined);
+      mockInvoke.mockResolvedValueOnce(undefined);
 
       const { result } = renderDialogs();
       act(() => result.current.onNewFile(""));
       act(() => result.current.setNewFileName("readme.md"));
       await act(async () => result.current.handleNewFileConfirm());
 
-      expect(mockInvoke).toHaveBeenCalledWith("stat_file", {
+      expect(mockInvoke).toHaveBeenCalledWith("create_new_file", {
         args: { workspaceRoot: "/workspace", path: "readme.md" },
       });
     });

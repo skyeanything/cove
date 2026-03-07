@@ -122,6 +122,7 @@ pub fn run() {
       fs_commands::read_file,
       fs_commands::read_file_raw,
       fs_commands::write_file,
+      fs_commands::create_new_file,
       fs_commands::write_binary_file,
       fs_commands::stat_file,
       fs_commands::list_dir,

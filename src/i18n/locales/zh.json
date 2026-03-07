@@ -108,7 +108,8 @@
     "deleteConfirmDescription": "确定要删除「{{name}}」吗？此操作无法撤销。",
     "folderAlreadyExists": "该名称已存在，请使用其他名称",
     "newFile": "新建文件",
-    "fileAlreadyExists": "该名称已存在，请使用其他名称"
+    "fileAlreadyExists": "该名称已存在，请使用其他名称",
+    "invalidFileName": "文件名无效"
   },
   "preview": {
     "openFilePanel": "打开文件面板",

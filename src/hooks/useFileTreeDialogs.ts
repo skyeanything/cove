@@ -91,33 +91,28 @@ export function useFileTreeDialogs({
     const name = newFileName.trim();
     if (!name || !workspaceRoot || newFileParentPath === null) return;
     if (name.includes("/") || name.includes("\\")) {
-      setNewFileError(t("explorer.fileAlreadyExists"));
+      setNewFileError(t("explorer.invalidFileName"));
       return;
     }
     setNewFileError(null);
     const parentPath = newFileParentPath;
     const fullPath = parentPath ? `${parentPath}/${name}` : name;
-    invoke("stat_file", { args: { workspaceRoot, path: fullPath } })
+    invoke("create_new_file", { args: { workspaceRoot, path: fullPath } })
       .then(() => {
-        setNewFileError(t("explorer.fileAlreadyExists"));
+        setNewFileParentPath(null);
+        setNewFileName("");
+        setNewFileError(null);
+        if (parentPath) {
+          setExpandedDirs((prev) => new Set([...prev, parentPath]));
+        }
       })
-      .catch(() => {
-        invoke("write_file", { args: { workspaceRoot, path: fullPath, content: "" } })
-          .then(() => {
-            setNewFileParentPath(null);
-            setNewFileName("");
-            setNewFileError(null);
-            if (parentPath) {
-              setExpandedDirs((prev) => new Set([...prev, parentPath]));
-            }
-          })
-          .catch((err: unknown) => {
-            const msg =
-              typeof err === "object" && err != null && "message" in err
-                ? String((err as { message: string }).message)
-                : String(err);
-            setNewFileError(msg);
-          });
+      .catch((err: unknown) => {
+        const msg =
+          typeof err === "object" && err != null && "message" in err
+            ? String((err as { message: string }).message)
+            : String(err);
+        const isAlreadyExists = /already exists|已存在/i.test(msg);
+        setNewFileError(isAlreadyExists ? t("explorer.fileAlreadyExists") : msg);
       });
   }, [workspaceRoot, newFileParentPath, newFileName, t, setExpandedDirs]);
 
