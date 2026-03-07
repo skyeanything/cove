@@ -25,7 +25,7 @@
     "appearanceComingSoon": "Appearance settings coming soon"
   },
   "chat": {
-    "placeholder": "Enter a message here, press {{shortcut}} to send",
+    "placeholder": "Describe a task, @ to invoke skills, / for commands",
     "placeholderNoModel": "Select a model to start chatting",
     "selectModel": "Select model",
     "workspace": "Workspace",
@@ -73,7 +73,6 @@
     "pinned": "Pinned",
     "today": "Today",
     "yesterday": "Yesterday",
-    "past7days": "Past 7 days",
     "earlier": "Earlier",
     "newChat": "New Chat",
     "searchPlaceholder": "Search",
@@ -88,6 +87,8 @@
     "unpinConversation": "Unpin conversation",
     "rename": "Rename",
     "delete": "Delete",
+    "confirmDelete": "Delete?",
+    "deleted": "Deleted",
     "searchMessagesTitle": "Search messages",
     "searchMessagesPlaceholder": "Search in message content…",
     "searching": "Searching…",
@@ -111,7 +112,15 @@
     "delete": "Delete",
     "deleteConfirmTitle": "Delete",
     "deleteConfirmDescription": "Are you sure you want to delete \"{{name}}\"? This cannot be undone.",
-    "folderAlreadyExists": "A folder with this name already exists."
+    "folderAlreadyExists": "A folder with this name already exists.",
+    "setContextAnchor": "Set as AI Context",
+    "contextAnchorActive": "AI Context",
+    "search": "Search files"
+  },
+  "context": {
+    "label": "Context",
+    "clear": "Clear",
+    "multipleItems": "{{count}} items selected"
   },
   "preview": {
     "openFilePanel": "Open file panel",
@@ -142,7 +151,9 @@
     "searchFiles": "Search files",
     "csvRows": "rows",
     "csvCols": "columns",
-    "csvTruncated": "showing {{rows}} rows x {{cols}} columns"
+    "csvTruncated": "showing {{rows}} rows x {{cols}} columns",
+    "dirItems": "items",
+    "dirLabel": "folder"
   },
   "common": {
     "settings": "Settings"

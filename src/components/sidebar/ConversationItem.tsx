@@ -7,14 +7,21 @@ import {
   ContextMenuSeparator,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Pin, Pencil, Trash2, MoreHorizontal } from "lucide-react";
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useState, useCallback } from "react";
 import type { Conversation } from "@/db/types";
-import { ProviderIcon } from "@/components/common/ProviderIcon";
 
 interface ConversationItemProps {
   conversation: Conversation;
   active: boolean;
+  isStreaming: boolean;
   isEditing: boolean;
   editingTitle: string;
   onEditingTitleChange: (v: string) => void;
@@ -29,6 +36,7 @@ interface ConversationItemProps {
 export function ConversationItem({
   conversation,
   active,
+  isStreaming,
   isEditing,
   editingTitle,
   onEditingTitleChange,
@@ -41,14 +49,22 @@ export function ConversationItem({
 }: ConversationItemProps) {
   const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
+  const [deleted, setDeleted] = useState(false);
 
   useEffect(() => {
     if (isEditing) inputRef.current?.focus();
   }, [isEditing]);
 
+  const handleDelete = useCallback((e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    setDeleted(true);
+    // Brief flash of "deleted" text, then actually remove
+    setTimeout(() => onDelete(), 600);
+  }, [onDelete]);
+
   if (isEditing) {
     return (
-      <div className="px-2 py-[6px]">
+      <div className="px-2 py-[5px]">
         <input
           ref={inputRef}
           type="text"
@@ -66,6 +82,16 @@ export function ConversationItem({
     );
   }
 
+  // After delete: show brief fade-out confirmation
+  if (deleted) {
+    return (
+      <div className="flex items-center gap-2 rounded-lg px-2 py-[5px] text-[13px] text-foreground-tertiary" style={{ animation: "fade-out 500ms ease-out forwards" }}>
+        <Trash2 className="size-3" strokeWidth={1.5} />
+        <span>{t("sidebar.deleted", "Deleted")}</span>
+      </div>
+    );
+  }
+
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
@@ -76,19 +102,63 @@ export function ConversationItem({
             onRename();
           }}
           className={cn(
-            "group flex w-full items-center gap-2.5 rounded-lg px-2 py-[6px] text-left text-[13px] transition-colors",
+            "group flex w-full items-center gap-2 rounded-lg px-2 py-[5px] text-left text-[13px] transition-colors",
             active
               ? "bg-sidebar-accent text-sidebar-accent-foreground"
               : "text-sidebar-foreground/80 hover:bg-sidebar-accent/50",
           )}
         >
-          {conversation.provider_type && (
-            <ProviderIcon type={conversation.provider_type} className="size-3.5 shrink-0 opacity-60" />
-          )}
-          <span className="truncate">{conversation.title || t("sidebar.untitled")}</span>
-          <div className="ml-auto opacity-0 transition-opacity group-hover:opacity-100">
-            <MoreHorizontal className="size-3.5 text-muted-foreground" />
+          {/* Status dot — outline by default, solid green only when streaming */}
+          <div className="flex size-4 shrink-0 items-center justify-center">
+            <span
+              className={cn(
+                "block size-[7px] rounded-full transition-colors duration-300",
+                isStreaming
+                  ? "animate-pulse bg-green-500 shadow-[0_0_4px_1px_rgba(34,197,94,0.5)]"
+                  : "border border-foreground/20",
+              )}
+            />
           </div>
+
+          <span className="min-w-0 truncate">{conversation.title || t("sidebar.untitled")}</span>
+
+          {/* More button — visible on hover */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={(e) => e.stopPropagation()}
+                className="ml-auto shrink-0 cursor-pointer rounded p-0.5 opacity-0 transition-opacity hover:bg-sidebar-accent group-hover:opacity-100 data-[state=open]:opacity-100"
+              >
+                <MoreHorizontal className="size-3.5 text-muted-foreground" strokeWidth={1.5} />
+              </div>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-40">
+              <DropdownMenuItem
+                className="gap-2 text-[13px]"
+                onClick={(e) => { e.stopPropagation(); onPin(); }}
+              >
+                <Pin className="size-3.5" strokeWidth={1.5} />
+                {conversation.pinned ? t("sidebar.unpinConversation") : t("sidebar.pinConversation")}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="gap-2 text-[13px]"
+                onClick={(e) => { e.stopPropagation(); onRename(); }}
+              >
+                <Pencil className="size-3.5" strokeWidth={1.5} />
+                {t("sidebar.rename")}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="gap-2 text-[13px] text-destructive focus:text-destructive"
+                onClick={(e) => { e.stopPropagation(); handleDelete(); }}
+              >
+                <Trash2 className="size-3.5" strokeWidth={1.5} />
+                {t("sidebar.delete")}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </button>
       </ContextMenuTrigger>
       <ContextMenuContent className="w-48">

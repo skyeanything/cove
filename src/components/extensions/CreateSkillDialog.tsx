@@ -1,5 +1,4 @@
 import { useState, useEffect } from "react";
-import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -22,7 +21,6 @@ interface Props {
 }
 
 export function CreateSkillDialog({ open, onOpenChange }: Props) {
-  const { t } = useTranslation();
   const saveSkill = useSkillsStore((s) => s.saveSkill);
   const workspacePath = useWorkspaceStore((s) => s.activeWorkspace?.path ?? null);
 
@@ -34,17 +32,25 @@ export function CreateSkillDialog({ open, onOpenChange }: Props) {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    if (open) { setName(""); setEmoji(""); setDescription(""); setInstructions(""); setError(""); }
+    if (open) {
+      setName(""); setEmoji(""); setDescription(""); setInstructions(""); setError("");
+    }
   }, [open]);
 
   const handleSave = async () => {
     const trimmed = name.trim();
-    if (!trimmed) { setError(t("skills.nameHint")); return; }
-    if (!description.trim()) { setError(t("skills.descriptionRequired", "Description is required")); return; }
+    if (!trimmed) { setError("名称不能为空"); return; }
+    if (!description.trim()) { setError("描述不能为空"); return; }
     setSaving(true);
     setError("");
     try {
-      const content = buildSkillMd({ name: trimmed, emoji, description, instructions, extraFrontmatter: [] });
+      const content = buildSkillMd({
+        name: trimmed,
+        emoji,
+        description,
+        instructions,
+        extraFrontmatter: [],
+      });
       await saveSkill(trimmed, content, workspacePath, trimmed);
       onOpenChange(false);
     } catch (e) {
@@ -58,51 +64,87 @@ export function CreateSkillDialog({ open, onOpenChange }: Props) {
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle>{t("skills.newSkill")}</DialogTitle>
-          <DialogDescription className="sr-only">{t("skills.newSkill")}</DialogDescription>
+          <DialogTitle>新建 Skill</DialogTitle>
+          <DialogDescription className="sr-only">新建 Skill</DialogDescription>
         </DialogHeader>
-        <div className="flex flex-col gap-3 py-2">
-          <div>
-            <Label htmlFor="skill-name" className="mb-1.5 text-[12px]">{t("skills.nameLabel")}</Label>
-            <Input
-              id="skill-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder={t("skills.namePlaceholder")}
-              className="font-mono text-[13px]"
-            />
+
+        <div className="flex flex-col gap-4 py-2">
+          {/* Name + Emoji on same row */}
+          <div className="flex gap-3">
+            <div className="flex-1">
+              <Label htmlFor="skill-name" className="mb-1.5 block text-[12px]">
+                名称 <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="skill-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="my-skill"
+                className="font-mono text-[13px]"
+                autoFocus
+              />
+            </div>
+            <div className="w-[72px]">
+              <Label htmlFor="skill-emoji" className="mb-1.5 block text-[12px]">
+                图标
+              </Label>
+              <Input
+                id="skill-emoji"
+                value={emoji}
+                onChange={(e) => setEmoji(e.target.value)}
+                placeholder="🔧"
+                className="text-center text-base"
+                maxLength={4}
+              />
+            </div>
           </div>
+
+          {/* Description */}
           <div>
-            <Label htmlFor="skill-emoji" className="mb-1.5 text-[12px]">{t("skills.emojiLabel")}</Label>
-            <Input id="skill-emoji" value={emoji} onChange={(e) => setEmoji(e.target.value)} placeholder={t("skills.emojiPlaceholder")} className="text-[13px]" />
-          </div>
-          <div>
-            <Label htmlFor="skill-description" className="mb-1.5 text-[12px]">{t("skills.descriptionLabel")}</Label>
+            <Label htmlFor="skill-description" className="mb-1.5 block text-[12px]">
+              描述 <span className="text-destructive">*</span>
+            </Label>
             <Textarea
               id="skill-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder={t("skills.descriptionPlaceholder")}
-              rows={3}
+              placeholder="简明描述此 Skill 的用途，例如：帮助分析数据并生成图表"
+              rows={2}
               className="resize-none text-[13px] leading-relaxed"
             />
+            <p className="mt-1 text-[11px] text-foreground-tertiary">
+              模型通过描述判断何时调用此 Skill
+            </p>
           </div>
+
+          {/* Instructions */}
           <div>
-            <Label htmlFor="skill-instructions" className="mb-1.5 text-[12px]">{t("skills.instructionsLabel")}</Label>
+            <Label htmlFor="skill-instructions" className="mb-1.5 block text-[12px]">
+              指令内容
+            </Label>
             <Textarea
               id="skill-instructions"
               value={instructions}
               onChange={(e) => setInstructions(e.target.value)}
-              placeholder={t("skills.instructionsPlaceholder")}
+              placeholder={"# 技能说明\n\n描述 Claude 应该如何执行此 Skill 的具体步骤和规则..."}
               rows={8}
               className="resize-none font-mono text-[12px] leading-relaxed"
             />
+            <p className="mt-1 text-[11px] text-foreground-tertiary">
+              支持 Markdown，将作为 system prompt 的一部分注入
+            </p>
           </div>
+
           {error && <p className="text-[12px] text-destructive">{error}</p>}
         </div>
+
         <DialogFooter>
-          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>{t("skills.cancel")}</Button>
-          <Button size="sm" onClick={handleSave} disabled={saving}>{t("skills.create")}</Button>
+          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+            取消
+          </Button>
+          <Button size="sm" onClick={() => void handleSave()} disabled={saving}>
+            {saving ? "创建中..." : "创建"}
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

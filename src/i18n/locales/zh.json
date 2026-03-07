@@ -25,7 +25,7 @@
     "appearanceComingSoon": "外观设置即将推出"
   },
   "chat": {
-    "placeholder": "在此输入消息，按 {{shortcut}} 发送",
+    "placeholder": "描述任务，@ 可调用技能，/ 唤起命令行",
     "placeholderNoModel": "请先选择模型开始对话",
     "selectModel": "选择模型",
     "workspace": "工作目录",
@@ -73,7 +73,6 @@
     "pinned": "置顶",
     "today": "今天",
     "yesterday": "昨天",
-    "past7days": "过去 7 天",
     "earlier": "更早",
     "newChat": "新对话",
     "searchPlaceholder": "搜索",
@@ -88,6 +87,8 @@
     "unpinConversation": "取消置顶",
     "rename": "重命名",
     "delete": "删除",
+    "confirmDelete": "确认删除?",
+    "deleted": "已删除",
     "searchMessagesTitle": "搜索消息内容",
     "searchMessagesPlaceholder": "在消息内容中搜索…",
     "searching": "搜索中…",
@@ -111,7 +112,15 @@
     "delete": "删除",
     "deleteConfirmTitle": "删除",
     "deleteConfirmDescription": "确定要删除「{{name}}」吗？此操作无法撤销。",
-    "folderAlreadyExists": "该名称已存在，请使用其他名称"
+    "folderAlreadyExists": "该名称已存在，请使用其他名称",
+    "setContextAnchor": "设为 AI 上下文",
+    "contextAnchorActive": "AI 上下文",
+    "search": "搜索文件"
+  },
+  "context": {
+    "label": "上下文",
+    "clear": "清除",
+    "multipleItems": "已选 {{count}} 项"
   },
   "preview": {
     "openFilePanel": "打开文件面板",
@@ -142,7 +151,9 @@
     "searchFiles": "搜索文件",
     "csvRows": "行",
     "csvCols": "列",
-    "csvTruncated": "显示 {{rows}} 行 x {{cols}} 列"
+    "csvTruncated": "显示 {{rows}} 行 x {{cols}} 列",
+    "dirItems": "项",
+    "dirLabel": "文件夹"
   },
   "common": {
     "settings": "设置"

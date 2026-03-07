@@ -2,7 +2,10 @@ import { useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useFileClipboardStore } from "@/stores/fileClipboardStore";
 
-export function useFileClipboard(workspaceRoot: string | null) {
+export function useFileClipboard(
+  workspaceRoot: string | null,
+  refreshDir?: (dirPath: string) => void,
+) {
   const sourcePath = useFileClipboardStore((s) => s.sourcePath);
   const mode = useFileClipboardStore((s) => s.mode);
   const setClipboard = useFileClipboardStore((s) => s.set);
@@ -44,7 +47,14 @@ export function useFileClipboard(workspaceRoot: string | null) {
         } else {
           await invoke("move_file", { args: { workspaceRoot, fromPath: sourcePath, toPath } });
           clearClipboard();
+          // Refresh source parent dir for cut (file was removed)
+          const srcParent = sourcePath.includes("/")
+            ? sourcePath.replace(/\/[^/]+$/, "")
+            : "";
+          refreshDir?.(srcParent);
         }
+        // Refresh target dir to show pasted item
+        refreshDir?.(targetDirPath);
       } catch {
         if (mode === "copy") {
           const ext = fileName.includes(".") ? `.${fileName.split(".").pop()}` : "";
@@ -52,11 +62,12 @@ export function useFileClipboard(workspaceRoot: string | null) {
           const fallbackPath = buildDestPath(`${base} (copy)${ext}`);
           try {
             await invoke("copy_entry", { args: { workspaceRoot, fromPath: sourcePath, toPath: fallbackPath } });
+            refreshDir?.(targetDirPath);
           } catch { /* silently fail */ }
         }
       }
     },
-    [sourcePath, mode, workspaceRoot, clearClipboard],
+    [sourcePath, mode, workspaceRoot, clearClipboard, refreshDir],
   );
 
   return { sourcePath, mode, onCopy, onCut, onPaste };

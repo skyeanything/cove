@@ -15,6 +15,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { useFilePreviewStore } from "@/stores/filePreviewStore";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { getPreviewKind } from "@/lib/preview-types";
+import { DirPreview } from "./DirPreview";
 import { cn } from "@/lib/utils";
 import {
   PreviewFileHeader,
@@ -27,8 +28,12 @@ import { usePreviewContent } from "@/hooks/usePreviewContent";
 export function FilePreviewPanel() {
   const { t } = useTranslation();
   const selectedPath = useFilePreviewStore((s) => s.selectedPath);
+  const selectedIsDir = useFilePreviewStore((s) => s.selectedIsDir);
   const previewError = useFilePreviewStore((s) => s.previewError);
-  const workspaceRoot = useWorkspaceStore((s) => s.activeWorkspace?.path ?? null);
+  const selectedWorkspaceRoot = useFilePreviewStore((s) => s.selectedWorkspaceRoot);
+  const activeWorkspaceRoot = useWorkspaceStore((s) => s.activeWorkspace?.path ?? null);
+  // Prefer the workspace root recorded at selection time (handles multi-workspace)
+  const workspaceRoot = selectedWorkspaceRoot ?? activeWorkspaceRoot;
   const { cached, loading, error } = usePreviewContent(selectedPath, workspaceRoot);
   const [mdViewMode, setMdViewMode] = useState<"preview" | "code">("preview");
   const officeApps = useDetectOfficeApps();
@@ -43,6 +48,10 @@ export function FilePreviewPanel() {
         </div>
       </div>
     );
+  }
+
+  if (selectedIsDir) {
+    return <DirPreview dirPath={selectedPath} workspaceRoot={workspaceRoot ?? ""} />;
   }
 
   const kind = getPreviewKind(selectedPath);

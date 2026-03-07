@@ -6,7 +6,6 @@ import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useSkillsStore } from "@/stores/skillsStore";
 import { getModelOption } from "@/lib/ai/model-service";
-import { estimateNextTurnTokens } from "@/lib/ai/context-compression";
 import { listSkills } from "@/lib/ai/skills/loader";
 import { USER_VISIBLE_TOOLS } from "@/lib/ai/tools/tool-meta";
 import { useMentionDetect } from "@/hooks/useMentionDetect";
@@ -51,7 +50,6 @@ export function ChatInput({
   const providers = useDataStore((s) => s.providers);
   const modelSelectorOpen = onModelSelectorOpenChange != null ? (modelSelectorOpenProp ?? false) : modelSelectorOpenLocal;
   const setModelSelectorOpen = onModelSelectorOpenChange ?? setModelSelectorOpenLocal;
-  const messages = useChatStore((s) => s.messages);
   const error = useChatStore((s) => s.error);
   const isCompressing = useChatStore((s) => s.isCompressing);
   const sendMessageShortcut = useSettingsStore((s) => s.sendMessageShortcut);
@@ -119,16 +117,6 @@ export function ChatInput({
   );
 
   // --- context / model ---
-  const sessionTokens = estimateNextTurnTokens(messages, message.length);
-  const contextLimit = useMemo(() => {
-    if (!modelId || !providerId) return 0;
-    const prov = providers.find((p) => p.id === providerId);
-    if (!prov) return 0;
-    return getModelOption(prov, modelId)?.context_window ?? 128_000;
-  }, [modelId, providerId, providers]);
-  const contextPercent = contextLimit === 0 ? 0 : Math.min(100, Math.round((sessionTokens / contextLimit) * 100));
-  const fmtNum = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : String(n));
-  const contextTooltip = t("chat.contextUsedFormula", { used: fmtNum(sessionTokens), limit: fmtNum(contextLimit), percent: contextPercent });
 
   const provider = useMemo(() => (providerId ? providers.find((p) => p.id === providerId) : undefined), [providerId, providers]);
   const modelSupportsVision = useMemo(() => {
@@ -137,6 +125,8 @@ export function ChatInput({
     return opt?.vision === true || opt?.image_in === true;
   }, [provider, modelId]);
   const canSend = Boolean((message.trim() || draftAttachments.length > 0) && modelId && !isStreaming);
+  const [webSearchEnabled, setWebSearchEnabled] = useState(false);
+  const toggleWebSearch = useCallback(() => setWebSearchEnabled((v) => !v), []);
 
   useEffect(() => { const el = textareaRef.current; if (!el) return; el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 200) + "px"; }, [message]);
 
@@ -146,8 +136,12 @@ export function ChatInput({
     if (!canSend) return;
     if (draftAttachments.some((a) => isImageAttachment(a)) && !modelSupportsVision) { setAttachError(t("chat.visionNotSupported")); return; }
     setAttachError(null);
+    const content = message.trim();
     setMessage("");
-    sendMessage(message.trim());
+    const withHint = webSearchEnabled
+      ? `${content}\n\n[Web search enabled: use fetch_url to retrieve current information when needed, e.g. https://html.duckduckgo.com/html/?q=YOUR_QUERY]`
+      : content;
+    sendMessage(withHint);
   };
 
   const handlePaste = async (e: React.ClipboardEvent) => {
@@ -205,14 +199,14 @@ export function ChatInput({
           <div className="mb-2 rounded-lg bg-destructive/10 px-3 py-2 text-[13px] text-destructive">{error ?? attachError}</div>
         )}
 
-        <div className="rounded-lg border border-border transition-colors focus-within:border-ring" onDrop={handleDrop} onDragOver={handleDragOver}>
+        <div className="rounded-lg border border-border transition-colors hover:border-accent focus-within:border-accent" onDrop={handleDrop} onDragOver={handleDragOver}>
           <AttachmentBar attachments={draftAttachments} onRemove={removeDraftAttachment} />
 
           <textarea
             ref={textareaRef} value={message} onChange={handleChange}
             onCompositionEnd={() => { lastCompositionEndRef.current = Date.now(); }}
             onKeyDown={handleKeyDown} onPaste={handlePaste}
-            placeholder={modelId ? t("chat.placeholder", { shortcut: sendMessageShortcut === "enter" ? t("settings.general.shortcutEnter") : t("settings.general.shortcutModifierEnter") }) : t("chat.placeholderNoModel")}
+            placeholder={modelId ? t("chat.placeholder") : t("chat.placeholderNoModel")}
             rows={1} disabled={!modelId}
             className="block min-h-[44px] max-h-[200px] w-full resize-none bg-transparent px-4 pt-3 pb-1 text-[14px] leading-[1.5] placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
           />
@@ -242,7 +236,7 @@ export function ChatInput({
 
           <ChatToolbar
             isStreaming={isStreaming} canSend={canSend}
-            contextPercent={contextPercent} contextTooltip={contextTooltip}
+            webSearchEnabled={webSearchEnabled} onWebSearchToggle={toggleWebSearch}
             modelSelectorOpen={modelSelectorOpen} onModelSelectorOpenChange={setModelSelectorOpen}
             onAttachFiles={handleAttachFiles} onSend={handleSend} onStop={stopGeneration}
           />

@@ -23,12 +23,15 @@ import { cancelAllActiveCommands } from "@/lib/ai/tools/bash";
 import { runPostConversationTasks } from "@/lib/ai/post-conversation";
 import { i18n } from "@/i18n";
 import { buildAttachmentInjection } from "@/lib/attachment-injection";
+import { buildFileContextBlock } from "@/lib/file-context-injection";
+import { useFilePreviewStore } from "@/stores/filePreviewStore";
 import type { UserContent } from "ai";
 
 export type { ToolCallInfo, DraftAttachment, MessagePart };
 
 const STREAM_RESET = {
   isStreaming: false,
+  streamingConversationId: null as string | null,
   streamingContent: "",
   streamingReasoning: "",
   streamingToolCalls: [] as ToolCallInfo[],
@@ -62,6 +65,8 @@ interface ChatState {
   attachmentsByMessage: Record<string, Attachment[]>;
   draftAttachments: DraftAttachment[];
   isStreaming: boolean;
+  /** ID of the conversation currently being streamed; null when idle */
+  streamingConversationId: string | null;
   streamingContent: string;
   streamingReasoning: string;
   streamingToolCalls: ToolCallInfo[];
@@ -95,6 +100,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   attachmentsByMessage: {},
   draftAttachments: [],
   isStreaming: false,
+  streamingConversationId: null,
   streamingContent: "",
   streamingReasoning: "",
   streamingToolCalls: [],
@@ -121,7 +127,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       }),
     );
     set({ messages, attachmentsByMessage, draftAttachments: [], error: null, summaryUpTo: conversation?.summary_up_to ?? null });
-    await useWorkspaceStore.getState().loadFromConversation(conversationId);
+    void useWorkspaceStore.getState().loadFromConversation(conversationId);
   },
 
   selectModel(providerId: string, modelId: string, providerType: string) {
@@ -174,9 +180,10 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         conversationId = crypto.randomUUID();
         const title = titleSource.slice(0, 50) || "New Chat";
         const activeWs = useWorkspaceStore.getState().activeWorkspace;
+        const wsPath = activeWs && !activeWs.is_default ? activeWs.path : undefined;
         await conversationRepo.create({
           id: conversationId, assistant_id: "default", title, pinned: 0,
-          provider_type: providerType ?? undefined, workspace_path: activeWs?.path,
+          provider_type: providerType ?? undefined, workspace_path: wsPath,
         });
         dataStore.setActiveConversation(conversationId);
         await dataStore.loadConversations();
@@ -215,7 +222,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     }
 
     const abortController = new AbortController();
-    set({ isStreaming: true, streamingContent: "", streamingReasoning: "", streamingToolCalls: [], streamingParts: [], abortController });
+    set({ isStreaming: true, streamingConversationId: conversationId, streamingContent: "", streamingReasoning: "", streamingToolCalls: [], streamingParts: [], abortController });
     const runMetrics = createAgentRunMetrics({ action: "send", conversationId, modelId });
 
     try {
@@ -226,6 +233,10 @@ export const useChatStore = create<ChatState>()((set, get) => ({
 
       const modelMessages = toModelMessages(updatedMessages, { summaryUpTo: compressed.summaryUpTo ?? get().summaryUpTo ?? undefined });
       const fetchBlock = await getFetchBlockForText(trimmedContent);
+      const wsPath = useWorkspaceStore.getState().activeWorkspace?.path;
+      const fileContextBlock = wsPath
+        ? await buildFileContextBlock(useFilePreviewStore.getState().selectedEntries, wsPath)
+        : "";
 
       if (readyAttachments.length > 0) {
         const latestUserIndex = [...modelMessages].reverse().findIndex((m) => m.role === "user");
@@ -233,7 +244,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
           const index = modelMessages.length - 1 - latestUserIndex;
           const modelSupportsVision = modelOption?.vision === true || modelOption?.image_in === true;
           const injection = buildAttachmentInjection(readyAttachments, { modelSupportsVision, modelSupportsPdfNative });
-          const userText = `${trimmedContent}${injection.textBlock}${fetchBlock}`.trim();
+          const userText = `${trimmedContent}${injection.textBlock}${fetchBlock}${fileContextBlock}`.trim();
           const nextContent: UserContent = [];
           if (userText) nextContent.push({ type: "text", text: userText });
           for (const part of injection.visionParts) nextContent.push(part);
@@ -242,12 +253,12 @@ export const useChatStore = create<ChatState>()((set, get) => ({
             modelMessages[index] = { role: "user", content: nextContent };
           }
         }
-      } else {
-        injectFetchBlockIntoLastUserMessage(modelMessages, fetchBlock);
+      } else if (fileContextBlock || fetchBlock) {
+        injectFetchBlockIntoLastUserMessage(modelMessages, fetchBlock + fileContextBlock);
       }
 
       const { streamResult, finalError } = await runStreamLoop(
-        { provider, modelId, modelMessages, workspacePath: useWorkspaceStore.getState().activeWorkspace?.path, abortSignal: abortController.signal, runMetrics, labelBase: `send:${provider.type}/${modelId}` },
+        { provider, modelId, modelMessages, workspacePath: wsPath, abortSignal: abortController.signal, runMetrics, labelBase: `send:${provider.type}/${modelId}` },
         { onUpdate: (s) => set(s), onRateLimitRetry: (attempt) => set({ error: i18n.t("chat.rateLimitRetry", { attempt }) }) },
       );
       if (finalError) { set({ error: finalError, ...STREAM_RESET }); return; }
@@ -319,7 +330,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     if (!provider) return;
 
     const abortController = new AbortController();
-    set({ isStreaming: true, streamingContent: "", streamingReasoning: "", streamingToolCalls: [], streamingParts: [], abortController });
+    set({ isStreaming: true, streamingConversationId: conversationId, streamingContent: "", streamingReasoning: "", streamingToolCalls: [], streamingParts: [], abortController });
     const runMetrics = createAgentRunMetrics({ action: "regenerate", conversationId, modelId });
 
     try {
@@ -327,10 +338,15 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       const modelMessages = toModelMessages(compressed.messages, { summaryUpTo: compressed.summaryUpTo ?? get().summaryUpTo ?? undefined });
       const last = compressed.messages[compressed.messages.length - 1];
       const lastUserContent = last?.role === "user" ? (last.content ?? "") : "";
-      injectFetchBlockIntoLastUserMessage(modelMessages, await getFetchBlockForText(lastUserContent));
+      const regenFetchBlock = await getFetchBlockForText(lastUserContent);
+      const regenWsPath = useWorkspaceStore.getState().activeWorkspace?.path;
+      const regenFileCtx = regenWsPath
+        ? await buildFileContextBlock(useFilePreviewStore.getState().selectedEntries, regenWsPath)
+        : "";
+      injectFetchBlockIntoLastUserMessage(modelMessages, regenFetchBlock + regenFileCtx);
 
       const { streamResult, finalError } = await runStreamLoop(
-        { provider, modelId, modelMessages, workspacePath: useWorkspaceStore.getState().activeWorkspace?.path, abortSignal: abortController.signal, runMetrics, labelBase: `regenerate:${provider.type}/${modelId}` },
+        { provider, modelId, modelMessages, workspacePath: regenWsPath, abortSignal: abortController.signal, runMetrics, labelBase: `regenerate:${provider.type}/${modelId}` },
         { onUpdate: (s) => set(s), onRateLimitRetry: (attempt) => set({ error: i18n.t("chat.rateLimitRetry", { attempt }) }) },
       );
       if (finalError) { set({ error: finalError, ...STREAM_RESET }); return; }
@@ -391,17 +407,22 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     if (!provider) return;
 
     const abortController = new AbortController();
-    set({ isStreaming: true, streamingContent: "", streamingReasoning: "", streamingToolCalls: [], streamingParts: [], abortController });
+    set({ isStreaming: true, streamingConversationId: conversationId, streamingContent: "", streamingReasoning: "", streamingToolCalls: [], streamingParts: [], abortController });
     const runMetrics = createAgentRunMetrics({ action: "edit_resend", conversationId, modelId });
 
     try {
       const compressed = await tryCompress(updatedMessages, conversationId, provider, modelId, set, get);
       updatedMessages = compressed.messages;
       const modelMessages = toModelMessages(updatedMessages, { summaryUpTo: compressed.summaryUpTo ?? get().summaryUpTo ?? undefined });
-      injectFetchBlockIntoLastUserMessage(modelMessages, await getFetchBlockForText(newContent));
+      const editFetchBlock = await getFetchBlockForText(newContent);
+      const editWsPath = useWorkspaceStore.getState().activeWorkspace?.path;
+      const editFileCtx = editWsPath
+        ? await buildFileContextBlock(useFilePreviewStore.getState().selectedEntries, editWsPath)
+        : "";
+      injectFetchBlockIntoLastUserMessage(modelMessages, editFetchBlock + editFileCtx);
 
       const { streamResult, finalError } = await runStreamLoop(
-        { provider, modelId, modelMessages, workspacePath: useWorkspaceStore.getState().activeWorkspace?.path, abortSignal: abortController.signal, runMetrics, labelBase: `edit_resend:${provider.type}/${modelId}` },
+        { provider, modelId, modelMessages, workspacePath: editWsPath, abortSignal: abortController.signal, runMetrics, labelBase: `edit_resend:${provider.type}/${modelId}` },
         { onUpdate: (s) => set(s), onRateLimitRetry: (attempt) => set({ error: i18n.t("chat.rateLimitRetry", { attempt }) }) },
       );
       if (finalError) { set({ error: finalError, ...STREAM_RESET }); return; }

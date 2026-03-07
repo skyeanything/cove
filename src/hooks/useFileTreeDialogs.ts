@@ -9,6 +9,8 @@ interface UseFileTreeDialogsParams {
   selectedPath: string | null;
   setSelected: (path: string | null) => void;
   setExpandedDirs: React.Dispatch<React.SetStateAction<Set<string>>>;
+  /** Called after mutation to immediately refresh the affected directory */
+  refreshDir: (dirPath: string) => void;
   t: TranslateFn;
 }
 
@@ -22,6 +24,7 @@ export function useFileTreeDialogs({
   selectedPath,
   setSelected,
   setExpandedDirs,
+  refreshDir,
   t,
 }: UseFileTreeDialogsParams) {
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
@@ -36,11 +39,18 @@ export function useFileTreeDialogs({
 
   const handleConfirmDelete = useCallback(() => {
     if (!deleteTarget || !workspaceRoot) return;
-    invoke("remove_entry", { args: { workspaceRoot, path: deleteTarget.path } }).finally(() => {
-      setDeleteTarget(null);
-      if (selectedPath === deleteTarget.path) setSelected(null);
-    });
-  }, [deleteTarget, workspaceRoot, selectedPath, setSelected]);
+    invoke("remove_entry", { args: { workspaceRoot, path: deleteTarget.path } })
+      .then(() => {
+        const parent = deleteTarget.path.includes("/")
+          ? deleteTarget.path.replace(/\/[^/]+$/, "")
+          : "";
+        refreshDir(parent);
+      })
+      .finally(() => {
+        setDeleteTarget(null);
+        if (selectedPath === deleteTarget.path) setSelected(null);
+      });
+  }, [deleteTarget, workspaceRoot, selectedPath, setSelected, refreshDir]);
 
   const onNewFolder = useCallback((parentPath: string) => {
     setNewFolderParentPath(parentPath);
@@ -61,6 +71,7 @@ export function useFileTreeDialogs({
         if (parentPath) {
           setExpandedDirs((prev) => new Set([...prev, parentPath]));
         }
+        refreshDir(parentPath);
       })
       .catch((err: unknown) => {
         const msg =
@@ -70,7 +81,7 @@ export function useFileTreeDialogs({
         const isAlreadyExists = /already exists|已存在/i.test(msg);
         setNewFolderError(isAlreadyExists ? t("explorer.folderAlreadyExists") : msg);
       });
-  }, [workspaceRoot, newFolderParentPath, newFolderName, t, setExpandedDirs]);
+  }, [workspaceRoot, newFolderParentPath, newFolderName, t, setExpandedDirs, refreshDir]);
 
   const handleNewFolderCancel = useCallback(() => {
     setNewFolderParentPath(null);

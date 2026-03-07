@@ -3,9 +3,10 @@ import { invoke } from "@tauri-apps/api/core";
 
 interface UseFileTreeDnDParams {
   workspaceRoot: string | null;
+  refreshDir?: (dirPath: string) => void;
 }
 
-export function useFileTreeDnD({ workspaceRoot }: UseFileTreeDnDParams) {
+export function useFileTreeDnD({ workspaceRoot, refreshDir }: UseFileTreeDnDParams) {
   const [draggedPath, setDraggedPath] = useState<string | null>(null);
   const [dropTargetPath, setDropTargetPath] = useState<string | null>(null);
 
@@ -64,13 +65,17 @@ export function useFileTreeDnD({ workspaceRoot }: UseFileTreeDnDParams) {
 
       if (fromPath === toPath) return;
 
-      invoke("move_file", { args: { workspaceRoot, fromPath, toPath } }).catch(
-        () => {},
-      );
+      const srcParent = fromPath.includes("/") ? fromPath.replace(/\/[^/]+$/, "") : "";
+      invoke("move_file", { args: { workspaceRoot, fromPath, toPath } })
+        .then(() => {
+          refreshDir?.(srcParent);
+          refreshDir?.(targetDirPath);
+        })
+        .catch(() => {});
       setDraggedPath(null);
       setDropTargetPath(null);
     },
-    [workspaceRoot, isDescendant],
+    [workspaceRoot, isDescendant, refreshDir],
   );
 
   const onRootDragOver = useCallback(
@@ -93,13 +98,19 @@ export function useFileTreeDnD({ workspaceRoot }: UseFileTreeDnDParams) {
       if (!fromPath || !workspaceRoot) return;
       const fileName = fromPath.split("/").pop() ?? fromPath;
       if (fromPath === fileName) return;
+      const srcParent = fromPath.includes("/") ? fromPath.replace(/\/[^/]+$/, "") : "";
       invoke("move_file", {
         args: { workspaceRoot, fromPath, toPath: fileName },
-      }).catch(() => {});
+      })
+        .then(() => {
+          refreshDir?.(srcParent);
+          refreshDir?.("");
+        })
+        .catch(() => {});
       setDraggedPath(null);
       setDropTargetPath(null);
     },
-    [workspaceRoot],
+    [workspaceRoot, refreshDir],
   );
 
   return {

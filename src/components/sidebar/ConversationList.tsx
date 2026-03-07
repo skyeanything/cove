@@ -9,13 +9,12 @@ import { useLayoutStore } from "@/stores/layoutStore";
 import { ConversationItem } from "./ConversationItem";
 import type { Conversation } from "@/db/types";
 
-const GROUP_ORDER = ["pinned", "today", "yesterday", "past7days", "earlier"] as const;
+const GROUP_ORDER = ["pinned", "today", "yesterday", "earlier"] as const;
 
 function groupConversations(conversations: Conversation[]): Record<string, Conversation[]> {
   const now = new Date();
   const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const yesterday = new Date(today.getTime() - 86400000);
-  const past7 = new Date(today.getTime() - 7 * 86400000);
 
   const pinned: Conversation[] = [];
   const unpinned: Conversation[] = [];
@@ -31,7 +30,6 @@ function groupConversations(conversations: Conversation[]): Record<string, Conve
     let group: string;
     if (d >= today) group = "today";
     else if (d >= yesterday) group = "yesterday";
-    else if (d >= past7) group = "past7days";
     else group = "earlier";
     if (!groups[group]) groups[group] = [];
     groups[group]!.push(conv);
@@ -54,6 +52,7 @@ export function ConversationList({ searchQuery, workspacePath }: ConversationLis
   const setPinned = useDataStore((s) => s.setPinned);
   const deleteConversation = useDataStore((s) => s.deleteConversation);
   const loadMessages = useChatStore((s) => s.loadMessages);
+  const streamingConversationId = useChatStore((s) => s.streamingConversationId);
   const setActivePage = useLayoutStore((s) => s.setActivePage);
 
   const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
@@ -150,6 +149,7 @@ const handleRenameSubmit = async () => {
                     key={conv.id}
                     conversation={conv}
                     active={conv.id === activeConversationId}
+                    isStreaming={conv.id === streamingConversationId}
                     isEditing={editingId === conv.id}
                     editingTitle={editingTitle}
                     onEditingTitleChange={setEditingTitle}
