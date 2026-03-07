@@ -13,6 +13,15 @@ vi.mock("@/lib/file-tree-icons", () => ({
   getFileIcon: () => null,
 }));
 
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: vi.fn().mockResolvedValue({}),
+}));
+
+vi.mock("@/stores/filePreviewStore", () => ({
+  useFilePreviewStore: (selector: (s: { workspaceRoot: string | null }) => unknown) =>
+    selector({ workspaceRoot: "/workspace" }),
+}));
+
 describe("renderContentWithMentions", () => {
   it("returns original content when no mentions", () => {
     const result = renderContentWithMentions("hello world");
@@ -40,7 +49,7 @@ describe("renderContentWithMentions", () => {
   });
 
   it("handles multiple mentions", () => {
-    const nodes = renderContentWithMentions("@file:a.ts and @file:b.ts");
+    const nodes = renderContentWithMentions("@file:src/a.ts and @file:src/b.ts");
     const { container } = render(<>{nodes}</>);
     const chips = container.querySelectorAll("[role='button']");
     expect(chips).toHaveLength(2);

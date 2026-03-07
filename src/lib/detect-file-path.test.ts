@@ -27,9 +27,46 @@ describe("detectPreviewableFilePath", () => {
     expect(detectPreviewableFilePath("src/file.xyz")).toBeNull();
   });
 
-  it("returns null for bare filename without directory separator", () => {
-    // FILE_PATH_PATTERN requires at least one directory segment
-    expect(detectPreviewableFilePath("package.json")).toBeNull();
+  it("returns bare filename with allowed extension", () => {
+    expect(detectPreviewableFilePath("report.docx")).toBe("report.docx");
+    expect(detectPreviewableFilePath("data.csv")).toBe("data.csv");
+    expect(detectPreviewableFilePath("config.json")).toBe("config.json");
+    expect(detectPreviewableFilePath("notes.md")).toBe("notes.md");
+    expect(detectPreviewableFilePath("photo.png")).toBe("photo.png");
+    expect(detectPreviewableFilePath("readme.txt")).toBe("readme.txt");
+    expect(detectPreviewableFilePath("page.html")).toBe("page.html");
+    expect(detectPreviewableFilePath("schema.yaml")).toBe("schema.yaml");
+    expect(detectPreviewableFilePath("icon.svg")).toBe("icon.svg");
+    expect(detectPreviewableFilePath("doc.pdf")).toBe("doc.pdf");
+  });
+
+  it("accepts bare code filenames (existence check handles false positives)", () => {
+    expect(detectPreviewableFilePath("hello.js")).toBe("hello.js");
+    expect(detectPreviewableFilePath("main.ts")).toBe("main.ts");
+    expect(detectPreviewableFilePath("script.py")).toBe("script.py");
+    expect(detectPreviewableFilePath("style.css")).toBe("style.css");
+    expect(detectPreviewableFilePath("lib.rs")).toBe("lib.rs");
+    expect(detectPreviewableFilePath("main.go")).toBe("main.go");
+  });
+
+  it("rejects blocklisted bare filenames that are common prose terms", () => {
+    expect(detectPreviewableFilePath("console.log")).toBeNull();
+    expect(detectPreviewableFilePath("node.js")).toBeNull();
+    expect(detectPreviewableFilePath("vue.js")).toBeNull();
+    expect(detectPreviewableFilePath("next.js")).toBeNull();
+  });
+
+  it("rejects bare filename with unsupported extension", () => {
+    expect(detectPreviewableFilePath("data.xyz")).toBeNull();
+    expect(detectPreviewableFilePath("file.abc")).toBeNull();
+  });
+
+  it("rejects bare filename with single-char extension", () => {
+    expect(detectPreviewableFilePath("file.a")).toBeNull();
+  });
+
+  it("rejects bare filename starting with dot", () => {
+    expect(detectPreviewableFilePath(".gitignore")).toBeNull();
   });
 
   it("returns null for empty string", () => {
@@ -53,3 +90,4 @@ describe("detectPreviewableFilePath", () => {
     expect(detectPreviewableFilePath("justAWord")).toBeNull();
   });
 });
+

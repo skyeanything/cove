@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
-import { FilePathChip } from "./FilePathChip";
+import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
+import { FilePathChip, clearExistsCache } from "./FilePathChip";
 
 const mockOpen = vi.fn();
 vi.mock("@/hooks/useOpenFilePreview", () => ({
@@ -12,8 +12,22 @@ vi.mock("@/lib/file-tree-icons", () => ({
   getFileIcon: () => null,
 }));
 
+const mockInvoke = vi.fn();
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: (...args: unknown[]) => mockInvoke(...args),
+}));
+
+let mockWorkspaceRoot: string | null = "/workspace";
+vi.mock("@/stores/filePreviewStore", () => ({
+  useFilePreviewStore: (selector: (s: { workspaceRoot: string | null }) => unknown) =>
+    selector({ workspaceRoot: mockWorkspaceRoot }),
+}));
+
 beforeEach(() => {
   mockOpen.mockClear();
+  mockInvoke.mockClear();
+  mockWorkspaceRoot = "/workspace";
+  clearExistsCache();
 });
 
 afterEach(cleanup);
@@ -91,5 +105,44 @@ describe("FilePathChip", () => {
     render(<FilePathChip path="/some/dir/archive.xyz" compact />);
     const el = screen.getByRole("button");
     expect(el.className).toMatch(/text-foreground-tertiary/);
+  });
+});
+
+describe("FilePathChip bare filename verification", () => {
+  it("renders bare filename as plain code initially (before verification)", () => {
+    mockInvoke.mockReturnValue(new Promise(() => {})); // never resolves
+    render(<FilePathChip path="report.docx" />);
+    const code = screen.getByText("report.docx");
+    expect(code.tagName).toBe("CODE");
+  });
+
+  it("renders as chip after stat_file resolves (file exists)", async () => {
+    mockInvoke.mockResolvedValue({ size: 100, isDir: false });
+    render(<FilePathChip path="exists.pdf" />);
+    await waitFor(() => {
+      expect(screen.getByRole("button")).toBeTruthy();
+    });
+  });
+
+  it("renders as plain code when stat_file rejects (file not found)", async () => {
+    mockInvoke.mockRejectedValue({ kind: "NotFound" });
+    render(<FilePathChip path="missing.docx" />);
+    await waitFor(() => {
+      const el = screen.getByText("missing.docx");
+      expect(el.tagName).toBe("CODE");
+    });
+  });
+
+  it("renders bare filename as plain code when no workspace root", () => {
+    mockWorkspaceRoot = null;
+    render(<FilePathChip path="noroot.csv" />);
+    const el = screen.getByText("noroot.csv");
+    expect(el.tagName).toBe("CODE");
+  });
+
+  it("does not verify paths that contain /", () => {
+    render(<FilePathChip path="some/dir/file.pdf" />);
+    expect(mockInvoke).not.toHaveBeenCalled();
+    expect(screen.getByRole("button")).toBeTruthy();
   });
 });

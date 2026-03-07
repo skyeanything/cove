@@ -8,6 +8,7 @@ import rehypeKatex from "rehype-katex";
 import type { Components } from "react-markdown";
 import { CodeBlock, reactNodeToDisplayString } from "./CodeBlock";
 import { detectPreviewableFilePath } from "@/lib/detect-file-path";
+import { resolveFilePathsFromContext } from "@/lib/resolve-file-paths";
 import { FilePathChip } from "@/components/common/FilePathChip";
 
 const remarkPlugins = [remarkGfm, remarkBreaks, remarkMath];
@@ -56,6 +57,14 @@ const markdownComponents: Components = {
       );
     }
     return <code {...props}>{safeChildren}</code>;
+  },
+  strong: ({ children }) => {
+    const text = typeof children === "string" ? children : reactNodeToDisplayString(children ?? "");
+    const filePath = detectPreviewableFilePath(text);
+    if (filePath) {
+      return <FilePathChip path={filePath} compact />;
+    }
+    return <strong>{children}</strong>;
   },
   a: ({ href, children }) => (
     <a
@@ -134,7 +143,9 @@ function sanitizeInvalidHtmlLikeTags(source: string): string {
 import { cn } from "@/lib/utils";
 
 export function MarkdownContent({ source, className, trailingCursor }: MarkdownContentProps) {
-  const normalizedSource = sanitizeInvalidHtmlLikeTags(normalizeEscapedMarkdown(source));
+  const normalizedSource = resolveFilePathsFromContext(
+    sanitizeInvalidHtmlLikeTags(normalizeEscapedMarkdown(source)),
+  );
   const hasVisibleContent = normalizedSource.trim().length > 0;
 
   useEffect(() => {
