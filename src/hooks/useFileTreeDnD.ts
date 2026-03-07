@@ -1,15 +1,10 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 
 interface UseFileTreeDnDParams {
   workspaceRoot: string | null;
-}
-
-/** Check if types list indicates an external file drop (from Finder / file manager). */
-function isExternalFileDrop(types: DOMStringList | readonly string[]): boolean {
-  // External file drops include "Files" in types. Internal DnD uses "text/plain".
-  // When both are present, "Files" without an internal draggedPath means external.
-  return Array.from(types).includes("Files");
+  containerRef: React.RefObject<HTMLElement | null>;
 }
 
 /** Extract the basename from a path, handling both POSIX and Windows separators. */
@@ -27,10 +22,132 @@ function fallbackName(name: string): string {
   return `${base} (copy)${ext}`;
 }
 
-export function useFileTreeDnD({ workspaceRoot }: UseFileTreeDnDParams) {
+/**
+ * Walk up the DOM from `el` to find the nearest ancestor (or self) with
+ * a `data-tree-path` attribute. Returns the path and isDir flag, or null.
+ */
+function findTreeTarget(el: Element | null): { path: string; isDir: boolean } | null {
+  let cur = el;
+  while (cur) {
+    if (cur instanceof HTMLElement && cur.hasAttribute("data-tree-path")) {
+      const path = cur.getAttribute("data-tree-path") ?? "";
+      const isDir = cur.getAttribute("data-tree-is-dir") === "true";
+      return { path, isDir };
+    }
+    if (cur instanceof HTMLElement && cur.hasAttribute("data-tree-root")) {
+      return { path: "", isDir: true };
+    }
+    cur = cur.parentElement;
+  }
+  return null;
+}
+
+/** Copy a single external file into the workspace, with fallback on conflict. */
+async function copyExternalFile(
+  workspaceRoot: string,
+  externalPath: string,
+  targetDirPath: string,
+): Promise<void> {
+  const fileName = basename(externalPath);
+  const destPath = targetDirPath ? `${targetDirPath}/${fileName}` : fileName;
+
+  try {
+    await invoke("copy_external_file", {
+      args: { workspaceRoot, externalPath, destPath },
+    });
+  } catch {
+    const altName = fallbackName(fileName);
+    const altPath = targetDirPath ? `${targetDirPath}/${altName}` : altName;
+    try {
+      await invoke("copy_external_file", {
+        args: { workspaceRoot, externalPath, destPath: altPath },
+      });
+    } catch {
+      /* silently fail on second attempt */
+    }
+  }
+}
+
+export function useFileTreeDnD({ workspaceRoot, containerRef }: UseFileTreeDnDParams) {
   const [draggedPath, setDraggedPath] = useState<string | null>(null);
   const [dropTargetPath, setDropTargetPath] = useState<string | null>(null);
+  const [isExternalDragOver, setIsExternalDragOver] = useState(false);
 
+  // Keep refs for values needed inside the Tauri event callback
+  const workspaceRootRef = useRef(workspaceRoot);
+  useEffect(() => {
+    workspaceRootRef.current = workspaceRoot;
+  }, [workspaceRoot]);
+
+  // --- Tauri native drag-drop (external files from OS) ---
+  useEffect(() => {
+    const unlisten = getCurrentWebview().onDragDropEvent((event) => {
+      const wsRoot = workspaceRootRef.current;
+
+      if (event.payload.type === "enter") {
+        setIsExternalDragOver(true);
+      } else if (event.payload.type === "over") {
+        const pos = event.payload.position;
+        const ratio = window.devicePixelRatio || 1;
+        const cssX = pos.x / ratio;
+        const cssY = pos.y / ratio;
+        const el = document.elementFromPoint(cssX, cssY);
+        const target = findTreeTarget(el);
+
+        if (target) {
+          // Only highlight directories as drop targets
+          if (target.isDir) {
+            setDropTargetPath(target.path);
+          } else {
+            // For files, use the parent directory
+            const parentPath = target.path.includes("/")
+              ? target.path.replace(/\/[^/]+$/, "")
+              : "";
+            setDropTargetPath(parentPath);
+          }
+        } else {
+          setDropTargetPath(null);
+        }
+      } else if (event.payload.type === "drop") {
+        if (!wsRoot) {
+          setIsExternalDragOver(false);
+          setDropTargetPath(null);
+          return;
+        }
+
+        const paths = event.payload.paths;
+        // Determine target directory from current dropTargetPath
+        const pos = event.payload.position;
+        const ratio = window.devicePixelRatio || 1;
+        const el = document.elementFromPoint(pos.x / ratio, pos.y / ratio);
+        const target = findTreeTarget(el);
+        let targetDir = "";
+        if (target) {
+          targetDir = target.isDir
+            ? target.path
+            : target.path.includes("/")
+              ? target.path.replace(/\/[^/]+$/, "")
+              : "";
+        }
+
+        for (const externalPath of paths) {
+          void copyExternalFile(wsRoot, externalPath, targetDir);
+        }
+
+        setIsExternalDragOver(false);
+        setDropTargetPath(null);
+      } else if (event.payload.type === "leave") {
+        setIsExternalDragOver(false);
+        setDropTargetPath(null);
+      }
+    });
+
+    return () => {
+      void unlisten.then((fn) => fn());
+    };
+  }, []);
+
+  // --- Internal HTML5 DnD (tree rearrangement) ---
   const onDragStart = useCallback((e: React.DragEvent, path: string) => {
     e.dataTransfer.setData("text/plain", path);
     e.dataTransfer.effectAllowed = "move";
@@ -42,66 +159,16 @@ export function useFileTreeDnD({ workspaceRoot }: UseFileTreeDnDParams) {
     setDropTargetPath(null);
   }, []);
 
-  // Check if dropping `dragPath` into `targetDir` would create a circular reference
   const isDescendant = useCallback((dragPath: string, targetDir: string) => {
     return targetDir === dragPath || targetDir.startsWith(dragPath + "/");
   }, []);
 
-  // Handle external file drops (files dragged from Finder / system file manager)
-  const onExternalDrop = useCallback(
-    async (e: React.DragEvent, targetDirPath: string) => {
-      if (!workspaceRoot) return;
-      if (e.dataTransfer.files.length === 0) return;
-
-      e.preventDefault();
-
-      for (const file of Array.from(e.dataTransfer.files)) {
-        // In Tauri/Electron webviews, File objects from native drops expose a `path` property
-        const externalPath = (file as File & { path?: string }).path;
-        if (!externalPath) continue;
-
-        const fileName = basename(externalPath) || file.name;
-        const destPath = targetDirPath ? `${targetDirPath}/${fileName}` : fileName;
-
-        try {
-          await invoke("copy_external_file", {
-            args: { workspaceRoot, externalPath, destPath },
-          });
-        } catch {
-          // If destination exists, try with (copy) suffix
-          const altName = fallbackName(fileName);
-          const altPath = targetDirPath ? `${targetDirPath}/${altName}` : altName;
-          try {
-            await invoke("copy_external_file", {
-              args: { workspaceRoot, externalPath, destPath: altPath },
-            });
-          } catch {
-            /* silently fail on second attempt */
-          }
-        }
-      }
-
-      setDraggedPath(null);
-      setDropTargetPath(null);
-    },
-    [workspaceRoot],
-  );
-
   const onDragOver = useCallback(
     (e: React.DragEvent, targetPath: string, isDir: boolean) => {
-      if (!isDir) return; // Only directories are drop targets
-
-      // Allow external file drops
-      if (isExternalFileDrop(e.dataTransfer.types) && !draggedPath) {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = "copy";
-        setDropTargetPath(targetPath);
-        return;
-      }
-
-      // Internal drag
+      if (!isDir) return;
       const dragged = e.dataTransfer.types.includes("text/plain") ? draggedPath : null;
-      if (dragged && isDescendant(dragged, targetPath)) return;
+      if (!dragged) return;
+      if (isDescendant(dragged, targetPath)) return;
       if (dragged === targetPath) return;
       e.preventDefault();
       e.dataTransfer.dropEffect = "move";
@@ -125,17 +192,6 @@ export function useFileTreeDnD({ workspaceRoot }: UseFileTreeDnDParams) {
 
   const onDrop = useCallback(
     (e: React.DragEvent, targetDirPath: string) => {
-      // Check external files first (when there is no active internal drag)
-      if (
-        isExternalFileDrop(e.dataTransfer.types) &&
-        !draggedPath &&
-        e.dataTransfer.files.length > 0
-      ) {
-        void onExternalDrop(e, targetDirPath);
-        return;
-      }
-
-      // Existing internal DnD logic
       e.preventDefault();
       const fromPath = e.dataTransfer.getData("text/plain");
       if (!fromPath || !workspaceRoot) return;
@@ -153,23 +209,13 @@ export function useFileTreeDnD({ workspaceRoot }: UseFileTreeDnDParams) {
       setDraggedPath(null);
       setDropTargetPath(null);
     },
-    [workspaceRoot, draggedPath, isDescendant, onExternalDrop],
+    [workspaceRoot, isDescendant],
   );
 
   const onRootDragOver = useCallback(
     (e: React.DragEvent) => {
-      // Allow external file drops to root
-      if (isExternalFileDrop(e.dataTransfer.types) && !draggedPath) {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = "copy";
-        setDropTargetPath("");
-        return;
-      }
-
-      // Internal drag
       const dragged = draggedPath;
       if (!dragged) return;
-      // Only allow if item is not already at root level
       if (!dragged.includes("/")) return;
       e.preventDefault();
       e.dataTransfer.dropEffect = "move";
@@ -180,17 +226,6 @@ export function useFileTreeDnD({ workspaceRoot }: UseFileTreeDnDParams) {
 
   const onRootDrop = useCallback(
     (e: React.DragEvent) => {
-      // Check external files first
-      if (
-        isExternalFileDrop(e.dataTransfer.types) &&
-        !draggedPath &&
-        e.dataTransfer.files.length > 0
-      ) {
-        void onExternalDrop(e, "");
-        return;
-      }
-
-      // Existing internal logic
       e.preventDefault();
       const fromPath = e.dataTransfer.getData("text/plain");
       if (!fromPath || !workspaceRoot) return;
@@ -202,12 +237,16 @@ export function useFileTreeDnD({ workspaceRoot }: UseFileTreeDnDParams) {
       setDraggedPath(null);
       setDropTargetPath(null);
     },
-    [workspaceRoot, draggedPath, onExternalDrop],
+    [workspaceRoot],
   );
+
+  // Suppress unused ref - containerRef is kept for future hit-testing scoping
+  void containerRef;
 
   return {
     draggedPath,
     dropTargetPath,
+    isExternalDragOver,
     onDragStart,
     onDragEnd,
     onDragOver,

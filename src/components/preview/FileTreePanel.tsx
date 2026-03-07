@@ -1,5 +1,5 @@
 // FILE_SIZE_EXCEPTION: file tree panel with many handler callbacks passed to children
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   useFileTreeKeyboard,
   isEditableTarget,
@@ -62,6 +62,7 @@ export function FileTreePanel() {
   const [loadedChildren, setLoadedChildren] = useState<Record<string, ListDirEntry[]>>({});
   const [editingPath, setEditingPath] = useState<string | null>(null);
   const [focusedPath, setFocusedPath] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const dialogs = useFileTreeDialogs({
     workspaceRoot,
@@ -71,7 +72,7 @@ export function FileTreePanel() {
     t,
   });
 
-  const dnd = useFileTreeDnD({ workspaceRoot });
+  const dnd = useFileTreeDnD({ workspaceRoot, containerRef });
   const search = useFileTreeSearch(rootEntries, loadedChildren);
   const clipboard = useFileClipboard(workspaceRoot);
 
@@ -374,6 +375,8 @@ export function FileTreePanel() {
         <ContextMenu>
           <ContextMenuTrigger asChild>
             <div
+              ref={containerRef}
+              data-tree-root="true"
               className="min-h-full px-3 pt-3 pb-2"
               onDragOver={dnd.onRootDragOver}
               onDrop={dnd.onRootDrop}

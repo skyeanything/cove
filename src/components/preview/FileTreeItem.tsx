@@ -215,6 +215,8 @@ export function FileTreeItem({
         <ContextMenuTrigger asChild>
           <button
             type="button"
+            data-tree-path={path}
+            data-tree-is-dir={String(isDir)}
             onClick={handleClick}
             draggable
             onDragStart={(e) => onDnDStart?.(e, path)}
