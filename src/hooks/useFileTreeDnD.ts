@@ -12,6 +12,12 @@ function isExternalFileDrop(types: DOMStringList | readonly string[]): boolean {
   return Array.from(types).includes("Files");
 }
 
+/** Extract the basename from a path, handling both POSIX and Windows separators. */
+function basename(filePath: string): string {
+  const lastSep = Math.max(filePath.lastIndexOf("/"), filePath.lastIndexOf("\\"));
+  return lastSep >= 0 ? filePath.slice(lastSep + 1) : filePath;
+}
+
 /** Extract a (copy) fallback name: `foo.txt` -> `foo (copy).txt` */
 function fallbackName(name: string): string {
   const dotIdx = name.lastIndexOf(".");
@@ -54,7 +60,7 @@ export function useFileTreeDnD({ workspaceRoot }: UseFileTreeDnDParams) {
         const externalPath = (file as File & { path?: string }).path;
         if (!externalPath) continue;
 
-        const fileName = externalPath.split("/").pop() ?? file.name;
+        const fileName = basename(externalPath) || file.name;
         const destPath = targetDirPath ? `${targetDirPath}/${fileName}` : fileName;
 
         try {

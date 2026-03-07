@@ -240,6 +240,32 @@ describe("useFileTreeDnD", () => {
     });
   });
 
+  it("extracts filename from Windows-style backslash path on external drop", async () => {
+    vi.mocked(invoke).mockResolvedValue(undefined);
+    const { result } = renderHook(() =>
+      useFileTreeDnD({ workspaceRoot: "/ws" }),
+    );
+
+    const e = makeDragEvent({
+      types: ["Files"],
+      files: [{ name: "report.docx", path: "C:\\Users\\me\\Documents\\report.docx" }],
+    });
+
+    act(() => {
+      result.current.onDrop(e, "docs");
+    });
+
+    await vi.waitFor(() => {
+      expect(invoke).toHaveBeenCalledWith("copy_external_file", {
+        args: {
+          workspaceRoot: "/ws",
+          externalPath: "C:\\Users\\me\\Documents\\report.docx",
+          destPath: "docs/report.docx",
+        },
+      });
+    });
+  });
+
   it("does nothing when workspaceRoot is null", () => {
     const { result } = renderHook(() =>
       useFileTreeDnD({ workspaceRoot: null }),
