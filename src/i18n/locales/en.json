@@ -221,6 +221,14 @@
     "deny": "Deny",
     "alwaysAllow": "Always allow (this session)"
   },
+  "trustMode": {
+    "enableTooltip": "Enable trust mode",
+    "disableTooltip": "Trust mode active (click to disable)",
+    "confirmTitle": "Enable Trust Mode",
+    "confirmDescription": "Commands that normally require confirmation will run automatically. Dangerous commands remain blocked. Resets on conversation switch or app close.",
+    "cancel": "Cancel",
+    "enable": "Enable"
+  },
   "skills": {
     "title": "Skills",
     "tooltipEnabled": "Skills ({{count}} enabled)",

@@ -1,13 +1,79 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Sun, Moon, LayoutPanelLeft } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Sun, Moon, LayoutPanelLeft, ShieldCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useThemeStore } from "@/stores/themeStore";
 import { useDataStore } from "@/stores/dataStore";
 import { useLayoutStore } from "@/stores/layoutStore";
+import { usePermissionStore } from "@/stores/permissionStore";
 
 interface ChatHeaderProps {
   leftSidebarOpen: boolean;
+}
+
+function TrustModeToggle({ conversationId }: { conversationId: string }) {
+  const { t } = useTranslation();
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const active = usePermissionStore((s) => s.trustModeConversations.has(conversationId));
+  const enableTrustMode = usePermissionStore((s) => s.enableTrustMode);
+  const disableTrustMode = usePermissionStore((s) => s.disableTrustMode);
+
+  const handleClick = () => {
+    if (active) {
+      disableTrustMode(conversationId);
+    } else {
+      setConfirmOpen(true);
+    }
+  };
+
+  return (
+    <>
+      <Button
+        variant="ghost"
+        size="icon-sm"
+        onClick={handleClick}
+        className={`size-6 ${
+          active
+            ? "text-amber-500 hover:text-amber-600"
+            : "text-muted-foreground hover:text-foreground"
+        }`}
+        title={active ? t("trustMode.disableTooltip") : t("trustMode.enableTooltip")}
+        data-testid="trust-mode-toggle"
+      >
+        <ShieldCheck className="size-[16px]" strokeWidth={1.5} />
+      </Button>
+
+      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t("trustMode.confirmTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {t("trustMode.confirmDescription")}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t("trustMode.cancel")}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => enableTrustMode(conversationId)}
+            >
+              {t("trustMode.enable")}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
 }
 
 export function ChatHeader({ leftSidebarOpen }: ChatHeaderProps) {
@@ -61,6 +127,11 @@ export function ChatHeader({ leftSidebarOpen }: ChatHeaderProps) {
             <Moon className="size-[16px]" strokeWidth={1.5} />
           )}
         </Button>
+
+        {/* Trust mode toggle */}
+        {activeConversationId && (
+          <TrustModeToggle conversationId={activeConversationId} />
+        )}
 
         {!filePanelOpen && (
           <Button
