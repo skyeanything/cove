@@ -7,6 +7,7 @@ vi.mock("@/lib/config", () => ({
     leftSidebarWidth: 260,
     chatWidth: 640,
     filePanelOpen: true,
+    fileTreeOpen: true,
     fileTreeWidth: 260,
     filePreviewWidth: 360,
     fileTreeShowHidden: true,
@@ -150,6 +151,45 @@ describe("layoutStore", () => {
     });
   });
 
+  describe("toggleFileTree", () => {
+    it("toggles from true to false", () => {
+      expect(useLayoutStore.getState().fileTreeOpen).toBe(true);
+      useLayoutStore.getState().toggleFileTree();
+      expect(useLayoutStore.getState().fileTreeOpen).toBe(false);
+    });
+
+    it("toggles from false to true", () => {
+      useLayoutStore.setState({ fileTreeOpen: false });
+      useLayoutStore.getState().toggleFileTree();
+      expect(useLayoutStore.getState().fileTreeOpen).toBe(true);
+    });
+
+    it("persists to config", () => {
+      useLayoutStore.getState().toggleFileTree();
+      expect(writeConfig).toHaveBeenCalledWith(
+        "layout",
+        expect.objectContaining({ fileTreeOpen: false }),
+      );
+    });
+  });
+
+  describe("setFileTreeOpen", () => {
+    it("sets fileTreeOpen directly", () => {
+      useLayoutStore.getState().setFileTreeOpen(false);
+      expect(useLayoutStore.getState().fileTreeOpen).toBe(false);
+      useLayoutStore.getState().setFileTreeOpen(true);
+      expect(useLayoutStore.getState().fileTreeOpen).toBe(true);
+    });
+
+    it("persists to config", () => {
+      useLayoutStore.getState().setFileTreeOpen(false);
+      expect(writeConfig).toHaveBeenCalledWith(
+        "layout",
+        expect.objectContaining({ fileTreeOpen: false }),
+      );
+    });
+  });
+
   describe("setFilePanelOpen", () => {
     it("directly sets filePanelOpen", () => {
       useLayoutStore.getState().setFilePanelOpen(false);
@@ -166,6 +206,7 @@ describe("layoutStore", () => {
         leftSidebarWidth: 200,
         chatWidth: 500,
         filePanelOpen: false,
+        fileTreeOpen: false,
         fileTreeWidth: 300,
         filePreviewWidth: 400,
         fileTreeShowHidden: false,
@@ -176,6 +217,7 @@ describe("layoutStore", () => {
       expect(s.leftSidebarWidth).toBe(200);
       expect(s.chatWidth).toBe(500);
       expect(s.filePanelOpen).toBe(false);
+      expect(s.fileTreeOpen).toBe(false);
       expect(s.fileTreeWidth).toBe(300);
       expect(s.filePreviewWidth).toBe(400);
       expect(s.fileTreeShowHidden).toBe(false);

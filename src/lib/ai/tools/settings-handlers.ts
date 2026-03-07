@@ -83,6 +83,7 @@ async function handleLayout(input: SettingsInput): Promise<string> {
       `- leftSidebarWidth: ${config.leftSidebarWidth}`,
       `- chatWidth: ${config.chatWidth}`,
       `- filePanelOpen: ${config.filePanelOpen}`,
+      `- fileTreeOpen: ${config.fileTreeOpen}`,
       `- fileTreeWidth: ${config.fileTreeWidth}`,
       `- filePreviewWidth: ${config.filePreviewWidth}`,
       `- fileTreeShowHidden: ${config.fileTreeShowHidden}`,
@@ -116,7 +117,7 @@ function setLayoutKey(
     fileTreeWidth: (n) => store.setFileTreeWidth(n),
     filePreviewWidth: (n) => store.setFilePreviewWidth(n),
   };
-  if (key in numericSetters) {
+  if (Object.prototype.hasOwnProperty.call(numericSetters, key)) {
     const n = parseNumber(value);
     if (n === null) return `Invalid number: ${value}`;
     numericSetters[key]!(n);
@@ -129,6 +130,12 @@ function setLayoutKey(
     if (key === "leftSidebarOpen" && open !== config.leftSidebarOpen) store.toggleLeftSidebar();
     if (key === "filePanelOpen" && open !== config.filePanelOpen) store.toggleFilePanel();
     return `${key} set to: ${open}`;
+  }
+  if (key === "fileTreeOpen") {
+    const open = parseBool(value);
+    if (open === null) return `Invalid boolean: ${value}`;
+    store.setFileTreeOpen(open);
+    return `fileTreeOpen set to: ${open}`;
   }
   if (key === "fileTreeShowHidden") {
     const show = parseBool(value);

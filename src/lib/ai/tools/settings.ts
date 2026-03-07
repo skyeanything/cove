@@ -6,7 +6,7 @@ export const settingsTool = tool({
   description: `Read and modify application settings. Categories and their keys:
 
 - appearance: theme (light|dark|system)
-- layout: leftSidebarOpen, leftSidebarWidth, chatWidth, filePanelOpen, fileTreeWidth, filePreviewWidth, fileTreeShowHidden
+- layout: leftSidebarOpen, leftSidebarWidth, chatWidth, filePanelOpen, fileTreeOpen, fileTreeWidth, filePreviewWidth, fileTreeShowHidden
 - general: locale (zh|en), sendShortcut (enter|modifierEnter)
 - skills: enabled (comma-separated names), dirPaths
 - provider: enabled, api_key, base_url (use provider_type to identify)

@@ -139,7 +139,9 @@
     "collapseAll": "Collapse all",
     "csvRows": "rows",
     "csvCols": "columns",
-    "csvTruncated": "showing {{rows}} rows x {{cols}} columns"
+    "csvTruncated": "showing {{rows}} rows x {{cols}} columns",
+    "collapseExplorer": "Collapse explorer",
+    "expandExplorer": "Expand explorer"
   },
   "common": {
     "settings": "Settings"

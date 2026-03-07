@@ -11,6 +11,7 @@ vi.mock("@/lib/config", () => ({
     leftSidebarWidth: 260,
     chatWidth: 640,
     filePanelOpen: true,
+    fileTreeOpen: true,
     fileTreeWidth: 260,
     filePreviewWidth: 360,
     fileTreeShowHidden: true,
@@ -62,6 +63,16 @@ describe("useOpenFilePreview", () => {
       act(() => result.current.openPreview("src/main.ts"));
 
       expect(useFilePreviewStore.getState().selectedPath).toBe("src/main.ts");
+    });
+
+    it("does not modify fileTreeOpen when tree is collapsed", () => {
+      useLayoutStore.setState({ filePanelOpen: false, fileTreeOpen: false });
+      const { result } = renderHook(() => useOpenFilePreview());
+
+      act(() => result.current.openPreview("/abs/file.ts"));
+
+      expect(useLayoutStore.getState().filePanelOpen).toBe(true);
+      expect(useLayoutStore.getState().fileTreeOpen).toBe(false);
     });
 
     it("does not toggle filePanelOpen when panel is already open", () => {

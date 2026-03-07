@@ -62,6 +62,10 @@ export async function migrateConfigIfNeeded(): Promise<void> {
       typeof layoutState?.filePanelOpen === "boolean"
         ? layoutState.filePanelOpen
         : CONFIG_DEFAULTS.layout.filePanelOpen,
+    fileTreeOpen:
+      typeof layoutState?.fileTreeOpen === "boolean"
+        ? layoutState.fileTreeOpen
+        : CONFIG_DEFAULTS.layout.fileTreeOpen,
     fileTreeWidth:
       typeof layoutState?.fileTreeWidth === "number"
         ? layoutState.fileTreeWidth

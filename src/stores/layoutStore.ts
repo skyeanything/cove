@@ -16,6 +16,9 @@ interface LayoutState {
   filePanelOpening: boolean;
   fileTreeWidth: number;
   filePreviewWidth: number;
+  fileTreeOpen: boolean;
+  toggleFileTree: () => void;
+  setFileTreeOpen: (open: boolean) => void;
   fileTreeShowHidden: boolean;
   setFileTreeShowHidden: (show: boolean) => void;
   toggleFilePanel: () => void;
@@ -41,6 +44,7 @@ function persistLayout(state: LayoutState): void {
     leftSidebarWidth: state.leftSidebarWidth,
     chatWidth: state.chatWidth,
     filePanelOpen: state.filePanelOpen,
+    fileTreeOpen: state.fileTreeOpen,
     fileTreeWidth: state.fileTreeWidth,
     filePreviewWidth: state.filePreviewWidth,
     fileTreeShowHidden: state.fileTreeShowHidden,
@@ -71,6 +75,15 @@ export const useLayoutStore = create<LayoutState>()((set, get) => ({
   filePanelOpening: false,
   fileTreeWidth: 260,
   filePreviewWidth: 360,
+  fileTreeOpen: true,
+  toggleFileTree: () => {
+    set((s) => ({ fileTreeOpen: !s.fileTreeOpen }));
+    persistLayout(get());
+  },
+  setFileTreeOpen: (open) => {
+    set({ fileTreeOpen: open });
+    persistLayout(get());
+  },
   fileTreeShowHidden: true,
   setFileTreeShowHidden: (show) => {
     set({ fileTreeShowHidden: show });
@@ -115,6 +128,7 @@ export const useLayoutStore = create<LayoutState>()((set, get) => ({
       leftSidebarWidth: config.leftSidebarWidth,
       chatWidth: config.chatWidth,
       filePanelOpen: config.filePanelOpen,
+      fileTreeOpen: config.fileTreeOpen,
       fileTreeWidth: config.fileTreeWidth,
       filePreviewWidth: config.filePreviewWidth,
       fileTreeShowHidden: config.fileTreeShowHidden,
