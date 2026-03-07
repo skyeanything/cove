@@ -35,6 +35,7 @@ export function FileTreeItem({
   entry,
   workspaceRoot,
   selectedPath,
+  focusedPath,
   expandedDirs,
   loadedChildren,
   editingPath,
@@ -65,6 +66,7 @@ export function FileTreeItem({
   entry: ListDirEntry;
   workspaceRoot: string;
   selectedPath: string | null;
+  focusedPath?: string | null;
   expandedDirs: Set<string>;
   loadedChildren: Record<string, ListDirEntry[]>;
   editingPath: string | null;
@@ -101,6 +103,7 @@ export function FileTreeItem({
   const isDropTarget = dropTargetPath === path && isDir;
   const children = loadedChildren[path];
   const isEditing = editingPath === path;
+  const isFocused = focusedPath === path;
   const isCut = clipboardMode === "cut" && clipboardSourcePath === path;
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -215,6 +218,7 @@ export function FileTreeItem({
               isSelected ? "font-medium text-foreground" : "text-foreground-secondary hover:bg-background-tertiary hover:text-foreground",
               isDragged && "opacity-40",
               isDropTarget && "ring-1 ring-accent/50 bg-accent/5",
+              isFocused && "ring-1 ring-accent/40",
               isCut && "opacity-50",
             )}
           >
@@ -278,6 +282,7 @@ export function FileTreeItem({
               entry={child}
               workspaceRoot={workspaceRoot}
               selectedPath={selectedPath}
+              focusedPath={focusedPath}
               expandedDirs={expandedDirs}
               loadedChildren={loadedChildren}
               editingPath={editingPath}
