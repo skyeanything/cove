@@ -108,8 +108,12 @@ pub(crate) fn reset_init_state() {
 mod tests {
     use super::*;
 
+    /// Serialize barrier tests that mutate the global INIT_STATE.
+    static BARRIER_LOCK: Mutex<()> = Mutex::new(());
+
     #[test]
     fn wait_returns_immediately_when_not_started() {
+        let _g = BARRIER_LOCK.lock().unwrap();
         reset_init_state();
         let start = std::time::Instant::now();
         wait_for_init();
@@ -118,6 +122,7 @@ mod tests {
 
     #[test]
     fn wait_returns_immediately_when_done() {
+        let _g = BARRIER_LOCK.lock().unwrap();
         reset_init_state();
         mark_init_started();
         mark_init_done();
@@ -128,6 +133,7 @@ mod tests {
 
     #[test]
     fn wait_blocks_until_done() {
+        let _g = BARRIER_LOCK.lock().unwrap();
         reset_init_state();
         mark_init_started();
         let handle = std::thread::spawn(|| {
@@ -138,7 +144,6 @@ mod tests {
         std::thread::sleep(Duration::from_millis(100));
         mark_init_done();
         let elapsed = handle.join().unwrap();
-        // Should have waited ~100ms, not the full 10s timeout
         assert!(elapsed >= Duration::from_millis(80));
         assert!(elapsed < Duration::from_secs(2));
     }
