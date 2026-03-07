@@ -34,6 +34,17 @@ vi.mock("./dataStore", () => ({ useDataStore: { getState: () => mockDataStore } 
 const mockWorkspaceStore = { activeWorkspace: null, loadFromConversation: vi.fn().mockResolvedValue(undefined) };
 vi.mock("./workspaceStore", () => ({ useWorkspaceStore: { getState: () => mockWorkspaceStore } }));
 
+const mockStreamStore = {
+  streams: {},
+  startStream: vi.fn(),
+  updateStream: vi.fn(),
+  endStream: vi.fn(),
+  abortStream: vi.fn(),
+  getStream: vi.fn().mockReturnValue(undefined),
+  isConversationStreaming: vi.fn().mockReturnValue(false),
+};
+vi.mock("./streamStore", () => ({ useStreamStore: { getState: () => mockStreamStore } }));
+
 vi.mock("./chat-stream-runner", () => ({ runStreamLoop: vi.fn() }));
 vi.mock("./chat-url-utils", () => ({
   getFetchBlockForText: vi.fn().mockResolvedValue(""),
@@ -92,7 +103,10 @@ function setupDefaultMocks() {
 
 // --- setup ---
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  mockStreamStore.getStream.mockReturnValue(undefined);
+});
 afterEach(() => resetStore());
 
 // --- tests ---
@@ -319,9 +333,7 @@ describe("chatStore — sendMessage", () => {
     it("resets streaming state after success", async () => {
       setupDefaultMocks();
       await useChatStore.getState().sendMessage("hello");
-      expect(useChatStore.getState().isStreaming).toBe(false);
-      expect(useChatStore.getState().abortController).toBeNull();
-      expect(useChatStore.getState().streamingContent).toBe("");
+      expect(mockStreamStore.endStream).toHaveBeenCalledWith("conv-1");
     });
   });
 
@@ -334,11 +346,12 @@ describe("chatStore — sendMessage", () => {
       });
       await useChatStore.getState().sendMessage("hello");
       expect(useChatStore.getState().error).toBe("rate limit");
-      expect(useChatStore.getState().isStreaming).toBe(false);
+      expect(mockStreamStore.endStream).toHaveBeenCalledWith("conv-1");
     });
 
     it("saves partial content on AbortError", async () => {
       setupDefaultMocks();
+      mockStreamStore.getStream.mockReturnValue({ streamingContent: "partial response", streamingReasoning: "" });
       vi.mocked(runStreamLoop).mockImplementation(async (_opts, callbacks) => {
         callbacks.onUpdate({ streamingContent: "partial response" });
         throw Object.assign(new Error("Aborted"), { name: "AbortError" });

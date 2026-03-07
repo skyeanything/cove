@@ -24,6 +24,16 @@ vi.mock("./dataStore", () => ({
 }));
 const mockWorkspaceStore = { activeWorkspace: null, loadFromConversation: vi.fn().mockResolvedValue(undefined) };
 vi.mock("./workspaceStore", () => ({ useWorkspaceStore: { getState: () => mockWorkspaceStore } }));
+const mockStreamStore = {
+  streams: {},
+  startStream: vi.fn(),
+  updateStream: vi.fn(),
+  endStream: vi.fn(),
+  abortStream: vi.fn(),
+  getStream: vi.fn().mockReturnValue(undefined),
+  isConversationStreaming: vi.fn().mockReturnValue(false),
+};
+vi.mock("./streamStore", () => ({ useStreamStore: { getState: () => mockStreamStore } }));
 vi.mock("./chat-stream-runner", () => ({ runStreamLoop: vi.fn() }));
 vi.mock("./chat-url-utils", () => ({ getFetchBlockForText: vi.fn().mockResolvedValue(""), injectFetchBlockIntoLastUserMessage: vi.fn() }));
 vi.mock("@/lib/ai/model-service", () => ({ getModelOption: vi.fn() }));
@@ -55,12 +65,6 @@ describe("chatStore — basic actions", () => {
       expect(s.messages).toEqual([]);
       expect(s.attachmentsByMessage).toEqual({});
       expect(s.draftAttachments).toEqual([]);
-      expect(s.isStreaming).toBe(false);
-      expect(s.streamingContent).toBe("");
-      expect(s.streamingReasoning).toBe("");
-      expect(s.streamingToolCalls).toEqual([]);
-      expect(s.streamingParts).toEqual([]);
-      expect(s.abortController).toBeNull();
       expect(s.error).toBeNull();
       expect(s.modelId).toBeNull();
       expect(s.providerId).toBeNull();
@@ -186,16 +190,12 @@ describe("chatStore — basic actions", () => {
   });
 
   describe("stopGeneration", () => {
-    it("calls abort on controller", () => {
-      const ac = new AbortController();
-      const spy = vi.spyOn(ac, "abort");
-      setStoreState(useChatStore, { abortController: ac });
+    it("does not call abortStream when activeConversationId is null", () => {
       useChatStore.getState().stopGeneration();
-      expect(spy).toHaveBeenCalled();
+      expect(mockStreamStore.abortStream).not.toHaveBeenCalled();
     });
 
-    it("is safe when no controller", () => {
-      setStoreState(useChatStore, { abortController: null });
+    it("is safe to call without throwing", () => {
       expect(() => useChatStore.getState().stopGeneration()).not.toThrow();
     });
   });
@@ -207,8 +207,6 @@ describe("chatStore — basic actions", () => {
         attachmentsByMessage: { m1: [] },
         draftAttachments: [{ id: "a1", type: "image" }],
         error: "some error",
-        isStreaming: true,
-        streamingContent: "partial",
       });
       useChatStore.getState().reset();
       const s = useChatStore.getState();
@@ -216,8 +214,6 @@ describe("chatStore — basic actions", () => {
       expect(s.attachmentsByMessage).toEqual({});
       expect(s.draftAttachments).toEqual([]);
       expect(s.error).toBeNull();
-      expect(s.isStreaming).toBe(false);
-      expect(s.streamingContent).toBe("");
     });
   });
 });

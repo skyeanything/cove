@@ -21,16 +21,13 @@ import {
 import { useAutoScroll } from "@/hooks/useAutoScroll";
 import { ScrollToBottomButton } from "./ScrollToBottomButton";
 import { renderContentWithMentions } from "@/lib/render-mentions";
+import { useChatStreamState } from "@/hooks/useChatStreamState";
 
 const EMPTY_ATTACHMENTS: Attachment[] = [];
 
 export function MessageList() {
   const messages = useChatStore((s) => s.messages);
-  const isStreaming = useChatStore((s) => s.isStreaming);
-  const streamingContent = useChatStore((s) => s.streamingContent);
-  const streamingReasoning = useChatStore((s) => s.streamingReasoning);
-  const streamingToolCalls = useChatStore((s) => s.streamingToolCalls);
-  const streamingParts = useChatStore((s) => s.streamingParts);
+  const { isStreaming, streamingContent, streamingReasoning, streamingToolCalls, streamingParts } = useChatStreamState();
 
   const hasOrderedStreamingParts = streamingParts.length > 0;
   const renderedContent = streamingContent;
@@ -115,7 +112,7 @@ function UserMessage({ messageId, content }: { messageId: string; content: strin
   const [hovered, setHovered] = useState(false);
   const editAndResend = useChatStore((s) => s.editAndResend);
   const attachments = useChatStore((s) => s.attachmentsByMessage[messageId] ?? EMPTY_ATTACHMENTS);
-  const isStreaming = useChatStore((s) => s.isStreaming);
+  const { isStreaming: isStreamingForEdit } = useChatStreamState();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleCopy = useCallback(() => {
@@ -136,10 +133,10 @@ function UserMessage({ messageId, content }: { messageId: string; content: strin
   }, [content]);
 
   const handleConfirm = useCallback(() => {
-    if (!editContent.trim() || isStreaming) return;
+    if (!editContent.trim() || isStreamingForEdit) return;
     setIsEditing(false);
     editAndResend(messageId, editContent.trim());
-  }, [editContent, isStreaming, editAndResend, messageId]);
+  }, [editContent, isStreamingForEdit, editAndResend, messageId]);
 
   // Auto-resize textarea and focus
   useEffect(() => {

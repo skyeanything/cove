@@ -7,6 +7,7 @@ import { providerRepo } from "@/db/repos/providerRepo";
 import { promptRepo } from "@/db/repos/promptRepo";
 import { summaryRepo } from "@/db/repos/summaryRepo";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
+import { useStreamStore } from "@/stores/streamStore";
 
 interface DataState {
   // Data
@@ -106,6 +107,8 @@ export const useDataStore = create<DataState>()((set, get) => ({
   },
 
   async deleteConversation(id) {
+    const { abortStream, isConversationStreaming } = useStreamStore.getState();
+    if (isConversationStreaming(id)) abortStream(id);
     await summaryRepo.deleteByConversation(id);
     await messageRepo.deleteByConversation(id);
     await conversationRepo.delete(id);

@@ -6,6 +6,7 @@ import {
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useChatStore } from "@/stores/chatStore";
+import { useChatStreamState } from "@/hooks/useChatStreamState";
 import { useDataStore } from "@/stores/dataStore";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { useSettingsStore } from "@/stores/settingsStore";
@@ -53,7 +54,7 @@ export function ChatInput({
   const addDraftAttachments = useChatStore((s) => s.addDraftAttachments);
   const removeDraftAttachment = useChatStore((s) => s.removeDraftAttachment);
   const draftAttachments = useChatStore((s) => s.draftAttachments);
-  const isStreaming = useChatStore((s) => s.isStreaming);
+  const { isStreaming, isCompressing } = useChatStreamState();
   const modelId = useChatStore((s) => s.modelId);
   const providerId = useChatStore((s) => s.providerId);
   const providers = useDataStore((s) => s.providers);
@@ -61,7 +62,6 @@ export function ChatInput({
   const setModelSelectorOpen = onModelSelectorOpenChange ?? setModelSelectorOpenLocal;
   const messages = useChatStore((s) => s.messages);
   const error = useChatStore((s) => s.error);
-  const isCompressing = useChatStore((s) => s.isCompressing);
   const sendMessageShortcut = useSettingsStore((s) => s.sendMessageShortcut);
   const activeWorkspace = useWorkspaceStore((s) => s.activeWorkspace);
   const externalSkills = useSkillsStore((s) => s.externalSkills);

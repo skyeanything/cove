@@ -19,6 +19,7 @@ import {
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { useDataStore } from "@/stores/dataStore";
 import { useChatStore } from "@/stores/chatStore";
+import { useStreamStore } from "@/stores/streamStore";
 import { ProviderIcon } from "@/components/common/ProviderIcon";
 import type { Conversation } from "@/db/types";
 
@@ -70,6 +71,7 @@ export function LeftSidebar({ open }: LeftSidebarProps) {
   const setPinned = useDataStore((s) => s.setPinned);
   const deleteConversation = useDataStore((s) => s.deleteConversation);
   const loadMessages = useChatStore((s) => s.loadMessages);
+  const streams = useStreamStore((s) => s.streams);
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState("");
@@ -207,6 +209,7 @@ export function LeftSidebar({ open }: LeftSidebarProps) {
                       key={conv.id}
                       conversation={conv}
                       active={conv.id === activeConversationId}
+                      isStreamingConv={!!streams[conv.id]?.isStreaming}
                       isEditing={editingId === conv.id}
                       editingTitle={editingTitle}
                       onEditingTitleChange={setEditingTitle}
@@ -231,6 +234,7 @@ export function LeftSidebar({ open }: LeftSidebarProps) {
 function ConversationItem({
   conversation,
   active,
+  isStreamingConv,
   isEditing,
   editingTitle,
   onEditingTitleChange,
@@ -244,6 +248,7 @@ function ConversationItem({
 }: {
   conversation: Conversation;
   active: boolean;
+  isStreamingConv: boolean;
   isEditing: boolean;
   editingTitle: string;
   onEditingTitleChange: (v: string) => void;
@@ -298,7 +303,9 @@ function ConversationItem({
           )}
         >
           <div className="flex size-[22px] shrink-0 items-center justify-center rounded-md">
-            {conversation.pinned ? (
+            {isStreamingConv ? (
+              <span className="size-2 rounded-full bg-accent animate-pulse" />
+            ) : conversation.pinned ? (
               <Pin className="size-3.5 text-muted-foreground" strokeWidth={1.5} />
             ) : conversation.provider_type ? (
               <ProviderIcon type={conversation.provider_type} className="size-4" />

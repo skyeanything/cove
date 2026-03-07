@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useChatStore } from "@/stores/chatStore";
 import type { ToolCallInfo, MessagePart } from "@/stores/chatStore";
+import { useChatStreamState } from "@/hooks/useChatStreamState";
 import { usePermissionStore } from "@/stores/permissionStore";
 import { cn, stripMarkdown } from "@/lib/utils";
 import { splitThinkBlocks } from "@/lib/splitThinkBlocks";
@@ -155,7 +156,7 @@ export function AssistantMessage({
   const [messageHovered, setMessageHovered] = useState(false);
   const [copiedWhich, setCopiedWhich] = useState<"plain" | "markdown" | null>(null);
   const regenerateMessage = useChatStore((s) => s.regenerateMessage);
-  const isStreaming = useChatStore((s) => s.isStreaming);
+  const { isStreaming } = useChatStreamState();
   const showTokens = (tokensInput != null && tokensInput > 0) || (tokensOutput != null && tokensOutput > 0);
 
   const handleRegenerate = useCallback(() => {
