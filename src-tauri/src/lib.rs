@@ -133,6 +133,7 @@ pub fn run() {
       fs_commands::move_file,
       fs_commands::remove_entry,
       fs_commands::copy_entry,
+      fs_commands::copy_external_file,
       fs_commands::reveal_in_finder,
       fs_commands::read_office_text,
       fs_commands::write_office_text,

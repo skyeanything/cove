@@ -18,6 +18,8 @@ mod tests_walk;
 #[cfg(test)]
 mod tests_copy;
 #[cfg(test)]
+mod tests_copy_external;
+#[cfg(test)]
 mod tests_detection;
 #[cfg(test)]
 mod tests_list;
