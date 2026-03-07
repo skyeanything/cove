@@ -382,9 +382,9 @@ export function FileTreePanel() {
         closeSearch={search.closeSearch}
         matchCount={search.matchCount}
       />
-      <ScrollArea className="min-h-0 flex-1">
-        <ContextMenu>
-          <ContextMenuTrigger asChild>
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <ScrollArea className="min-h-0 flex-1">
             <div
               ref={containerRef}
               data-tree-root="true"
@@ -437,25 +437,25 @@ export function FileTreePanel() {
                 ))
               )}
             </div>
-          </ContextMenuTrigger>
-          <ContextMenuContent className="w-48 rounded-lg border border-border shadow-lg">
-            <ContextMenuItem className="gap-2 text-[13px]" onClick={() => dialogs.onNewFile("")}>
-              <FilePlus className="size-4" strokeWidth={1.5} />
-              {t("explorer.newFile")}
+          </ScrollArea>
+        </ContextMenuTrigger>
+        <ContextMenuContent className="w-48 rounded-lg border border-border shadow-lg">
+          <ContextMenuItem className="gap-2 text-[13px]" onClick={() => dialogs.onNewFile("")}>
+            <FilePlus className="size-4" strokeWidth={1.5} />
+            {t("explorer.newFile")}
+          </ContextMenuItem>
+          <ContextMenuItem className="gap-2 text-[13px]" onClick={() => dialogs.onNewFolder("")}>
+            <FolderPlus className="size-4" strokeWidth={1.5} />
+            {t("explorer.newFolder")}
+          </ContextMenuItem>
+          {clipboard.sourcePath && (
+            <ContextMenuItem className="gap-2 text-[13px]" onClick={() => void clipboard.onPaste("")}>
+              <Clipboard className="size-4" strokeWidth={1.5} />
+              {t("explorer.paste")}
             </ContextMenuItem>
-            <ContextMenuItem className="gap-2 text-[13px]" onClick={() => dialogs.onNewFolder("")}>
-              <FolderPlus className="size-4" strokeWidth={1.5} />
-              {t("explorer.newFolder")}
-            </ContextMenuItem>
-            {clipboard.sourcePath && (
-              <ContextMenuItem className="gap-2 text-[13px]" onClick={() => void clipboard.onPaste("")}>
-                <Clipboard className="size-4" strokeWidth={1.5} />
-                {t("explorer.paste")}
-              </ContextMenuItem>
-            )}
-          </ContextMenuContent>
-        </ContextMenu>
-      </ScrollArea>
+          )}
+        </ContextMenuContent>
+      </ContextMenu>
 
       <FileTreeDialogs dialogs={dialogs} t={t} />
     </div>

@@ -237,8 +237,8 @@ export function FileTreeItem({
               isSelected ? "font-medium text-foreground" : "text-foreground-secondary hover:bg-background-tertiary hover:text-foreground",
               isDragged && "opacity-40",
               isDropTarget && "ring-1 ring-accent/50 bg-accent/5",
-              isFocused && !isSelected && "bg-background-tertiary/60 text-foreground",
-              isFocused && "ring-1 ring-accent/60",
+              isFocused && !isSelected && "bg-background-tertiary text-foreground",
+              isFocused && "ring-2 ring-accent",
               isCut && "opacity-50",
             )}
           >
