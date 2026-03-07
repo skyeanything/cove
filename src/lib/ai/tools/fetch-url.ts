@@ -55,23 +55,23 @@ export const fetchUrlTool = tool({
         args: { url, timeoutMs, maxChars, cookies },
       });
 
-      if (res.ok && res.content_md) {
-        const title = res.title ? `[${res.title}](${res.source})` : res.source;
-        const qualityNote = res.low_quality
-          ? "\n\n[Note: Content appears low quality, possibly anti-bot protection. " +
-            "Consider asking user to paste content directly.]"
-          : "";
-        return `## ${title}\n\n${res.content_md}${qualityNote}`;
-      }
-
+      // Cookie retry takes priority: suggest retry before returning low-quality content
       if (res.retry_with_cookies && !useCookies) {
+        const context = res.ok
+          ? `${res.source} returned low-quality content (possibly anti-bot protection).`
+          : `${res.source} fetch failed: ${res.error ?? "blocked"}.`;
         return (
-          `${res.source} fetch failed: ${res.error ?? "blocked"}. ` +
+          `${context} ` +
           "This site may require browser cookies to access. " +
           "Ask the user: 'This site appears to block automated access. " +
           "Would you like me to retry using your Chrome cookies for this domain?' " +
           "If they agree, call fetch_url again with useCookies=true."
         );
+      }
+
+      if (res.ok && res.content_md) {
+        const title = res.title ? `[${res.title}](${res.source})` : res.source;
+        return `## ${title}\n\n${res.content_md}`;
       }
 
       return res.error

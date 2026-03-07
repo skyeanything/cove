@@ -98,6 +98,42 @@ describe("fetchUrlTool – failure with no error and no content", () => {
   });
 });
 
+describe("fetchUrlTool – low quality with cookie retry suggestion", () => {
+  it("suggests cookie retry when ok=true but low_quality and retry_with_cookies", async () => {
+    setupTauriMocks({
+      fetch_url: () => makeFetchResult({
+        ok: true,
+        source: "https://protected.example.com",
+        content_md: "short",
+        low_quality: true,
+        retry_with_cookies: true,
+      }),
+    });
+
+    const result = await exec("https://protected.example.com");
+    expect(result).toContain("low-quality content");
+    expect(result).toContain("useCookies=true");
+    expect(result).not.toContain("## ");
+  });
+
+  it("suggests cookie retry when ok=false and retry_with_cookies", async () => {
+    setupTauriMocks({
+      fetch_url: () => makeFetchResult({
+        ok: false,
+        source: "https://blocked.example.com",
+        error: "Forbidden (403)",
+        content_md: undefined,
+        retry_with_cookies: true,
+      }),
+    });
+
+    const result = await exec("https://blocked.example.com");
+    expect(result).toContain("fetch failed");
+    expect(result).toContain("Forbidden (403)");
+    expect(result).toContain("useCookies=true");
+  });
+});
+
 describe("fetchUrlTool – invoke throws", () => {
   it("catches Error and returns 抓取失败 with message", async () => {
     setupTauriMocks({
