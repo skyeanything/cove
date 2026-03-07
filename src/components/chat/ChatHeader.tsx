@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import {
@@ -92,19 +92,8 @@ export function ChatHeader({ leftSidebarOpen }: ChatHeaderProps) {
     (theme === "system" &&
       window.matchMedia("(prefers-color-scheme: dark)").matches);
 
-  const disableTrustMode = usePermissionStore((s) => s.disableTrustMode);
   const filePanelOpen = useLayoutStore((s) => s.filePanelOpen);
   const toggleFilePanel = useLayoutStore((s) => s.toggleFilePanel);
-
-  // Reset trust mode when switching conversations
-  const prevConvRef = useRef(activeConversationId);
-  useEffect(() => {
-    const prev = prevConvRef.current;
-    prevConvRef.current = activeConversationId;
-    if (prev && prev !== activeConversationId) {
-      disableTrustMode(prev);
-    }
-  }, [activeConversationId, disableTrustMode]);
 
   return (
     <div className="shrink-0">

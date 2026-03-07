@@ -115,7 +115,7 @@ describe("ChatHeader — TrustModeToggle", () => {
     expect(btn.className).toContain("text-amber-500");
   });
 
-  it("resets trust mode when conversation switches", () => {
+  it("preserves trust mode when conversation switches", () => {
     usePermissionStore.getState().enableTrustMode("conv-1");
     const { rerender } = render(<ChatHeader leftSidebarOpen={true} />);
     expect(usePermissionStore.getState().isTrustMode("conv-1")).toBe(true);
@@ -124,6 +124,7 @@ describe("ChatHeader — TrustModeToggle", () => {
     mockActiveConversationId = "conv-2";
     rerender(<ChatHeader leftSidebarOpen={true} />);
 
-    expect(usePermissionStore.getState().isTrustMode("conv-1")).toBe(false);
+    // Trust mode on conv-1 should persist
+    expect(usePermissionStore.getState().isTrustMode("conv-1")).toBe(true);
   });
 });
