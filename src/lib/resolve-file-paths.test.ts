@@ -132,4 +132,39 @@ describe("resolveFilePathsFromContext", () => {
     // Line outside fence (index 1) is transformed
     expect(lines[1]).toContain("`docs/readme.md`");
   });
+
+  it("handles mixed fence markers without leaking state", () => {
+    // A ~~~ inside a ``` block must NOT close the fence
+    const input = [
+      "**tests/**",
+      "- `1.docx`",
+      "```",
+      "~~~",
+      "- `1.docx`",
+      "~~~",
+      "```",
+    ].join("\n");
+    const result = resolveFilePathsFromContext(input);
+    const lines = result.split("\n");
+    // Line 1: outside fence, transformed
+    expect(lines[1]).toContain("`tests/1.docx`");
+    // Line 4: inside ``` fence (~~~ does not close it), untouched
+    expect(lines[4]).toBe("- `1.docx`");
+  });
+
+  it("requires closing fence to be at least as long as opening", () => {
+    const input = [
+      "**tests/**",
+      "- `1.docx`",
+      "````",
+      "```",
+      "- `1.docx`",
+      "```",
+      "````",
+    ].join("\n");
+    const result = resolveFilePathsFromContext(input);
+    const lines = result.split("\n");
+    // ``` (3 chars) cannot close ```` (4 chars), so line 4 is still inside
+    expect(lines[4]).toBe("- `1.docx`");
+  });
 });

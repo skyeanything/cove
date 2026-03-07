@@ -32,17 +32,31 @@ export function resolveFilePathsFromContext(markdown: string): string {
 
   const lines = markdown.split("\n");
   let currentDir: string | null = null;
-  let inFencedBlock = false;
+  let fenceMarker: string | null = null; // e.g. "```" or "~~~~"
   const result: string[] = [];
 
   for (const line of lines) {
-    // Track fenced code blocks — never transform inside them
-    if (/^(`{3,}|~{3,})/.test(line.trimStart())) {
-      inFencedBlock = !inFencedBlock;
-      result.push(line);
-      continue;
+    // Track fenced code blocks (CommonMark: closing fence must match
+    // the opening marker char and be at least as long)
+    const fenceMatch = /^(\s*(`{3,}|~{3,}))/.exec(line);
+    if (fenceMatch && fenceMatch[2]) {
+      const marker = fenceMatch[2];
+      if (fenceMarker === null) {
+        // Opening fence
+        fenceMarker = marker;
+        result.push(line);
+        continue;
+      } else if (
+        marker[0] === fenceMarker[0] &&
+        marker.length >= fenceMarker.length
+      ) {
+        // Closing fence — same char type, at least same length
+        fenceMarker = null;
+        result.push(line);
+        continue;
+      }
     }
-    if (inFencedBlock) {
+    if (fenceMarker !== null) {
       result.push(line);
       continue;
     }
