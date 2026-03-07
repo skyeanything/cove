@@ -1,7 +1,5 @@
-//! 嵌入式 QuickJS JavaScript 代码解释器。
-//!
-//! 通过 rquickjs 嵌入 QuickJS 引擎，AI agent 可直接执行 JS 代码。
-//! 引擎天然沙箱：默认不暴露文件系统/网络/进程 API，仅注册受控的安全函数。
+//! Embedded QuickJS JavaScript interpreter for AI agent code execution.
+//! Sandboxed: no FS/network/process by default, only controlled workspace functions exposed.
 
 use rquickjs::{CaughtError, Context, Function, Runtime};
 use serde::{Deserialize, Serialize};
@@ -17,6 +15,7 @@ use crate::fs_commands::{ensure_inside_workspace_exists, ensure_inside_workspace
 const DEFAULT_MEMORY_LIMIT: usize = 64 * 1024 * 1024; // 64 MB
 const DEFAULT_MAX_STACK: usize = 512 * 1024; // 512 KB
 const DEFAULT_TIMEOUT_MS: u64 = 30_000;
+const OFFICELLM_BRIDGE: &str = include_str!("officellm_bridge.js");
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -87,6 +86,12 @@ pub fn run_js(app: tauri::AppHandle, args: RunJsArgs) -> Result<JsExecutionResul
         register_workspace_fns(&ctx, &ws, &workspace_root, officellm_home.as_deref())?;
         globals.set("workspace", ws).map_err(|e| format!("{e}"))?;
 
+        // --- officellm bridge preload ---
+        if officellm_home.is_some() {
+            ctx.eval::<(), _>(OFFICELLM_BRIDGE.as_bytes())
+                .map_err(|e| format!("officellm bridge init: {e}"))?;
+        }
+
         // --- eval ---
         let eval_result: Result<rquickjs::Value, _> = ctx.eval(code.as_bytes());
         let execution_ms = start.elapsed().as_millis() as u64;
@@ -136,11 +141,7 @@ fn register_console_fn<'js>(
             let parts: Vec<String> = args
                 .0
                 .iter()
-                .map(|v| {
-                    v.as_string()
-                        .and_then(|s| s.to_string().ok())
-                        .unwrap_or_else(|| format!("{v:?}"))
-                })
+                .map(|v| v.as_string().and_then(|s| s.to_string().ok()).unwrap_or_else(|| format!("{v:?}")))
                 .collect();
             let line = if prefix.is_empty() {
                 parts.join(" ")
@@ -217,9 +218,9 @@ fn register_workspace_fns<'js>(
     let officellm_fn = Function::new(
         ctx.clone(),
         move |cmd: String, mut args: HashMap<String, String>| -> rquickjs::Result<String> {
-            // 路径边界校验：防 `..` 逃逸，拒绝 workspace 外路径（绝对/相对均检查）
-            // 输入类路径文件必须存在，输出类路径可不存在
+            // Path boundary: input paths must exist, output paths may not
             for key in &["i", "input", "path"] {
+                if *key == "path" && cmd == "save" { continue; }
                 if let Some(v) = args.get(*key) {
                     let abs = ensure_inside_workspace_exists(&wr4, v)
                         .map_err(|e| js_err(&format!("{e:?}")))?;
@@ -247,24 +248,31 @@ fn register_workspace_fns<'js>(
                     crate::officellm::server::close()
                         .map(|_| serde_json::json!({"status":"success"}))
                 }
+                "save" => {
+                    let p = if let Some(v) = args.get("path") {
+                        Some(ensure_inside_workspace_may_not_exist(&wr4, v)
+                            .map_err(|e| js_err(&format!("{e:?}")))?.to_string_lossy().into_owned())
+                    } else { None };
+                    crate::officellm::server::save(p.as_deref())
+                        .map(|r| serde_json::to_value(&r).unwrap_or(serde_json::Value::Null))
+                }
                 "status" => {
                     crate::officellm::server::status()
                         .map(|info| serde_json::json!({"status":"success","data": info}))
                 }
                 _ => {
-                    // 将 HashMap 转换为 CLI 风格参数数组，如 {"limit":"10"} → ["--limit","10"]
+                    // HashMap → CLI args: {"limit":"10"} → ["--limit","10"], empty val → bare flag
                     let cli_args: Vec<String> = args.iter().flat_map(|(key, value)| {
                         let flag = if key.len() == 1 { format!("-{key}") } else { format!("--{key}") };
-                        [flag, value.clone()]
+                        if value.is_empty() { vec![flag] } else { vec![flag, value.clone()] }
                     }).collect();
-                    let r = if crate::officellm::server::has_session() {
+                    if crate::officellm::server::has_session() {
                         crate::officellm::server::call(&cmd, &cli_args)
                             .map(|r| serde_json::to_value(&r).unwrap_or(serde_json::Value::Null))
                     } else {
                         crate::officellm::cli::call(&cmd, &cli_args, home, std::path::Path::new(&wr4))
                             .map(|r| serde_json::to_value(&r).unwrap_or(serde_json::Value::Null))
-                    };
-                    r
+                    }
                 }
             };
 
