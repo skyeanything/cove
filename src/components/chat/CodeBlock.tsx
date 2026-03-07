@@ -176,6 +176,7 @@ export function CodeBlock({
         {collapsible ? (
           <button
             type="button"
+            aria-expanded={expanded}
             className="flex items-center gap-1.5 min-w-0 cursor-pointer hover:bg-background-tertiary/50 transition-colors duration-150 rounded-md -ml-1 pl-1 pr-2 py-0.5"
             onClick={() => setExpanded((v) => !v)}
           >
