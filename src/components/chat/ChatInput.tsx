@@ -28,6 +28,7 @@ import {
   imageFilesToDraftAttachments,
   nonImageFilesToDraftAttachments,
 } from "@/lib/chat-input-utils";
+import { clipboardFilesToDraftAttachments } from "@/lib/clipboard-files";
 import type { SkillMeta } from "@/lib/ai/skills/types";
 
 const IME_COMMIT_GRACE_MS = 150;
@@ -159,11 +160,22 @@ export function ChatInput({
 
   const handlePaste = async (e: React.ClipboardEvent) => {
     const items = e.clipboardData?.items; if (!items?.length) return;
+    // 1. Check for image blobs (screenshots, copied images)
     const files: File[] = [];
     for (let i = 0; i < items.length; i++) { const item = items[i]; if (item?.kind === "file") { const f = item.getAsFile(); if (f && isImageFile(f)) files.push(f); } }
-    if (files.length === 0) return;
+    if (files.length > 0) {
+      e.preventDefault();
+      const attachments = await imageFilesToDraftAttachments(files, activeWorkspace?.path);
+      if (attachments.length > 0) { addDraftAttachments(attachments); setAttachError(null); }
+      return;
+    }
+    // 2. Fallback: check native clipboard for file paths (Finder/Explorer copy)
+    // macOS/Windows set no text/plain when copying files; Linux may set file:// URIs
+    const text = e.clipboardData?.getData("text/plain") ?? "";
+    const isFileUriList = text.trim().split("\n").every((l) => l.trim().startsWith("file://") || l.trim().startsWith("#") || l.trim() === "");
+    if (text && !isFileUriList) return; // Normal text paste, let browser handle it
     e.preventDefault();
-    const attachments = await imageFilesToDraftAttachments(files, activeWorkspace?.path);
+    const attachments = await clipboardFilesToDraftAttachments(activeWorkspace?.path);
     if (attachments.length > 0) { addDraftAttachments(attachments); setAttachError(null); }
   };
 
