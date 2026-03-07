@@ -10,6 +10,8 @@ import {
   Pencil,
   FileUp,
   Copy,
+  CopyPlus,
+  ExternalLink,
   Link,
   Trash2,
   Scissors,
@@ -50,6 +52,8 @@ export function FileTreeItem({
   onCopy,
   onCut,
   onPaste,
+  onDuplicate,
+  onOpenDefaultApp,
   onRename,
   onRevealInFinder,
   onCopyRelativePath,
@@ -82,6 +86,8 @@ export function FileTreeItem({
   onCopy?: (path: string) => void;
   onCut?: (path: string) => void;
   onPaste?: (targetDirPath: string) => void;
+  onDuplicate?: (path: string) => void;
+  onOpenDefaultApp?: (path: string) => void;
   onRename: (path: string) => void;
   onRevealInFinder: (path: string) => void;
   onCopyRelativePath: (path: string) => void;
@@ -252,11 +258,21 @@ export function FileTreeItem({
               {t("explorer.paste")}
             </ContextMenuItem>
           )}
+          <ContextMenuItem className="gap-2 text-[13px]" onClick={() => onDuplicate?.(path)}>
+            <CopyPlus className="size-4" strokeWidth={1.5} />
+            {t("explorer.duplicate")}
+          </ContextMenuItem>
           <ContextMenuSeparator />
           <ContextMenuItem className="gap-2 text-[13px]" onClick={() => onRename(path)}>
             <Pencil className="size-4" strokeWidth={1.5} />
             {t("explorer.rename")}
           </ContextMenuItem>
+          {!isDir && (
+            <ContextMenuItem className="gap-2 text-[13px]" onClick={() => onOpenDefaultApp?.(path)}>
+              <ExternalLink className="size-4" strokeWidth={1.5} />
+              {t("explorer.openInDefaultApp")}
+            </ContextMenuItem>
+          )}
           <ContextMenuItem className="gap-2 text-[13px]" onClick={() => onRevealInFinder(path)}>
             <FileUp className="size-4" strokeWidth={1.5} />
             {t("explorer.revealInFinder")}
@@ -303,6 +319,8 @@ export function FileTreeItem({
               onCopy={onCopy}
               onCut={onCut}
               onPaste={onPaste}
+              onDuplicate={onDuplicate}
+              onOpenDefaultApp={onOpenDefaultApp}
               onRename={onRename}
               onRevealInFinder={onRevealInFinder}
               onCopyRelativePath={onCopyRelativePath}

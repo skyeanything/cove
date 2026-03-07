@@ -100,6 +100,8 @@
     "revealInFinder": "Reveal in Finder",
     "copyRelativePath": "Copy Relative Path",
     "copyAbsolutePath": "Copy Absolute Path",
+    "duplicate": "Duplicate",
+    "openInDefaultApp": "Open in Default App",
     "delete": "Delete",
     "deleteConfirmTitle": "Delete",
     "deleteConfirmDescription": "Are you sure you want to delete \"{{name}}\"? This cannot be undone.",
