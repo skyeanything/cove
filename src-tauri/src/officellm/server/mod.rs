@@ -55,7 +55,7 @@ pub fn open(path: &str, home: &std::path::Path) -> Result<(), String> {
     if guard.is_some() {
         return Err("已有活跃会话，请先调用 close() 关闭".to_string());
     }
-
+    super::init::wait_for_init();
     let bin = super::detect::bin_path()?;
 
     log::info!("[officellm-server] opening: {path}");

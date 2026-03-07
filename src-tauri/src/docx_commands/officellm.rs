@@ -44,6 +44,8 @@ pub(super) fn convert_docx_via_officellm(app: tauri::AppHandle, data_url: String
     fs::write(&input_path, &bytes).map_err(|e| format!("写入临时文件失败: {e}"))?;
 
     // ── 4. 调用 officellm to-pdf（通过统一的 resolve 模块获取路径）──────────────
+    crate::officellm::init::wait_for_init();
+
     let (bin, is_bundled) = resolve::resolve_bin().ok_or_else(|| {
         let _ = fs::remove_file(&input_path);
         "未找到 officellm".to_string()
@@ -65,7 +67,7 @@ pub(super) fn convert_docx_via_officellm(app: tauri::AppHandle, data_url: String
     // 立即清理临时输入文件
     let _ = fs::remove_file(&input_path);
 
-    let out = result.map_err(|e| format!("调用 officellm 失败: {e}"))?;
+    let out = result.map_err(|e| format!("调用 officellm 失败 ({}): {e}", bin.display()))?;
 
     if !out.status.success() {
         let _ = fs::remove_file(&output_path);
