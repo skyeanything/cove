@@ -34,6 +34,8 @@ interface PermissionState {
   pendingQueue: PendingPermission[];
   /** bash 会话级已允许的命令首词 */
   allowedBashPatterns: Record<string, Set<string>>;
+  /** 开启信任模式的会话 ID 集合 */
+  trustModeConversations: Set<string>;
 
   ask: (
     conversationId: string,
@@ -43,12 +45,17 @@ interface PermissionState {
   ) => Promise<boolean>;
 
   respond: (choice: PermissionChoice) => void;
+
+  enableTrustMode: (conversationId: string) => void;
+  disableTrustMode: (conversationId: string) => void;
+  isTrustMode: (conversationId: string) => boolean;
 }
 
 export const usePermissionStore = create<PermissionState>()((setState, get) => ({
   pendingAsk: null,
   pendingQueue: [],
   allowedBashPatterns: {},
+  trustModeConversations: new Set<string>(),
 
   ask: (conversationId, operation, pathOrCommand, options) => {
     if (operation === "bash" && options?.bashPattern) {
@@ -56,6 +63,10 @@ export const usePermissionStore = create<PermissionState>()((setState, get) => (
       if (patterns?.has(options.bashPattern)) {
         return Promise.resolve(true);
       }
+    }
+    // Trust mode: auto-approve all confirmable operations
+    if (get().trustModeConversations.has(conversationId)) {
+      return Promise.resolve(true);
     }
     return new Promise<boolean>((resolve) => {
       const bashPattern = operation === "bash" ? (options?.bashPattern ?? getBashCommandPattern(pathOrCommand)) : undefined;
@@ -100,5 +111,21 @@ export const usePermissionStore = create<PermissionState>()((setState, get) => (
     } else {
       setState({ pendingAsk: null, pendingQueue: [] });
     }
+  },
+
+  enableTrustMode: (conversationId) => {
+    const next = new Set(get().trustModeConversations);
+    next.add(conversationId);
+    setState({ trustModeConversations: next });
+  },
+
+  disableTrustMode: (conversationId) => {
+    const next = new Set(get().trustModeConversations);
+    next.delete(conversationId);
+    setState({ trustModeConversations: next });
+  },
+
+  isTrustMode: (conversationId) => {
+    return get().trustModeConversations.has(conversationId);
   },
 }));

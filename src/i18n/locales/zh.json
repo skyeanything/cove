@@ -221,6 +221,14 @@
     "deny": "拒绝",
     "alwaysAllow": "始终允许（本会话）"
   },
+  "trustMode": {
+    "enableTooltip": "启用信任模式",
+    "disableTooltip": "信任模式已开启（点击关闭）",
+    "confirmTitle": "启用信任模式",
+    "confirmDescription": "需要确认的命令将自动执行。危险命令仍被拦截。切换对话或关闭应用后失效。",
+    "cancel": "取消",
+    "enable": "启用"
+  },
   "skills": {
     "title": "技能",
     "tooltipEnabled": "技能（已选 {{count}} 个）",

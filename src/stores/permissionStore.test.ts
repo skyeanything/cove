@@ -200,3 +200,54 @@ describe("permissionStore — multi-request flow", () => {
     expect(usePermissionStore.getState().pendingAsk).toBeNull();
   });
 });
+
+describe("permissionStore — trust mode", () => {
+  it("enable/disable/isTrustMode basic operations", () => {
+    const store = usePermissionStore.getState();
+    expect(store.isTrustMode("conv-1")).toBe(false);
+
+    store.enableTrustMode("conv-1");
+    expect(usePermissionStore.getState().isTrustMode("conv-1")).toBe(true);
+
+    usePermissionStore.getState().disableTrustMode("conv-1");
+    expect(usePermissionStore.getState().isTrustMode("conv-1")).toBe(false);
+  });
+
+  it("does not affect other conversations", () => {
+    usePermissionStore.getState().enableTrustMode("conv-1");
+    expect(usePermissionStore.getState().isTrustMode("conv-2")).toBe(false);
+  });
+
+  it("ask() returns true immediately in trust mode without creating pendingAsk", async () => {
+    usePermissionStore.getState().enableTrustMode("conv-1");
+
+    const result = await usePermissionStore.getState().ask("conv-1", "bash", "curl http://x");
+    expect(result).toBe(true);
+    expect(usePermissionStore.getState().pendingAsk).toBeNull();
+  });
+
+  it("trust mode works for all operation types", async () => {
+    usePermissionStore.getState().enableTrustMode("conv-1");
+
+    const r1 = await usePermissionStore.getState().ask("conv-1", "bash", "ls");
+    const r2 = await usePermissionStore.getState().ask("conv-1", "write", "/tmp/file");
+    const r3 = await usePermissionStore.getState().ask("conv-1", "edit", "/tmp/file");
+    expect(r1).toBe(true);
+    expect(r2).toBe(true);
+    expect(r3).toBe(true);
+    expect(usePermissionStore.getState().pendingAsk).toBeNull();
+  });
+
+  it("enable/disable are idempotent", () => {
+    const store = usePermissionStore.getState();
+    store.enableTrustMode("conv-1");
+    store.enableTrustMode("conv-1");
+    expect(usePermissionStore.getState().isTrustMode("conv-1")).toBe(true);
+
+    usePermissionStore.getState().disableTrustMode("conv-1");
+    expect(usePermissionStore.getState().isTrustMode("conv-1")).toBe(false);
+
+    usePermissionStore.getState().disableTrustMode("conv-1");
+    expect(usePermissionStore.getState().isTrustMode("conv-1")).toBe(false);
+  });
+});
