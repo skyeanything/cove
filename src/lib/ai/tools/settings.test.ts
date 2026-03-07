@@ -275,7 +275,7 @@ describe("handleSettings - assistant trust_mode", () => {
     sort_order: 0, created_at: "", updated_at: "",
   };
 
-  it("setting trust_mode true calls enableTrustMode with active conversationId", async () => {
+  it("setting trust_mode true requires user confirmation via UI", async () => {
     vi.mocked(useDataStore.getState).mockReturnValue({
       ...useDataStore.getState(),
       assistants: [assistantFixture],
@@ -285,8 +285,8 @@ describe("handleSettings - assistant trust_mode", () => {
       action: "set", category: "assistant", assistant_name: "Helper",
       key: "trust_mode", value: "true",
     });
-    expect(result).toContain("enabled");
-    expect(usePermissionStore.getState().enableTrustMode).toHaveBeenCalledWith("conv-42");
+    expect(result).toContain("shield icon");
+    expect(usePermissionStore.getState().enableTrustMode).not.toHaveBeenCalled();
   });
 
   it("setting trust_mode false calls disableTrustMode", async () => {
@@ -303,7 +303,7 @@ describe("handleSettings - assistant trust_mode", () => {
     expect(usePermissionStore.getState().disableTrustMode).toHaveBeenCalledWith("conv-42");
   });
 
-  it("returns error when no active conversation", async () => {
+  it("returns error when disabling with no active conversation", async () => {
     vi.mocked(useDataStore.getState).mockReturnValue({
       ...useDataStore.getState(),
       assistants: [assistantFixture],
@@ -311,7 +311,7 @@ describe("handleSettings - assistant trust_mode", () => {
     });
     const result = await handleSettings({
       action: "set", category: "assistant", assistant_name: "Helper",
-      key: "trust_mode", value: "true",
+      key: "trust_mode", value: "false",
     });
     expect(result).toContain("No active conversation");
   });
