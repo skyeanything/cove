@@ -1,4 +1,6 @@
+// FILE_SIZE_EXCEPTION: keyboard navigation integration adds state + hook wiring that cannot be split further
 import { useCallback, useEffect, useState } from "react";
+import { useFileTreeKeyboard } from "@/hooks/useFileTreeKeyboard";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { useTranslation } from "react-i18next";
@@ -63,6 +65,7 @@ export function FileTreePanel() {
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set());
   const [loadedChildren, setLoadedChildren] = useState<Record<string, ListDirEntry[]>>({});
   const [editingPath, setEditingPath] = useState<string | null>(null);
+  const [focusedPath, setFocusedPath] = useState<string | null>(null);
 
   const dialogs = useFileTreeDialogs({
     workspaceRoot,
@@ -240,6 +243,18 @@ export function FileTreePanel() {
   );
   const onRenameCancel = useCallback(() => setEditingPath(null), []);
 
+  const keyboard = useFileTreeKeyboard({
+    rootEntries: search.filteredRootEntries,
+    expandedDirs,
+    loadedChildren,
+    focusedPath,
+    setFocusedPath,
+    onToggleExpand,
+    onSelectFile: setSelected,
+    onRename,
+    onDelete: dialogs.onDelete,
+  });
+
   if (!workspaceRoot) {
     return (
       <div className="flex h-full flex-col overflow-hidden bg-background">
@@ -260,7 +275,11 @@ export function FileTreePanel() {
           search.openSearch();
           return;
         }
-        if (!selectedPath) return;
+        if (!selectedPath) {
+          // Even without selection, allow keyboard nav
+          keyboard.handleKeyDown(e);
+          return;
+        }
         if ((e.metaKey || e.ctrlKey) && e.key === "c") {
           e.preventDefault();
           clipboard.onCopy(selectedPath);
@@ -271,6 +290,8 @@ export function FileTreePanel() {
           e.preventDefault();
           const pasteTarget = lastOpenedDirPath ?? "";
           void clipboard.onPaste(pasteTarget);
+        } else {
+          keyboard.handleKeyDown(e);
         }
       }}
     >
@@ -335,6 +356,7 @@ export function FileTreePanel() {
                     entry={entry}
                     workspaceRoot={workspaceRoot}
                     selectedPath={selectedPath}
+                    focusedPath={focusedPath}
                     expandedDirs={expandedDirs}
                     loadedChildren={loadedChildren}
                     editingPath={editingPath}
