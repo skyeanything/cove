@@ -168,7 +168,7 @@ export function MarkdownContent({ source, className, trailingCursor }: MarkdownC
   if (!hasVisibleContent) return null;
 
   const wrapperCls = cn(
-    "markdown-body mb-4 text-[14px] leading-relaxed select-text",
+    "markdown-body mb-4 text-[14px] leading-relaxed select-text break-words",
     className,
   );
 
@@ -194,7 +194,7 @@ export function MarkdownContent({ source, className, trailingCursor }: MarkdownC
         <div className={wrapperCls} data-md>
           <SettledMarkdown source={settled} />
           {pending ? (
-            <p className="mb-0 last:mb-0">
+            <p className="mb-0 last:mb-0 break-words">
               {pending}
               {CURSOR_EL}
             </p>

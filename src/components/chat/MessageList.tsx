@@ -48,7 +48,7 @@ export function MessageList() {
 
   return (
     <div className="relative min-h-0 flex-1">
-      <div ref={scrollRef} className="absolute inset-0 overflow-y-auto">
+      <div ref={scrollRef} className="absolute inset-0 overflow-y-auto overflow-x-hidden">
         <div className="mx-auto w-full max-w-[896px] px-4 py-6">
           {messages.map((msg) => (
             <MessageBubble key={msg.id} message={msg} />
@@ -196,12 +196,12 @@ function UserMessage({ messageId, content }: { messageId: string; content: strin
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <div className="flex max-w-[85%] flex-col items-end">
+      <div className="flex max-w-[85%] min-w-0 flex-col items-end">
         {attachments.length > 0 && (
           <UserAttachmentList attachments={attachments} />
         )}
         {content.trim() && (
-          <div className="rounded-[4px] bg-background-tertiary px-3 py-1.5 text-[14px] leading-relaxed whitespace-pre-wrap">
+          <div className="max-w-full rounded-[4px] bg-background-tertiary px-3 py-1.5 text-[14px] leading-relaxed whitespace-pre-wrap break-words">
             {renderContentWithMentions(content)}
           </div>
         )}

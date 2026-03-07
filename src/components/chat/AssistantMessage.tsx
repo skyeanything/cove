@@ -237,7 +237,7 @@ export function AssistantMessage({
               {orderedParts!.map((part, index) =>
                 part.type === "text" ? (
                   part.text ? (
-                    <div key={index} className="text-[14px] leading-relaxed">
+                    <div key={index} className="text-[14px] leading-relaxed break-words">
                       {renderMessageContent(part.text, !!streaming, index === orderedParts!.length - 1)}
                     </div>
                   ) : null
@@ -257,7 +257,7 @@ export function AssistantMessage({
                 )
               )}
               {content?.trim() && copyContent !== content && (
-                <div className="mt-1 text-[14px] leading-relaxed">
+                <div className="mt-1 text-[14px] leading-relaxed break-words">
                   {renderMessageContent(content, !!streaming, true)}
                 </div>
               )}
@@ -271,7 +271,7 @@ export function AssistantMessage({
                   ))}
                 </div>
               )}
-              <div className="text-[14px] leading-relaxed">
+              <div className="text-[14px] leading-relaxed break-words">
                 {renderMessageContent(content ?? "", !!streaming, true)}
                 {streaming && !content && (toolCalls?.length ?? 0) === 0 && (
                   <span className="cursor-blink ml-0.5 inline-block h-4 w-0.5 bg-brand align-middle" aria-hidden />
