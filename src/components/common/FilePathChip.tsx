@@ -14,6 +14,11 @@ function basename(path: string): string {
 /** Cache existence checks to avoid repeated FS calls */
 const existsCache = new Map<string, boolean>();
 
+/** @internal — exposed for test isolation */
+export function clearExistsCache() {
+  existsCache.clear();
+}
+
 function isBareFilename(path: string): boolean {
   return !path.includes("/");
 }

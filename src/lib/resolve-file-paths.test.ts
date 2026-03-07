@@ -97,4 +97,39 @@ describe("resolveFilePathsFromContext", () => {
     expect(result).toContain("`assets/logo.png`");
     expect(result).toContain("`docs/readme.md`");
   });
+
+  it("does not transform content inside fenced code blocks", () => {
+    const input = [
+      "**tests/**",
+      "- `1.docx`",
+      "",
+      "```markdown",
+      "- `1.docx`",
+      "```",
+    ].join("\n");
+    const result = resolveFilePathsFromContext(input);
+    // Outside fence: transformed
+    expect(result).toContain("`tests/1.docx`");
+    // Inside fence: the backtick line must remain untouched
+    const fencedLine = result.split("\n").find(
+      (_, i, arr) => i > 0 && arr[i - 1]?.startsWith("```"),
+    );
+    expect(fencedLine).toBe("- `1.docx`");
+  });
+
+  it("does not transform content inside tilde fenced blocks", () => {
+    const input = [
+      "**docs/**",
+      "- `readme.md`",
+      "~~~",
+      "- `readme.md`",
+      "~~~",
+    ].join("\n");
+    const result = resolveFilePathsFromContext(input);
+    const lines = result.split("\n");
+    // Line inside fence (index 3) stays unchanged
+    expect(lines[3]).toBe("- `readme.md`");
+    // Line outside fence (index 1) is transformed
+    expect(lines[1]).toContain("`docs/readme.md`");
+  });
 });

@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
-import { FilePathChip } from "./FilePathChip";
+import { FilePathChip, clearExistsCache } from "./FilePathChip";
 
 const mockOpen = vi.fn();
 vi.mock("@/hooks/useOpenFilePreview", () => ({
@@ -27,8 +27,7 @@ beforeEach(() => {
   mockOpen.mockClear();
   mockInvoke.mockClear();
   mockWorkspaceRoot = "/workspace";
-  // Clear the exists cache between tests
-  vi.resetModules;
+  clearExistsCache();
 });
 
 afterEach(cleanup);

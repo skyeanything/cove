@@ -32,9 +32,20 @@ export function resolveFilePathsFromContext(markdown: string): string {
 
   const lines = markdown.split("\n");
   let currentDir: string | null = null;
+  let inFencedBlock = false;
   const result: string[] = [];
 
   for (const line of lines) {
+    // Track fenced code blocks — never transform inside them
+    if (/^(`{3,}|~{3,})/.test(line.trimStart())) {
+      inFencedBlock = !inFencedBlock;
+      result.push(line);
+      continue;
+    }
+    if (inFencedBlock) {
+      result.push(line);
+      continue;
+    }
     const dirMatch = DIR_HEADING_PATTERN.exec(line);
     if (dirMatch && dirMatch[1]) {
       currentDir = dirMatch[1].replace(/\/+$/, "");
