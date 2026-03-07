@@ -1,27 +1,39 @@
 //! Resolve the officellm binary path.
 //!
 //! Priority: bundled sidecar > external install (~/.officellm/bin/officellm).
+//! On Windows, binary names include `.exe`; on Unix no extension.
 
 use std::path::PathBuf;
 
 /// Target triple baked in at compile time (e.g. `aarch64-apple-darwin`).
 const TARGET_TRIPLE: &str = env!("TARGET");
 
+#[cfg(windows)]
+const BIN_EXT: &str = ".exe";
+#[cfg(not(windows))]
+const BIN_EXT: &str = "";
+
 /// Resolve the officellm binary.
 ///
 /// Returns `(path, is_bundled)` where `is_bundled` is `true` when the binary
 /// was found next to the application executable (sidecar), and `false` when
-/// it was found at the default external install location.
+/// it was found at the default external install location or in PATH.
 pub fn resolve_bin() -> Option<(PathBuf, bool)> {
     // 1. Bundled sidecar (already existence-checked inside sidecar_path)
     if let Some(path) = sidecar_path() {
         return Some((path, true));
     }
 
-    // 2. External install fallback
-    let ext = external_bin_path()?;
-    if ext.exists() {
-        return Some((ext, false));
+    // 2. Default external install (~/.officellm/bin/officellm or ...\officellm.exe)
+    if let Some(ext) = external_bin_path() {
+        if ext.exists() {
+            return Some((ext, false));
+        }
+    }
+
+    // 3. Search PATH (e.g. npm -g, scoop, chocolatey, or custom install)
+    if let Some(path) = find_officellm_in_path() {
+        return Some((path, false));
     }
 
     None
@@ -30,26 +42,25 @@ pub fn resolve_bin() -> Option<(PathBuf, bool)> {
 /// Return the expected sidecar binary path based on the current executable.
 ///
 /// Tauri uses `officellm-<triple>` during development but strips the suffix
-/// to plain `officellm` when bundling into the `.app`.  Check both names.
+/// to plain `officellm` when bundling. On Windows both names include `.exe`.
 fn sidecar_path() -> Option<PathBuf> {
     let exe_dir = std::env::current_exe().ok()?.parent()?.to_path_buf();
-    // Dev / unbundled: officellm-aarch64-apple-darwin
-    let with_triple = exe_dir.join(format!("officellm-{TARGET_TRIPLE}"));
+    // Dev / unbundled: officellm-aarch64-apple-darwin or officellm-x86_64-pc-windows-msvc.exe
+    let with_triple = exe_dir.join(format!("officellm-{TARGET_TRIPLE}{BIN_EXT}"));
     if with_triple.exists() {
         return Some(with_triple);
     }
-    // Bundled .app: officellm (no suffix)
-    let plain = exe_dir.join("officellm");
+    // Bundled: officellm or officellm.exe
+    let plain = exe_dir.join(format!("officellm{BIN_EXT}"));
     if plain.exists() {
         return Some(plain);
     }
-    // Dev fallback: src-tauri/binaries/ (tauri dev does not copy externalBin
-    // to target/debug/, so look in the source tree directly).
+    // Dev fallback: src-tauri/binaries/
     #[cfg(debug_assertions)]
     {
         let dev_bin = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("binaries")
-            .join(format!("officellm-{TARGET_TRIPLE}"));
+            .join(format!("officellm-{TARGET_TRIPLE}{BIN_EXT}"));
         if dev_bin.exists() {
             return Some(dev_bin);
         }
@@ -57,9 +68,22 @@ fn sidecar_path() -> Option<PathBuf> {
     None
 }
 
-/// Return the external install binary path (`~/.officellm/bin/officellm`).
+/// Return the external install binary path (`~/.officellm/bin/officellm` or `...\officellm.exe` on Windows).
 fn external_bin_path() -> Option<PathBuf> {
-    dirs::home_dir().map(|h| h.join(".officellm/bin/officellm"))
+    dirs::home_dir().map(|h| h.join(".officellm").join("bin").join(format!("officellm{BIN_EXT}")))
+}
+
+/// Search PATH for officellm (e.g. npm -g, scoop, chocolatey). Returns first existing path.
+fn find_officellm_in_path() -> Option<PathBuf> {
+    let path_env = std::env::var_os("PATH")?;
+    let separator = if cfg!(windows) { ';' } else { ':' };
+    for dir in std::env::split_paths(&path_env) {
+        let candidate = dir.join(format!("officellm{BIN_EXT}"));
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+    }
+    None
 }
 
 /// Return the external `OFFICELLM_HOME` directory (`~/.officellm`).
