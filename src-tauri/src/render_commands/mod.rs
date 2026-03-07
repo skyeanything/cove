@@ -19,6 +19,7 @@ pub struct RenderUrlArgs {
     pub pdf: Option<bool>,
     pub window_width: Option<u32>,
     pub window_height: Option<u32>,
+    pub max_chars: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -102,7 +103,7 @@ pub async fn render_extract_content(args: RenderUrlArgs) -> Result<RenderContent
     let timeout = args.timeout_ms.unwrap_or(DEFAULT_TIMEOUT_MS);
     let width = args.window_width.unwrap_or(DEFAULT_WIDTH);
     let height = args.window_height.unwrap_or(DEFAULT_HEIGHT);
-    let max_chars: u32 = 120_000;
+    let max_chars = args.max_chars.unwrap_or(120_000);
 
     match tokio::time::timeout(
         std::time::Duration::from_millis(timeout),

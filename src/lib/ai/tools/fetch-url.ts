@@ -106,7 +106,7 @@ export const fetchUrlTool = tool({
       }
 
       // HTTP returned no/low-quality content — try Chrome rendering first
-      const chromeResult = await chromeFallback(url);
+      const chromeResult = await chromeFallback(url, timeoutMs, maxChars);
       if (chromeResult) return chromeResult;
 
       // Chrome also failed — suggest cookie retry if applicable
@@ -133,10 +133,10 @@ export const fetchUrlTool = tool({
   },
 });
 
-async function chromeFallback(url: string): Promise<string | null> {
+async function chromeFallback(url: string, timeoutMs: number, maxChars: number): Promise<string | null> {
   try {
     const rendered = await invoke<RenderContentResult>("render_extract_content", {
-      args: { url },
+      args: { url, timeoutMs, maxChars },
     });
     if (rendered.ok && rendered.content_md) {
       const title = rendered.title ? `[${rendered.title}](${rendered.source})` : rendered.source;

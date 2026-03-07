@@ -1,6 +1,5 @@
 /// Detect proxy from environment variables or macOS system proxy.
 pub fn detect_proxy() -> Option<String> {
-    // 1. Check environment variables (works on all platforms)
     for var in [
         "https_proxy",
         "HTTPS_PROXY",
@@ -17,7 +16,6 @@ pub fn detect_proxy() -> Option<String> {
         }
     }
 
-    // 2. macOS: read system HTTP proxy via networksetup
     #[cfg(target_os = "macos")]
     {
         if let Some(proxy) = detect_macos_system_proxy() {
@@ -29,16 +27,45 @@ pub fn detect_proxy() -> Option<String> {
 }
 
 #[cfg(target_os = "macos")]
+fn get_active_network_service() -> Option<String> {
+    // Get the primary network interface (e.g. "en0")
+    let route_out = std::process::Command::new("route")
+        .args(["-n", "get", "default"])
+        .output()
+        .ok()?;
+    let route_text = String::from_utf8_lossy(&route_out.stdout);
+    let iface = route_text.lines().find_map(|l| {
+        let t = l.trim();
+        t.strip_prefix("interface:").map(|v| v.trim().to_string())
+    })?;
+
+    // Map interface to service name (e.g. "en0" -> "Wi-Fi")
+    let list_out = std::process::Command::new("networksetup")
+        .args(["-listallhardwareports"])
+        .output()
+        .ok()?;
+    let list_text = String::from_utf8_lossy(&list_out.stdout);
+    let mut current_service: Option<String> = None;
+    for line in list_text.lines() {
+        let line = line.trim();
+        if let Some(name) = line.strip_prefix("Hardware Port:") {
+            current_service = Some(name.trim().to_string());
+        } else if let Some(dev) = line.strip_prefix("Device:") {
+            if dev.trim() == iface {
+                return current_service;
+            }
+        }
+    }
+    None
+}
+
+#[cfg(target_os = "macos")]
 fn detect_macos_system_proxy() -> Option<String> {
-    // Try HTTPS proxy first, then HTTP
-    for service in ["Web", "Secure Web"] {
-        let kind = if service == "Web" {
-            "webproxy"
-        } else {
-            "securewebproxy"
-        };
+    let service = get_active_network_service()?;
+
+    for kind in ["webproxy", "securewebproxy"] {
         let output = std::process::Command::new("networksetup")
-            .args([&format!("-get{kind}"), "Wi-Fi"])
+            .args([&format!("-get{kind}"), &service])
             .output()
             .ok()?;
         let text = String::from_utf8_lossy(&output.stdout);
@@ -56,7 +83,7 @@ fn detect_macos_system_proxy() -> Option<String> {
             }
         }
         if enabled && !server.is_empty() && !port.is_empty() && port != "0" {
-            let scheme = if service == "Secure Web" {
+            let scheme = if kind == "securewebproxy" {
                 "https"
             } else {
                 "http"
@@ -65,9 +92,9 @@ fn detect_macos_system_proxy() -> Option<String> {
         }
     }
 
-    // Also check SOCKS proxy
+    // SOCKS proxy
     let output = std::process::Command::new("networksetup")
-        .args(["-getsocksfirewallproxy", "Wi-Fi"])
+        .args(["-getsocksfirewallproxy", &service])
         .output()
         .ok()?;
     let text = String::from_utf8_lossy(&output.stdout);
