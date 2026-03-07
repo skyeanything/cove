@@ -53,6 +53,13 @@
     "externalBin": ["binaries/officellm", "binaries/pdftoppm", "binaries/pdftotext"],
     "macOS": {
       "entitlements": "entitlements.plist"
+    },
+    "windows": {
+      "nsis": {
+        "installMode": "both",
+        "languages": ["English", "SimpChinese"],
+        "displayLanguageSelector": true
+      }
     }
   }
 }
