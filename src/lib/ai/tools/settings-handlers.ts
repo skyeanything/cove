@@ -365,14 +365,13 @@ async function setAssistantKey(
   if (key === "trust_mode") {
     const b = parseBool(value);
     if (b === null) return `Invalid boolean: ${value}`;
+    if (b) {
+      return "Trust mode requires explicit user confirmation. Ask the user to click the shield icon in the chat header to enable it.";
+    }
     const conversationId = useDataStore.getState().activeConversationId;
     if (!conversationId) return "No active conversation to set trust mode on.";
-    if (b) {
-      usePermissionStore.getState().enableTrustMode(conversationId);
-    } else {
-      usePermissionStore.getState().disableTrustMode(conversationId);
-    }
-    return `trust_mode ${b ? "enabled" : "disabled"} for current conversation.`;
+    usePermissionStore.getState().disableTrustMode(conversationId);
+    return "trust_mode disabled for current conversation.";
   }
 
   if (key === "name" || key === "model" || key === "system_instruction") {
