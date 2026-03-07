@@ -1,10 +1,11 @@
 import { useEffect, useState, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { listen } from "@tauri-apps/api/event";
+import { invoke } from "@tauri-apps/api/core";
+import { openPath } from "@tauri-apps/plugin-opener";
 import { ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FloatingPreviewContent } from "./FloatingPreviewContent";
-import { useOpenFilePreview } from "@/hooks/useOpenFilePreview";
 import { getFileIcon } from "@/lib/file-tree-icons";
 
 function basename(p: string): string {
@@ -25,7 +26,6 @@ export function PreviewWindow() {
   const initial = getInitialParams();
   const [path, setPath] = useState<string | null>(initial.path);
   const [workspace, setWorkspace] = useState<string | null>(initial.workspace);
-  const { openExternal } = useOpenFilePreview();
 
   // Listen for navigation events from the main window
   useEffect(() => {
@@ -42,9 +42,17 @@ export function PreviewWindow() {
     };
   }, []);
 
+  // Use the window's own workspace state, not the store-based hook
   const handleOpenExternal = useCallback(() => {
-    if (path) openExternal(path);
-  }, [path, openExternal]);
+    if (!path) return;
+    if (path.startsWith("/")) {
+      openPath(path).catch((e) => console.error("openPath failed:", e));
+    } else if (workspace) {
+      invoke("open_with_app", {
+        args: { workspaceRoot: workspace, path, openWith: null },
+      }).catch((e) => console.error("open_with_app failed:", e));
+    }
+  }, [path, workspace]);
 
   if (!path) {
     return (
