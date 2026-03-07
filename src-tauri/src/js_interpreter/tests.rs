@@ -248,6 +248,15 @@ fn test_glob_nested_parent_traversal_rejected() {
     assert!(r.error.unwrap().contains("parent traversal"));
 }
 
+#[cfg(windows)]
+#[test]
+fn test_glob_backslash_parent_traversal_rejected() {
+    let dir = TempDir::new().unwrap();
+    let r = run(dir.path().to_str().unwrap(), r#"workspace.glob('..\\*')"#);
+    assert!(r.error.is_some());
+    assert!(r.error.unwrap().contains("parent traversal"));
+}
+
 // --- appendFile ---
 
 #[test]

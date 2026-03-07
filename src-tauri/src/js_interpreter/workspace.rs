@@ -240,7 +240,7 @@ fn register_glob<'js>(
             if std::path::Path::new(&pattern).is_absolute() {
                 return Err(js_err("absolute glob patterns not allowed"));
             }
-            if pattern.split('/').any(|seg| seg == "..") {
+            if std::path::Path::new(&pattern).components().any(|c| matches!(c, std::path::Component::ParentDir)) {
                 return Err(js_err("glob pattern must not contain parent traversal"));
             }
             let root = std::path::Path::new(&wr);
