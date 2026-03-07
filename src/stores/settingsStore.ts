@@ -3,7 +3,7 @@ import type { ProviderType } from "@/db/types";
 import { readConfig, writeConfig } from "@/lib/config";
 import type { GeneralConfig } from "@/lib/config/types";
 
-type SettingsTab = "providers" | "general" | "skills" | "tools" | "appearance" | "workspaces" | "soul";
+type SettingsTab = "providers" | "general" | "skills" | "tools" | "workspaces";
 export type SendMessageShortcut = "enter" | "modifierEnter";
 
 interface SettingsState {

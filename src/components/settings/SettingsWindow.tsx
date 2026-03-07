@@ -1,22 +1,19 @@
 import { useTranslation } from "react-i18next";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { cn } from "@/lib/utils";
-import { Blocks, Brain, FolderOpen, Settings, Palette, Wand2, Wrench } from "lucide-react";
+import { Blocks, FolderOpen, Settings, Wand2, Wrench } from "lucide-react";
 import { ProvidersPage } from "./ProvidersPage";
 import { GeneralPage } from "./GeneralPage";
 import { SkillsPage } from "./SkillsPage";
 import { ToolsPage } from "./ToolsPage";
 import { WorkspacesPage } from "./WorkspacesPage";
-import { SoulPage } from "./SoulPage";
 
 const TABS = [
   { id: "providers" as const, labelKey: "settings.tabs.providers", icon: Blocks },
   { id: "general" as const, labelKey: "settings.tabs.general", icon: Settings },
   { id: "skills" as const, labelKey: "settings.tabs.skills", icon: Wand2 },
   { id: "tools" as const, labelKey: "settings.tabs.tools", icon: Wrench },
-  { id: "appearance" as const, labelKey: "settings.tabs.appearance", icon: Palette },
   { id: "workspaces" as const, labelKey: "settings.tabs.workspaces", icon: FolderOpen },
-  { id: "soul" as const, labelKey: "settings.tabs.soul", icon: Brain },
 ] as const;
 
 export function SettingsWindow() {
@@ -66,13 +63,7 @@ export function SettingsWindow() {
         {tab === "general" && <GeneralPage />}
         {tab === "skills" && <SkillsPage />}
         {tab === "tools" && <ToolsPage />}
-        {tab === "appearance" && (
-          <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
-            {t("settings.appearanceComingSoon")}
-          </div>
-        )}
         {tab === "workspaces" && <WorkspacesPage />}
-        {tab === "soul" && <SoulPage />}
       </div>
     </div>
   );
