@@ -331,13 +331,14 @@ describe("ToolCallBlock", () => {
       />,
     );
     const grid = container.querySelector("[style]") as HTMLElement;
-    expect(grid.style.gridTemplateRows).toBe("1fr");
-    // Click the header button to collapse
+    // Default: collapsed
+    expect(grid.style.gridTemplateRows).toBe("0fr");
+    // Click the header button to expand
     const headerBtn = container.querySelector("button") as HTMLElement;
     await fireEvent.click(headerBtn);
-    // After click, state toggles open -> closed
+    // After click, state toggles closed -> open
     const gridAfter = container.querySelector("[style]") as HTMLElement;
-    expect(gridAfter.style.gridTemplateRows).toBe("0fr");
+    expect(gridAfter.style.gridTemplateRows).toBe("1fr");
   });
 
   it("shows permission bar when pending ask matches", () => {

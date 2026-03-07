@@ -449,7 +449,7 @@ function isToolCallPending(toolCall: ToolCallInfo, pendingAsk: PendingPermission
 }
 
 export function ToolCallBlock({ toolCall, pendingAsk }: { toolCall: ToolCallInfo; pendingAsk: PendingPermission | null }) {
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(false);
   const { t } = useTranslation();
   const respond = usePermissionStore((s) => s.respond);
   const toolDisplayName = (typeof toolCall.toolName === "string" ? toolCall.toolName : "tool").replace(/_/g, " ");
