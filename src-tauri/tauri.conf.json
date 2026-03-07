@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Cove",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "identifier": "com.officellm.chat",
   "build": {
     "frontendDist": "../dist",
@@ -50,14 +50,21 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
-    "externalBin": ["binaries/officellm", "binaries/pdftoppm", "binaries/pdftotext"],
+    "externalBin": [
+      "binaries/officellm",
+      "binaries/pdftoppm",
+      "binaries/pdftotext"
+    ],
     "macOS": {
       "entitlements": "entitlements.plist"
     },
     "windows": {
       "nsis": {
         "installMode": "both",
-        "languages": ["English", "SimpChinese"],
+        "languages": [
+          "English",
+          "SimpChinese"
+        ],
         "displayLanguageSelector": true
       }
     }
