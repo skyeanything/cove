@@ -75,8 +75,8 @@ describe("FileTreeItem focus visibility", () => {
     );
     const button = container.querySelector("button");
     expect(button).not.toBeNull();
-    expect(button!.className).toContain("ring-1");
-    expect(button!.className).toContain("ring-accent/60");
+    expect(button!.className).toContain("ring-2");
+    expect(button!.className).toContain("ring-accent");
   });
 
   it("applies background highlight when focused but not selected", () => {
@@ -86,7 +86,7 @@ describe("FileTreeItem focus visibility", () => {
       />,
     );
     const button = container.querySelector("button");
-    expect(button!.className).toContain("bg-background-tertiary/60");
+    expect(button!.className).toContain("bg-background-tertiary");
   });
 
   it("does not apply background highlight when focused and selected", () => {
@@ -100,9 +100,9 @@ describe("FileTreeItem focus visibility", () => {
     );
     const button = container.querySelector("button");
     // ring should still appear
-    expect(button!.className).toContain("ring-accent/60");
-    // but background-tertiary/60 should not (since isSelected is true)
-    expect(button!.className).not.toContain("bg-background-tertiary/60");
+    expect(button!.className).toContain("ring-accent");
+    // but bg-background-tertiary should not (since isSelected is true)
+    expect(button!.className).not.toContain("bg-background-tertiary");
   });
 
   it("does not apply focus ring when focusedPath does not match", () => {
