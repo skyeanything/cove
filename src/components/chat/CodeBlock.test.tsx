@@ -52,12 +52,21 @@ function longCode() {
   return Array.from({ length: COLLAPSE_THRESHOLD + 5 }, (_, i) => `line ${i + 1}`).join("\n");
 }
 
+function getToggleButton(container: HTMLElement): HTMLButtonElement | null {
+  return container.querySelector("button[type='button']");
+}
+
+function getGrid(container: HTMLElement): HTMLElement | null {
+  return container.querySelector("[style]");
+}
+
 describe("CodeBlock collapse", () => {
-  it("short blocks have no chevron and are always expanded", () => {
+  it("short blocks have no toggle button and are always expanded", () => {
     const { container } = render(
       <CodeBlock>{makeCodeElement(shortCode())}</CodeBlock>,
     );
     expect(container.querySelector("pre")).toBeTruthy();
+    expect(getToggleButton(container)).toBeNull();
     expect(screen.queryByText(/lines/)).toBeNull();
   });
 
@@ -67,9 +76,7 @@ describe("CodeBlock collapse", () => {
       <CodeBlock>{makeCodeElement(longCode())}</CodeBlock>,
     );
     expect(screen.getByText(`${lines} lines`)).toBeTruthy();
-    const grid = container.querySelector("[style]");
-    expect(grid).toBeTruthy();
-    expect(grid!.getAttribute("style")).toContain("0fr");
+    expect(getGrid(container)!.getAttribute("style")).toContain("0fr");
   });
 
   it("shows first-line preview when collapsed", () => {
@@ -79,26 +86,36 @@ describe("CodeBlock collapse", () => {
     expect(preview!.textContent).toBe("line 1");
   });
 
-  it("clicking header expands the code block", () => {
+  it("clicking toggle button expands the code block", () => {
     const { container } = render(
       <CodeBlock>{makeCodeElement(longCode())}</CodeBlock>,
     );
-    const header = container.firstElementChild!.firstElementChild!;
-    expect(header.className).toContain("cursor-pointer");
-    fireEvent.click(header);
-    const grid = container.querySelector("[style]");
-    expect(grid!.getAttribute("style")).toContain("1fr");
+    const toggle = getToggleButton(container)!;
+    expect(toggle).toBeTruthy();
+    fireEvent.click(toggle);
+    expect(getGrid(container)!.getAttribute("style")).toContain("1fr");
   });
 
-  it("clicking header again collapses the code block", () => {
+  it("clicking toggle button again collapses the code block", () => {
     const { container } = render(
       <CodeBlock>{makeCodeElement(longCode())}</CodeBlock>,
     );
-    const header = container.firstElementChild!.firstElementChild!;
-    fireEvent.click(header);
-    fireEvent.click(header);
-    const grid = container.querySelector("[style]");
-    expect(grid!.getAttribute("style")).toContain("0fr");
+    const toggle = getToggleButton(container)!;
+    fireEvent.click(toggle);
+    fireEvent.click(toggle);
+    expect(getGrid(container)!.getAttribute("style")).toContain("0fr");
+  });
+
+  it("toggle button is keyboard accessible", () => {
+    const { container } = render(
+      <CodeBlock>{makeCodeElement(longCode())}</CodeBlock>,
+    );
+    const toggle = getToggleButton(container)!;
+    expect(toggle.tagName).toBe("BUTTON");
+    // Enter key triggers native button click via fireEvent.click
+    fireEvent.keyDown(toggle, { key: "Enter" });
+    // Native button handles Enter/Space, just verify it's focusable
+    expect(toggle.tabIndex).not.toBe(-1);
   });
 
   it("copy button does not toggle collapse", () => {
@@ -111,21 +128,33 @@ describe("CodeBlock collapse", () => {
     const { container } = render(
       <CodeBlock>{makeCodeElement(longCode())}</CodeBlock>,
     );
+    // Last button is the copy button (after the toggle button)
     const buttons = container.querySelectorAll("button");
     const copyBtn = buttons[buttons.length - 1];
     fireEvent.click(copyBtn!);
-    const grid = container.querySelector("[style]");
-    expect(grid!.getAttribute("style")).toContain("0fr");
+    expect(getGrid(container)!.getAttribute("style")).toContain("0fr");
     expect(clipboardSpy).toHaveBeenCalled();
   });
 
-  it("short block header is not clickable", () => {
-    const { container } = render(
+  it("syncs expanded state when code changes from short to long", () => {
+    const { container, rerender } = render(
       <CodeBlock>{makeCodeElement(shortCode())}</CodeBlock>,
     );
-    // The header div (first child of the outer container) should not have cursor-pointer
-    const outerDiv = container.firstElementChild!;
-    const headerDiv = outerDiv.firstElementChild!;
-    expect(headerDiv.className).not.toContain("cursor-pointer");
+    // Short code: expanded, no grid collapse
+    expect(getGrid(container)!.getAttribute("style")).toContain("1fr");
+
+    // Rerender with long code
+    rerender(<CodeBlock>{makeCodeElement(longCode())}</CodeBlock>);
+    expect(getGrid(container)!.getAttribute("style")).toContain("0fr");
+  });
+
+  it("syncs expanded state when code changes from long to short", () => {
+    const { container, rerender } = render(
+      <CodeBlock>{makeCodeElement(longCode())}</CodeBlock>,
+    );
+    expect(getGrid(container)!.getAttribute("style")).toContain("0fr");
+
+    rerender(<CodeBlock>{makeCodeElement(shortCode())}</CodeBlock>);
+    expect(getGrid(container)!.getAttribute("style")).toContain("1fr");
   });
 });

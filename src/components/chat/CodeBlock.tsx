@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import Prism from "prismjs";
 import { Highlight } from "prism-react-renderer";
 import { renderMermaidSVG } from "beautiful-mermaid";
@@ -102,6 +102,13 @@ export function CodeBlock({
   const lineCount = code.split("\n").length;
   const collapsible = lineCount > COLLAPSE_THRESHOLD;
   const [expanded, setExpanded] = useState(!collapsible);
+  const prevCollapsible = useRef(collapsible);
+  useEffect(() => {
+    if (prevCollapsible.current !== collapsible) {
+      prevCollapsible.current = collapsible;
+      setExpanded(!collapsible);
+    }
+  }, [collapsible]);
   const [copied, setCopied] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [mermaidError, setMermaidError] = useState<string | null>(null);
@@ -162,29 +169,30 @@ export function CodeBlock({
 
   return (
     <div className="my-3 overflow-hidden rounded-lg border border-border bg-background-secondary">
-      <div
-        className={cn(
-          "flex items-center justify-between gap-2 px-2 py-1.5 text-[12px]",
-          expanded && "border-b border-border",
-          collapsible && "cursor-pointer hover:bg-background-tertiary/50 transition-colors duration-150",
-        )}
-        onClick={collapsible ? () => setExpanded((v) => !v) : undefined}
-      >
-        <span className="flex items-center gap-1.5 min-w-0">
-          {collapsible && (
-            expanded
+      <div className={cn(
+        "flex items-center justify-between gap-2 px-2 py-1.5 text-[12px]",
+        expanded && "border-b border-border",
+      )}>
+        {collapsible ? (
+          <button
+            type="button"
+            className="flex items-center gap-1.5 min-w-0 cursor-pointer hover:bg-background-tertiary/50 transition-colors duration-150 rounded-md -ml-1 pl-1 pr-2 py-0.5"
+            onClick={() => setExpanded((v) => !v)}
+          >
+            {expanded
               ? <ChevronDown className="size-3 shrink-0 text-muted-foreground" strokeWidth={1.5} />
               : <ChevronRight className="size-3 shrink-0 text-muted-foreground" strokeWidth={1.5} />
-          )}
-          <span className="font-medium text-muted-foreground">{lang}</span>
-          {collapsible && (
+            }
+            <span className="font-medium text-muted-foreground">{lang}</span>
             <span className="text-muted-foreground/60">{lineCount} lines</span>
-          )}
-          {collapsible && !expanded && firstLine && (
-            <span className="truncate text-muted-foreground/40 font-mono">{firstLine}</span>
-          )}
-        </span>
-        <div className="flex items-center gap-0.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+            {!expanded && firstLine && (
+              <span className="truncate text-muted-foreground/40 font-mono">{firstLine}</span>
+            )}
+          </button>
+        ) : (
+          <span className="font-medium text-muted-foreground">{lang}</span>
+        )}
+        <div className="flex items-center gap-0.5 shrink-0">
           {(isHtml || isMermaid) && (
             <Button
               variant="ghost"
