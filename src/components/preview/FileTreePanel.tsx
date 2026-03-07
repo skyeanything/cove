@@ -22,7 +22,7 @@ import { useFileTreeDialogs } from "@/hooks/useFileTreeDialogs";
 import { useFileTreeDnD } from "@/hooks/useFileTreeDnD";
 import { useFileTreeSearch } from "@/hooks/useFileTreeSearch";
 import { useFileClipboard } from "@/hooks/useFileClipboard";
-import { getDuplicateName } from "@/lib/file-utils";
+import { getAvailableDuplicateName } from "@/lib/file-utils";
 import { FileTreeItem, type ListDirEntry } from "./FileTreeItem";
 import { FileTreeDialogs } from "./FileTreeDialogs";
 import { FileTreeSearch } from "./FileTreeSearch";
@@ -256,9 +256,11 @@ export function FileTreePanel() {
       if (!workspaceRoot) return;
       const fileName = path.split("/").pop() ?? path;
       const parentDir = path.includes("/") ? path.replace(/\/[^/]+$/, "") : "";
-      const destName = getDuplicateName(fileName);
-      const toPath = parentDir ? `${parentDir}/${destName}` : destName;
       try {
+        const siblings = await listDir(workspaceRoot, parentDir, true);
+        const siblingNames = new Set(siblings.map((e) => e.name));
+        const destName = getAvailableDuplicateName(fileName, siblingNames);
+        const toPath = parentDir ? `${parentDir}/${destName}` : destName;
         await invoke("copy_entry", { args: { workspaceRoot, fromPath: path, toPath } });
       } catch {
         // silently fail - file watcher will update if successful

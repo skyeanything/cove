@@ -15,3 +15,19 @@ export function getDuplicateName(fileName: string): string {
   }
   return `${base} (copy)${ext}`;
 }
+
+/**
+ * Find the next non-colliding duplicate name given a set of existing sibling names.
+ * Iterates getDuplicateName until no collision.
+ */
+export function getAvailableDuplicateName(
+  fileName: string,
+  existingNames: Set<string>,
+): string {
+  let candidate = getDuplicateName(fileName);
+  const MAX = 100;
+  for (let i = 0; i < MAX && existingNames.has(candidate); i++) {
+    candidate = getDuplicateName(candidate);
+  }
+  return candidate;
+}
