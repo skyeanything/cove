@@ -159,6 +159,12 @@ jobs:
           fi
           echo "VERSION=$TAG_VERSION" >> "$GITHUB_ENV"
 
+      - name: Pull officellm binary
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.OFFICELLM_REPO_TOKEN }}
+        run: bash scripts/pull-officellm.sh
+
       - name: Build frontend
         run: pnpm build
 

@@ -10,12 +10,29 @@
 set -euo pipefail
 
 REPO="ZhenchongLi/office-llm"
-export ASSET_NAME="officellm-osx-arm64.tar.gz"
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 BINARY_DIR="$PROJECT_DIR/src-tauri/binaries"
-TARGET_BIN="$BINARY_DIR/officellm-aarch64-apple-darwin"
 VERSION_FILE="$BINARY_DIR/.officellm-version"
+
+# ── Detect platform ──────────────────────────────────────────────────────
+OS="$(uname -s)"
+case "$OS" in
+  Darwin)
+    export ASSET_NAME="officellm-osx-arm64.tar.gz"
+    TARGET_BIN="$BINARY_DIR/officellm-aarch64-apple-darwin"
+    IS_WINDOWS=false
+    ;;
+  MINGW*|MSYS*|CYGWIN*)
+    export ASSET_NAME="officellm-win-x64.zip"
+    TARGET_BIN="$BINARY_DIR/officellm-x86_64-pc-windows-msvc.exe"
+    IS_WINDOWS=true
+    ;;
+  *)
+    echo "ERROR: unsupported platform '$OS'"
+    exit 1
+    ;;
+esac
 
 FORCE=false
 for arg in "$@"; do
@@ -99,19 +116,30 @@ curl -fSL "${CURL_AUTH[@]}" -H "Accept: application/octet-stream" \
 }
 
 echo "Extracting ..."
-tar -xzf "$TMPDIR_DL/$ASSET_NAME" -C "$TMPDIR_DL"
+if [ "$IS_WINDOWS" = true ]; then
+  unzip -q "$TMPDIR_DL/$ASSET_NAME" -d "$TMPDIR_DL"
+else
+  tar -xzf "$TMPDIR_DL/$ASSET_NAME" -C "$TMPDIR_DL"
+fi
 
 # Locate the officellm binary in extracted contents
 EXTRACTED_BIN=""
-if [ -f "$TMPDIR_DL/officellm" ]; then
-  EXTRACTED_BIN="$TMPDIR_DL/officellm"
+if [ "$IS_WINDOWS" = true ]; then
+  if [ -f "$TMPDIR_DL/officellm.exe" ]; then
+    EXTRACTED_BIN="$TMPDIR_DL/officellm.exe"
+  else
+    EXTRACTED_BIN="$(find "$TMPDIR_DL" -maxdepth 2 -name "officellm.exe" -type f | head -1)"
+  fi
 else
-  # Search one level deep
-  EXTRACTED_BIN="$(find "$TMPDIR_DL" -maxdepth 2 -name "officellm" -type f | head -1)"
+  if [ -f "$TMPDIR_DL/officellm" ]; then
+    EXTRACTED_BIN="$TMPDIR_DL/officellm"
+  else
+    EXTRACTED_BIN="$(find "$TMPDIR_DL" -maxdepth 2 -name "officellm" -type f | head -1)"
+  fi
 fi
 
 if [ -z "$EXTRACTED_BIN" ] || [ ! -f "$EXTRACTED_BIN" ]; then
-  echo "ERROR: 'officellm' binary not found in archive"
+  echo "ERROR: officellm binary not found in archive"
   echo "Archive contents:"
   ls -la "$TMPDIR_DL"
   exit 1
@@ -119,8 +147,10 @@ fi
 
 # ── Install binary ──────────────────────────────────────────────────────
 cp "$EXTRACTED_BIN" "$TARGET_BIN"
-chmod +x "$TARGET_BIN"
-xattr -cr "$TARGET_BIN" 2>/dev/null || true
+if [ "$IS_WINDOWS" = false ]; then
+  chmod +x "$TARGET_BIN"
+  xattr -cr "$TARGET_BIN" 2>/dev/null || true
+fi
 echo "$LATEST_TAG" > "$VERSION_FILE"
 
 echo "Installed officellm $LATEST_TAG -> $TARGET_BIN"
