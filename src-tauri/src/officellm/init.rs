@@ -24,6 +24,9 @@ enum InitState {
 
 static INIT_STATE: (Mutex<InitState>, Condvar) =
     (Mutex::new(InitState::NotStarted), Condvar::new());
+/// Stores the result of the last init attempt so concurrent waiters can
+/// retrieve it after being woken.
+static INIT_RESULT: Mutex<Option<Result<(), String>>> = Mutex::new(None);
 
 /// Maximum time to wait for init to complete before proceeding anyway.
 const INIT_WAIT_TIMEOUT: Duration = Duration::from_secs(10);
@@ -42,14 +45,24 @@ pub(crate) fn mark_init_started() -> bool {
     false
 }
 
-/// Mark init as done and wake all waiters. Called after `officellm_init`
-/// completes (regardless of success/failure).
-pub(crate) fn mark_init_done() {
+/// Mark init as done and wake all waiters. On success, state moves to
+/// `Done` (no further init attempts). On failure, state resets to
+/// `NotStarted` so the next caller can retry.
+pub(crate) fn mark_init_done(result: &Result<(), String>) {
+    if let Ok(mut stored) = INIT_RESULT.lock() {
+        *stored = Some(result.clone());
+    }
     let (lock, cvar) = &INIT_STATE;
     if let Ok(mut state) = lock.lock() {
-        *state = InitState::Done;
+        *state = if result.is_ok() { InitState::Done } else { InitState::NotStarted };
         cvar.notify_all();
     }
+}
+
+/// Retrieve the result of the last init attempt. Returns `Ok(())` if
+/// init has never run (e.g. timeout or `NotStarted`).
+pub(crate) fn init_result() -> Result<(), String> {
+    INIT_RESULT.lock().ok().and_then(|r| r.clone()).unwrap_or(Ok(()))
 }
 
 /// Block until init has completed. If init is `InProgress`, wait up to
@@ -108,6 +121,9 @@ pub(crate) fn reset_init_state() {
     if let Ok(mut state) = lock.lock() {
         *state = InitState::NotStarted;
     }
+    if let Ok(mut stored) = INIT_RESULT.lock() {
+        *stored = None;
+    }
 }
 
 #[cfg(test)]
@@ -131,7 +147,7 @@ mod tests {
         let _g = BARRIER_LOCK.lock().unwrap();
         reset_init_state();
         mark_init_started();
-        mark_init_done();
+        mark_init_done(&Ok(()));
         let start = std::time::Instant::now();
         wait_for_init();
         assert!(start.elapsed() < Duration::from_millis(50));
@@ -148,20 +164,33 @@ mod tests {
             start.elapsed()
         });
         std::thread::sleep(Duration::from_millis(100));
-        mark_init_done();
+        mark_init_done(&Ok(()));
         let elapsed = handle.join().unwrap();
         assert!(elapsed >= Duration::from_millis(80));
         assert!(elapsed < Duration::from_secs(2));
     }
 
     #[test]
-    fn mark_init_started_is_single_flight() {
+    fn single_flight_success_prevents_retry() {
         let _g = BARRIER_LOCK.lock().unwrap();
         reset_init_state();
-        assert!(mark_init_started(), "first call claims the slot");
-        assert!(!mark_init_started(), "second call is rejected");
-        mark_init_done();
-        assert!(!mark_init_started(), "after Done, still rejected");
+        assert!(mark_init_started());
+        mark_init_done(&Ok(()));
+        assert!(!mark_init_started(), "after success, no retry");
+        assert!(init_result().is_ok());
+    }
+
+    #[test]
+    fn failure_allows_retry() {
+        let _g = BARRIER_LOCK.lock().unwrap();
+        reset_init_state();
+        assert!(mark_init_started());
+        mark_init_done(&Err("boom".into()));
+        assert!(init_result().is_err());
+        // State reset to NotStarted — retry is possible
+        assert!(mark_init_started(), "after failure, retry allowed");
+        mark_init_done(&Ok(()));
+        assert!(init_result().is_ok());
     }
 
     #[cfg(unix)]

@@ -103,7 +103,7 @@ pub async fn officellm_doctor(app: tauri::AppHandle) -> Result<CommandResult, St
 pub async fn officellm_init(app: tauri::AppHandle) -> Result<(), String> {
     if !init::mark_init_started() {
         init::wait_for_init();
-        return Ok(());
+        return init::init_result();
     }
     let result = async {
         let (bin, _) = resolve::resolve_bin()
@@ -115,6 +115,6 @@ pub async fn officellm_init(app: tauri::AppHandle) -> Result<(), String> {
         .await
         .map_err(|e| format!("后台线程错误: {e}"))?
     }.await;
-    init::mark_init_done();
+    init::mark_init_done(&result);
     result
 }
