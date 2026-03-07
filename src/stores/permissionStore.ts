@@ -36,6 +36,8 @@ interface PermissionState {
   allowedBashPatterns: Record<string, Set<string>>;
   /** 开启信任模式的会话 ID 集合 */
   trustModeConversations: Set<string>;
+  /** AI 请求开启信任模式时的待确认项（需用户确认） */
+  pendingTrustModeRequest: { conversationId: string; resolve: (approved: boolean) => void } | null;
 
   ask: (
     conversationId: string,
@@ -49,6 +51,9 @@ interface PermissionState {
   enableTrustMode: (conversationId: string) => void;
   disableTrustMode: (conversationId: string) => void;
   isTrustMode: (conversationId: string) => boolean;
+  /** AI 请求启用信任模式，返回 Promise 等待用户确认 */
+  requestTrustMode: (conversationId: string) => Promise<boolean>;
+  resolveTrustModeRequest: (approved: boolean) => void;
 }
 
 export const usePermissionStore = create<PermissionState>()((setState, get) => ({
@@ -56,6 +61,7 @@ export const usePermissionStore = create<PermissionState>()((setState, get) => (
   pendingQueue: [],
   allowedBashPatterns: {},
   trustModeConversations: new Set<string>(),
+  pendingTrustModeRequest: null,
 
   ask: (conversationId, operation, pathOrCommand, options) => {
     if (operation === "bash" && options?.bashPattern) {
@@ -127,5 +133,24 @@ export const usePermissionStore = create<PermissionState>()((setState, get) => (
 
   isTrustMode: (conversationId) => {
     return get().trustModeConversations.has(conversationId);
+  },
+
+  requestTrustMode: (conversationId) => {
+    return new Promise<boolean>((resolve) => {
+      setState({ pendingTrustModeRequest: { conversationId, resolve } });
+    });
+  },
+
+  resolveTrustModeRequest: (approved) => {
+    const req = get().pendingTrustModeRequest;
+    if (!req) return;
+    if (approved) {
+      const next = new Set(get().trustModeConversations);
+      next.add(req.conversationId);
+      setState({ trustModeConversations: next, pendingTrustModeRequest: null });
+    } else {
+      setState({ pendingTrustModeRequest: null });
+    }
+    req.resolve(approved);
   },
 }));

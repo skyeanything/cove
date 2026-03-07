@@ -53,6 +53,7 @@ vi.mock("@/stores/permissionStore", () => ({
     getState: vi.fn().mockReturnValue({
       enableTrustMode: vi.fn(),
       disableTrustMode: vi.fn(),
+      requestTrustMode: vi.fn().mockResolvedValue(true),
     }),
   },
 }));
@@ -275,7 +276,11 @@ describe("handleSettings - assistant trust_mode", () => {
     sort_order: 0, created_at: "", updated_at: "",
   };
 
-  it("setting trust_mode true requires user confirmation via UI", async () => {
+  it("setting trust_mode true calls requestTrustMode and awaits user confirmation", async () => {
+    vi.mocked(usePermissionStore.getState).mockReturnValue({
+      ...usePermissionStore.getState(),
+      requestTrustMode: vi.fn().mockResolvedValue(true),
+    });
     vi.mocked(useDataStore.getState).mockReturnValue({
       ...useDataStore.getState(),
       assistants: [assistantFixture],
@@ -285,8 +290,26 @@ describe("handleSettings - assistant trust_mode", () => {
       action: "set", category: "assistant", assistant_name: "Helper",
       key: "trust_mode", value: "true",
     });
-    expect(result).toContain("shield icon");
-    expect(usePermissionStore.getState().enableTrustMode).not.toHaveBeenCalled();
+    expect(result).toContain("enabled");
+    expect(result).toContain("user confirmed");
+    expect(usePermissionStore.getState().requestTrustMode).toHaveBeenCalledWith("conv-42");
+  });
+
+  it("setting trust_mode true returns denied when user rejects", async () => {
+    vi.mocked(usePermissionStore.getState).mockReturnValue({
+      ...usePermissionStore.getState(),
+      requestTrustMode: vi.fn().mockResolvedValue(false),
+    });
+    vi.mocked(useDataStore.getState).mockReturnValue({
+      ...useDataStore.getState(),
+      assistants: [assistantFixture],
+      activeConversationId: "conv-42",
+    });
+    const result = await handleSettings({
+      action: "set", category: "assistant", assistant_name: "Helper",
+      key: "trust_mode", value: "true",
+    });
+    expect(result).toContain("denied");
   });
 
   it("setting trust_mode false calls disableTrustMode", async () => {

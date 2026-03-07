@@ -28,6 +28,12 @@ function TrustModeToggle({ conversationId }: { conversationId: string }) {
   const active = usePermissionStore((s) => s.trustModeConversations.has(conversationId));
   const enableTrustMode = usePermissionStore((s) => s.enableTrustMode);
   const disableTrustMode = usePermissionStore((s) => s.disableTrustMode);
+  const pendingReq = usePermissionStore((s) => s.pendingTrustModeRequest);
+  const resolveTrustModeRequest = usePermissionStore((s) => s.resolveTrustModeRequest);
+
+  // AI requested trust mode for this conversation
+  const aiRequested = pendingReq?.conversationId === conversationId;
+  const dialogOpen = confirmOpen || aiRequested;
 
   const handleClick = () => {
     if (active) {
@@ -35,6 +41,17 @@ function TrustModeToggle({ conversationId }: { conversationId: string }) {
     } else {
       setConfirmOpen(true);
     }
+  };
+
+  const handleConfirm = () => {
+    enableTrustMode(conversationId);
+    if (aiRequested) resolveTrustModeRequest(true);
+    setConfirmOpen(false);
+  };
+
+  const handleCancel = () => {
+    if (aiRequested) resolveTrustModeRequest(false);
+    setConfirmOpen(false);
   };
 
   return (
@@ -54,7 +71,7 @@ function TrustModeToggle({ conversationId }: { conversationId: string }) {
         <ShieldCheck className="size-[16px]" strokeWidth={1.5} />
       </Button>
 
-      <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+      <AlertDialog open={dialogOpen} onOpenChange={(open) => { if (!open) handleCancel(); }}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>{t("trustMode.confirmTitle")}</AlertDialogTitle>
@@ -63,10 +80,8 @@ function TrustModeToggle({ conversationId }: { conversationId: string }) {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>{t("trustMode.cancel")}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => enableTrustMode(conversationId)}
-            >
+            <AlertDialogCancel onClick={handleCancel}>{t("trustMode.cancel")}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirm}>
               {t("trustMode.enable")}
             </AlertDialogAction>
           </AlertDialogFooter>
