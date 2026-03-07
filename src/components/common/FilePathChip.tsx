@@ -4,6 +4,7 @@ import { cn } from "@/lib/utils";
 import { getPreviewKind } from "@/lib/preview-types";
 import { getFileIcon } from "@/lib/file-tree-icons";
 import { useOpenFilePreview } from "@/hooks/useOpenFilePreview";
+import { useFloatingPreview } from "@/hooks/useFloatingPreview";
 import { useFilePreviewStore } from "@/stores/filePreviewStore";
 
 function basename(path: string): string {
@@ -33,7 +34,8 @@ export interface FilePathChipProps {
 }
 
 export function FilePathChip({ path, label, compact }: FilePathChipProps) {
-  const { open } = useOpenFilePreview();
+  const { openPreview, openExternal } = useOpenFilePreview();
+  const floatingPreview = useFloatingPreview();
   const workspaceRoot = useFilePreviewStore((s) => s.workspaceRoot);
   const displayName = label || basename(path);
   const kind = getPreviewKind(path);
@@ -76,11 +78,19 @@ export function FilePathChip({ path, label, compact }: FilePathChipProps) {
     );
   }
 
-  const handleClick = () => open(path);
+  const handleClick = () => {
+    if (kind === "unsupported") {
+      openExternal(path);
+    } else if (floatingPreview) {
+      floatingPreview.openPopup(path);
+    } else {
+      openPreview(path);
+    }
+  };
   const handleKeyDown = (e: KeyboardEvent) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
-      open(path);
+      handleClick();
     }
   };
 

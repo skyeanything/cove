@@ -141,7 +141,10 @@
     "csvCols": "列",
     "csvTruncated": "显示 {{rows}} 行 x {{cols}} 列",
     "collapseExplorer": "收起资源管理器",
-    "expandExplorer": "展开资源管理器"
+    "expandExplorer": "展开资源管理器",
+    "openInPanel": "在面板中打开",
+    "pdfFallback": "PDF 预览可在侧面板中查看",
+    "officeFallback": "Office 文档预览可在侧面板中查看"
   },
   "common": {
     "settings": "设置"

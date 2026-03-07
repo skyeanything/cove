@@ -13,6 +13,7 @@ import { FileTreePanel } from "@/components/preview/FileTreePanel";
 import { FilePreviewPanel } from "@/components/preview/FilePreviewPanel";
 import { ResizeHandle } from "./ResizeHandle";
 import { WindowControls } from "./WindowControls";
+import { FloatingPreviewProvider } from "@/components/preview/FloatingPreviewPopup";
 import { openSettingsWindow } from "@/lib/settings-window";
 import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
 
@@ -196,6 +197,7 @@ export function AppLayout() {
   }, [toggleLeft, handleNewChat]);
 
   return (
+    <FloatingPreviewProvider>
     <div className="relative flex h-screen w-screen overflow-hidden bg-background">
       <WindowControls onToggleSidebar={toggleLeft} onNewChat={handleNewChat} />
 
@@ -291,5 +293,6 @@ export function AppLayout() {
         onOpenChange={setSearchMessagesOpen}
       />
     </div>
+    </FloatingPreviewProvider>
   );
 }

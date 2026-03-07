@@ -141,7 +141,10 @@
     "csvCols": "columns",
     "csvTruncated": "showing {{rows}} rows x {{cols}} columns",
     "collapseExplorer": "Collapse explorer",
-    "expandExplorer": "Expand explorer"
+    "expandExplorer": "Expand explorer",
+    "openInPanel": "Open in panel",
+    "pdfFallback": "PDF preview is available in the side panel",
+    "officeFallback": "Office document preview is available in the side panel"
   },
   "common": {
     "settings": "Settings"

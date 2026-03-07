@@ -4,6 +4,7 @@ import { useChatStore } from "@/stores/chatStore";
 import { useLayoutStore } from "@/stores/layoutStore";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { SettingsWindow } from "@/components/settings/SettingsWindow";
+import { PreviewWindow } from "@/components/preview/PreviewWindow";
 import { useTauriDrag } from "@/hooks/useTauriDrag";
 import { useEffect } from "react";
 import { listen } from "@tauri-apps/api/event";
@@ -13,8 +14,9 @@ import { migrateConfigIfNeeded } from "@/lib/config/migration";
 import { i18n } from "@/i18n";
 import { useSettingsStore } from "@/stores/settingsStore";
 
-const isSettingsWindow =
-  new URLSearchParams(window.location.search).get("window") === "settings";
+const windowParam = new URLSearchParams(window.location.search).get("window");
+const isSettingsWindow = windowParam === "settings";
+const isPreviewWindow = windowParam === "preview";
 
 export function App() {
   const theme = useThemeStore((s) => s.theme);
@@ -124,6 +126,10 @@ export function App() {
 
   if (isSettingsWindow) {
     return <SettingsWindow />;
+  }
+
+  if (isPreviewWindow) {
+    return <PreviewWindow />;
   }
 
   return <AppLayout />;

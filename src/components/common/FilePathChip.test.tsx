@@ -2,10 +2,18 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/react";
 import { FilePathChip, clearExistsCache } from "./FilePathChip";
+import { FloatingPreviewContext } from "@/hooks/useFloatingPreview";
+import type { FloatingPreviewContextValue } from "@/hooks/useFloatingPreview";
 
-const mockOpen = vi.fn();
+const mockOpenPreview = vi.fn();
+const mockOpenExternal = vi.fn();
+
 vi.mock("@/hooks/useOpenFilePreview", () => ({
-  useOpenFilePreview: () => ({ open: mockOpen, openPreview: vi.fn(), openExternal: vi.fn() }),
+  useOpenFilePreview: () => ({
+    open: vi.fn(),
+    openPreview: mockOpenPreview,
+    openExternal: mockOpenExternal,
+  }),
 }));
 
 vi.mock("@/lib/file-tree-icons", () => ({
@@ -24,13 +32,38 @@ vi.mock("@/stores/filePreviewStore", () => ({
 }));
 
 beforeEach(() => {
-  mockOpen.mockClear();
+  mockOpenPreview.mockClear();
+  mockOpenExternal.mockClear();
   mockInvoke.mockClear();
   mockWorkspaceRoot = "/workspace";
   clearExistsCache();
 });
 
 afterEach(cleanup);
+
+// ── Helper: wrap in FloatingPreviewContext ────────────────────────────────────
+
+function makeFloatingCtx(
+  overrides?: Partial<FloatingPreviewContextValue>,
+): FloatingPreviewContextValue {
+  return {
+    path: null,
+    openPopup: vi.fn(),
+    closePopup: vi.fn(),
+    ...overrides,
+  };
+}
+
+function renderWithFloatingCtx(
+  chip: React.ReactElement,
+  ctx: FloatingPreviewContextValue,
+) {
+  return render(
+    <FloatingPreviewContext value={ctx}>{chip}</FloatingPreviewContext>,
+  );
+}
+
+// ── Base rendering ────────────────────────────────────────────────────────────
 
 describe("FilePathChip", () => {
   it("renders basename of path as display text by default", () => {
@@ -44,31 +77,30 @@ describe("FilePathChip", () => {
     expect(screen.queryByText("report.pdf")).toBeNull();
   });
 
-  it("calls open(path) when clicked", () => {
+  it("calls openPreview(path) when clicked (no provider, previewable file)", () => {
     render(<FilePathChip path="/some/dir/report.pdf" />);
     fireEvent.click(screen.getByRole("button"));
-    expect(mockOpen).toHaveBeenCalledOnce();
-    expect(mockOpen).toHaveBeenCalledWith("/some/dir/report.pdf");
+    expect(mockOpenPreview).toHaveBeenCalledOnce();
+    expect(mockOpenPreview).toHaveBeenCalledWith("/some/dir/report.pdf");
   });
 
-  it("calls open(path) on Enter keypress", () => {
+  it("calls openPreview(path) on Enter keypress (no provider)", () => {
     render(<FilePathChip path="/some/dir/report.pdf" />);
     fireEvent.keyDown(screen.getByRole("button"), { key: "Enter" });
-    expect(mockOpen).toHaveBeenCalledOnce();
-    expect(mockOpen).toHaveBeenCalledWith("/some/dir/report.pdf");
+    expect(mockOpenPreview).toHaveBeenCalledOnce();
   });
 
-  it("calls open(path) on Space keypress", () => {
+  it("calls openPreview(path) on Space keypress (no provider)", () => {
     render(<FilePathChip path="/some/dir/report.pdf" />);
     fireEvent.keyDown(screen.getByRole("button"), { key: " " });
-    expect(mockOpen).toHaveBeenCalledOnce();
-    expect(mockOpen).toHaveBeenCalledWith("/some/dir/report.pdf");
+    expect(mockOpenPreview).toHaveBeenCalledOnce();
   });
 
-  it("does not call open on unrelated keypress", () => {
+  it("does not call any handler on unrelated keypress", () => {
     render(<FilePathChip path="/some/dir/report.pdf" />);
     fireEvent.keyDown(screen.getByRole("button"), { key: "Tab" });
-    expect(mockOpen).not.toHaveBeenCalled();
+    expect(mockOpenPreview).not.toHaveBeenCalled();
+    expect(mockOpenExternal).not.toHaveBeenCalled();
   });
 
   it("compact variant does not have border styling", () => {
@@ -108,9 +140,11 @@ describe("FilePathChip", () => {
   });
 });
 
+// ── Bare filename verification (from #379) ───────────────────────────────────
+
 describe("FilePathChip bare filename verification", () => {
   it("renders bare filename as plain code initially (before verification)", () => {
-    mockInvoke.mockReturnValue(new Promise(() => {})); // never resolves
+    mockInvoke.mockReturnValue(new Promise(() => {}));
     render(<FilePathChip path="report.docx" />);
     const code = screen.getByText("report.docx");
     expect(code.tagName).toBe("CODE");
@@ -144,5 +178,40 @@ describe("FilePathChip bare filename verification", () => {
     render(<FilePathChip path="some/dir/file.pdf" />);
     expect(mockInvoke).not.toHaveBeenCalled();
     expect(screen.getByRole("button")).toBeTruthy();
+  });
+});
+
+// ── FloatingPreviewContext integration ────────────────────────────────────────
+
+describe("FilePathChip — with FloatingPreviewContext provider", () => {
+  it("calls openPopup for previewable files when provider present", () => {
+    const ctx = makeFloatingCtx();
+    renderWithFloatingCtx(<FilePathChip path="/workspace/notes.md" />, ctx);
+    fireEvent.click(screen.getByRole("button"));
+    expect(ctx.openPopup).toHaveBeenCalledWith("/workspace/notes.md");
+    expect(mockOpenPreview).not.toHaveBeenCalled();
+  });
+
+  it("calls openPopup for .pdf files when provider present", () => {
+    const ctx = makeFloatingCtx();
+    renderWithFloatingCtx(<FilePathChip path="/workspace/report.pdf" />, ctx);
+    fireEvent.click(screen.getByRole("button"));
+    expect(ctx.openPopup).toHaveBeenCalledWith("/workspace/report.pdf");
+  });
+});
+
+describe("FilePathChip — unsupported files", () => {
+  it("calls openExternal for unsupported files regardless of provider", () => {
+    const ctx = makeFloatingCtx();
+    renderWithFloatingCtx(<FilePathChip path="/workspace/archive.zip" />, ctx);
+    fireEvent.click(screen.getByRole("button"));
+    expect(ctx.openPopup).not.toHaveBeenCalled();
+    expect(mockOpenExternal).toHaveBeenCalledWith("/workspace/archive.zip");
+  });
+
+  it("calls openExternal for unsupported files without provider", () => {
+    render(<FilePathChip path="/workspace/archive.zip" />);
+    fireEvent.click(screen.getByRole("button"));
+    expect(mockOpenExternal).toHaveBeenCalledWith("/workspace/archive.zip");
   });
 });
