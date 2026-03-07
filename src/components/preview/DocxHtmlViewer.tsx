@@ -106,7 +106,7 @@ export function DocxHtmlViewer({ dataUrl, className }: DocxHtmlViewerProps) {
           {/* Container must always be in the DOM for renderAsync to write into */}
           <div
             ref={containerRef}
-            className="p-4"
+            className="p-2"
             style={{ visibility: status === "done" ? "visible" : "hidden" }}
           />
         </>

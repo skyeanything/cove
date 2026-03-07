@@ -13,19 +13,19 @@ export const subAgentRepo = {
     return rows[0];
   },
 
-  async create(agent: Omit<SubAgentDef, "created_at" | "updated_at">): Promise<void> {
+  async create(agent: Omit<SubAgentDef, "created_at" | "updated_at" | "created_by">): Promise<void> {
     const db = await getDb();
     await db.execute(
-      `INSERT INTO sub_agents (id, name, description, icon, system_prompt, skill_names, tool_ids, enabled)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-      [agent.id, agent.name, agent.description, agent.icon ?? null, agent.system_prompt, agent.skill_names, agent.tool_ids, agent.enabled],
+      `INSERT INTO sub_agents (id, name, description, icon, system_prompt, skill_names, tool_ids, connector_ids, model_id, provider_id, enabled)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+      [agent.id, agent.name, agent.description, agent.icon ?? null, agent.system_prompt, agent.skill_names, agent.tool_ids, agent.connector_ids, agent.model_id ?? null, agent.provider_id ?? null, agent.enabled],
     );
   },
 
   async update(id: string, data: Partial<SubAgentDef>): Promise<void> {
     const ALLOWED_COLUMNS = [
       "name", "description", "icon", "system_prompt",
-      "skill_names", "tool_ids", "enabled"
+      "skill_names", "tool_ids", "connector_ids", "model_id", "provider_id", "enabled"
     ] as const;
 
     const db = await getDb();

@@ -96,7 +96,7 @@ export function FilePreviewPanel() {
     return (
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
         <PreviewFileHeader path={selectedPath} {...headerProps} />
-        <ScrollArea className="flex-1 p-1.5">
+        <ScrollArea className="flex-1 p-4">
           <div className="file-preview-code">
             <pre className="m-0 overflow-auto pt-1 pb-1 text-[13px] leading-relaxed text-foreground">
               <code>
@@ -120,7 +120,7 @@ export function FilePreviewPanel() {
     return (
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
         <PreviewFileHeader path={selectedPath} {...headerProps} />
-        <ScrollArea className="min-h-0 flex-1 p-1.5">
+        <ScrollArea className="min-h-0 flex-1 p-4">
           <CsvViewer text={cached.text} />
         </ScrollArea>
       </div>
@@ -175,7 +175,7 @@ export function FilePreviewPanel() {
           </div>
           </div>
         </div>
-        <ScrollArea className="min-h-0 flex-1 p-1.5">
+        <ScrollArea className="min-h-0 flex-1 p-4">
           {mdViewMode === "preview" ? (
             <MarkdownContent source={cached.text} className="text-[14px]" />
           ) : (
@@ -190,7 +190,7 @@ export function FilePreviewPanel() {
     return (
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
         <PreviewFileHeader path={selectedPath} {...headerProps} />
-        <ScrollArea className="min-h-0 flex-1 p-1.5">
+        <ScrollArea className="min-h-0 flex-1 p-4">
           <CodeViewer path={selectedPath} code={cached.text} className="file-preview-code" />
         </ScrollArea>
       </div>
@@ -230,7 +230,7 @@ export function FilePreviewPanel() {
     return (
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
         <PreviewFileHeader path={selectedPath} {...headerProps} />
-        <ScrollArea className="min-h-0 flex-1 p-1.5">
+        <ScrollArea className="min-h-0 flex-1 p-4">
           {officeExt === "xlsx" && <XlsxViewer dataUrl={cached.dataUrl} />}
           {(officeExt === "pptx" || officeExt === "ppt") && <PptxViewer dataUrl={cached.dataUrl} />}
           {!["xlsx", "pptx", "ppt"].includes(officeExt) && (

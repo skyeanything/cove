@@ -87,11 +87,6 @@ export function DirPreview({ dirPath, workspaceRoot }: DirPreviewProps) {
                 <span className="min-w-0 flex-1 truncate text-[13px] text-foreground">
                   {entry.name}
                 </span>
-                {entry.isDir && (
-                  <span className="shrink-0 text-[11px] text-foreground-tertiary">
-                    {t("preview.dirLabel", "folder")}
-                  </span>
-                )}
               </button>
             ))}
           </div>

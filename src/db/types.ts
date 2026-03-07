@@ -186,6 +186,10 @@ export interface SubAgentDef {
   system_prompt: string;
   skill_names: string; // JSON array
   tool_ids: string; // JSON array
+  connector_ids: string; // JSON array
+  model_id?: string;
+  provider_id?: string;
+  created_by: string;
   enabled: number;
   created_at: string;
   updated_at: string;

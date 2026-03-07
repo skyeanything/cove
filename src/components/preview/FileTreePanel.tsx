@@ -17,12 +17,10 @@ import {
   Plus,
   FolderPlus,
   FolderOpen,
-  Clipboard,
   ChevronDown,
   ChevronRight,
   Search,
   Copy,
-  Scissors,
   FileUp,
   Link,
   Trash2,
@@ -93,12 +91,14 @@ function WorkspaceRootNode({
   onSelectFile,
   onRemove,
   searchQuery,
+  onMatchCount,
 }: {
   workspace: Workspace;
   selectedEntries: string[];
   onSelectFile: (e: React.MouseEvent, path: string, isDir: boolean, name: string) => void;
   onRemove: () => void;
   searchQuery: string;
+  onMatchCount: (id: string, count: number) => void;
 }) {
   const { t } = useTranslation();
   const workspaceRoot = workspace.path;
@@ -299,8 +299,9 @@ function WorkspaceRootNode({
     return count(rootEntries);
   }, [searchQuery, rootEntries, loadedChildren]);
 
-  // Expose matchCount to parent via a callback (used for search result count)
-  void matchCount;
+  useEffect(() => {
+    onMatchCount(workspace.id, matchCount);
+  }, [matchCount, workspace.id, onMatchCount]);
 
   const sharedItemProps = {
     workspaceRoot,
@@ -382,21 +383,6 @@ function WorkspaceRootNode({
             {t("explorer.newFolder")}
           </ContextMenuItem>
           <ContextMenuSeparator />
-          <ContextMenuItem className="gap-2 text-[13px]" onClick={() => clipboard.onCopy("")}>
-            <Copy className="size-4" strokeWidth={1.5} />
-            {t("explorer.copy")}
-          </ContextMenuItem>
-          <ContextMenuItem className="gap-2 text-[13px]" onClick={() => clipboard.onCut("")}>
-            <Scissors className="size-4" strokeWidth={1.5} />
-            {t("explorer.cut")}
-          </ContextMenuItem>
-          {clipboard.sourcePath && (
-            <ContextMenuItem className="gap-2 text-[13px]" onClick={() => void clipboard.onPaste("")}>
-              <Clipboard className="size-4" strokeWidth={1.5} />
-              {t("explorer.paste")}
-            </ContextMenuItem>
-          )}
-          <ContextMenuSeparator />
           <ContextMenuItem className="gap-2 text-[13px]" onClick={() => onRevealInFinder("")}>
             <FileUp className="size-4" strokeWidth={1.5} />
             {t("explorer.revealInFinder")}
@@ -475,6 +461,16 @@ export function FileTreePanel() {
   const [removeTarget, setRemoveTarget] = useState<Workspace | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [matchCounts, setMatchCounts] = useState<Record<string, number>>({});
+
+  const totalMatchCount = useMemo(
+    () => Object.values(matchCounts).reduce((s, n) => s + n, 0),
+    [matchCounts],
+  );
+
+  const handleMatchCount = useCallback((id: string, count: number) => {
+    setMatchCounts((prev) => prev[id] === count ? prev : { ...prev, [id]: count });
+  }, []);
 
   const selectedEntryPaths = useMemo(
     () => selectedEntries.map((e) => e.path),
@@ -547,7 +543,7 @@ export function FileTreePanel() {
           searchQuery={searchQuery}
           setSearchQuery={setSearchQuery}
           closeSearch={handleCloseSearch}
-          matchCount={0}
+          matchCount={totalMatchCount}
         />
 
         <ScrollArea className="min-h-0 flex-1">
@@ -575,6 +571,7 @@ export function FileTreePanel() {
                   onSelectFile={handleSelectFile}
                   onRemove={() => setRemoveTarget(ws)}
                   searchQuery={searchQuery}
+                  onMatchCount={handleMatchCount}
                 />
               ))}
             </div>
@@ -589,7 +586,7 @@ export function FileTreePanel() {
             <AlertDialogTitle>{t("workspace.removeTitle", "Remove workspace")}</AlertDialogTitle>
             <AlertDialogDescription>
               {t(
-                "workspace.removeDesc",
+                "workspace.removeDescription",
                 "Remove \"{{name}}\" from workspace list? Associated chat history will also be deleted. The folder itself is not affected.",
                 { name: removeTarget?.name ?? "" },
               )}

@@ -3,7 +3,6 @@ import { useState, useEffect, useMemo } from "react";
 import { MoreHorizontal, Wand2, Wrench, Blocks, Bot, MessageSquare, Pencil, Trash2 } from "lucide-react";
 import type { ComponentType } from "react";
 import { cn } from "@/lib/utils";
-import { Switch } from "@/components/ui/switch";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -19,45 +18,13 @@ import { getAllBundledSkills } from "@/lib/ai/skills/loader";
 import { mcpServerRepo } from "@/db/repos/mcpServerRepo";
 import { subAgentRepo } from "@/db/repos/subAgentRepo";
 import type { McpServer, SubAgentDef } from "@/db/types";
+import { ALL_TOOL_INFOS } from "@/lib/ai/tools/tool-meta";
+import { SkillEditDialog } from "@/components/settings/SkillEditDialog";
+import { parseSkillFields, buildSkillMd } from "@/components/settings/skill-utils";
+import { CreateMcpDialog } from "./CreateMcpDialog";
+import { CreateSubAgentDialog } from "./CreateSubAgentDialog";
 
 // ── Shared primitives ─────────────────────────────────────────────────────────
-
-function MoreActionsMenu({
-  onUse,
-  onDelete,
-}: {
-  onUse: () => void;
-  onDelete?: () => void;
-}) {
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button className="rounded-md p-1 text-foreground-secondary hover:bg-background-tertiary hover:text-foreground">
-          <MoreHorizontal className="size-4" strokeWidth={1.5} />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-28">
-        <DropdownMenuItem onClick={onUse}>
-          <MessageSquare className="mr-2 size-3.5" strokeWidth={1.5} />
-          使用
-        </DropdownMenuItem>
-        <DropdownMenuItem>
-          <Pencil className="mr-2 size-3.5" strokeWidth={1.5} />
-          编辑
-        </DropdownMenuItem>
-        {onDelete && (
-          <DropdownMenuItem
-            onClick={onDelete}
-            className="text-destructive focus:text-destructive"
-          >
-            <Trash2 className="mr-2 size-3.5" strokeWidth={1.5} />
-            删除
-          </DropdownMenuItem>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
 
 function DeleteDialog({
   open,
@@ -95,30 +62,66 @@ function DeleteDialog({
 
 function DetailHeader({
   icon: Icon,
+  emoji,
   name,
-  enabled,
-  onToggle,
   onUse,
+  onEdit,
   onDelete,
 }: {
   icon: ComponentType<{ className?: string; strokeWidth?: number }>;
+  emoji?: string;
   name: string;
-  enabled?: boolean;
-  onToggle?: () => void;
-  onUse: () => void;
+  onUse?: () => void;
+  onEdit?: () => void;
   onDelete?: () => void;
 }) {
   return (
     <div className="flex items-center justify-between">
-      <h2 className="flex items-center gap-2 text-[15px] font-semibold text-foreground">
-        <Icon className="size-[18px] shrink-0 text-foreground-secondary" strokeWidth={1.5} />
-        {name}
-      </h2>
-      <div className="flex items-center gap-2">
-        {onToggle !== undefined && enabled !== undefined && (
-          <Switch checked={enabled} onCheckedChange={onToggle} />
+      <h2 className="flex min-w-0 items-center gap-2 text-[15px] font-semibold text-foreground">
+        {emoji ? (
+          <span className="shrink-0 text-[18px] leading-none">{emoji}</span>
+        ) : (
+          <Icon className="size-[18px] shrink-0 text-foreground-secondary" strokeWidth={1.5} />
         )}
-        <MoreActionsMenu onUse={onUse} onDelete={onDelete} />
+        <span className="truncate">{name}</span>
+      </h2>
+      <div className="flex shrink-0 items-center gap-0.5">
+        {onUse && (
+          <button
+            onClick={onUse}
+            className="rounded-md p-1 text-foreground-secondary transition-colors hover:bg-background-tertiary hover:text-foreground"
+            title="使用"
+          >
+            <MessageSquare className="size-4" strokeWidth={1.5} />
+          </button>
+        )}
+        {onEdit && (
+          <button
+            onClick={onEdit}
+            className="rounded-md p-1 text-foreground-secondary transition-colors hover:bg-background-tertiary hover:text-foreground"
+            title="编辑"
+          >
+            <Pencil className="size-4" strokeWidth={1.5} />
+          </button>
+        )}
+        {onDelete && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button className="rounded-md p-1 text-foreground-secondary transition-colors hover:bg-background-tertiary hover:text-foreground">
+                <MoreHorizontal className="size-4" strokeWidth={1.5} />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-28">
+              <DropdownMenuItem
+                onClick={onDelete}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash2 className="mr-2 size-3.5" strokeWidth={1.5} />
+                删除
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
     </div>
   );
@@ -131,8 +134,7 @@ function SkillDetailContent({
   description,
   content,
   addedBy,
-  enabled,
-  onToggle,
+  folderName,
   onUse,
   onDelete,
 }: {
@@ -140,21 +142,28 @@ function SkillDetailContent({
   description: string;
   content: string;
   addedBy: string;
-  enabled: boolean;
-  onToggle: () => void;
+  /** Present only for user (ext) skills — enables edit button */
+  folderName?: string;
   onUse: () => void;
   onDelete?: () => void;
 }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const saveSkill = useSkillsStore((s) => s.saveSkill);
+  const workspacePath = useWorkspaceStore((s) => s.activeWorkspace?.path ?? null);
+
+  const editFields = useMemo(
+    () => (folderName ? parseSkillFields(content) : null),
+    [folderName, content],
+  );
 
   return (
     <div className="flex flex-col gap-5">
       <DetailHeader
         icon={Wand2}
         name={name}
-        enabled={enabled}
-        onToggle={onToggle}
         onUse={onUse}
+        onEdit={folderName ? () => setEditOpen(true) : undefined}
         onDelete={onDelete ? () => setConfirmOpen(true) : undefined}
       />
 
@@ -180,6 +189,18 @@ function SkillDetailContent({
         </pre>
       </div>
 
+      {folderName && editFields && (
+        <SkillEditDialog
+          open={editOpen}
+          onOpenChange={setEditOpen}
+          fields={editFields}
+          onSave={async (fields) => {
+            const md = buildSkillMd(fields);
+            await saveSkill(folderName, md, workspacePath, folderName);
+          }}
+        />
+      )}
+
       {onDelete && (
         <DeleteDialog
           open={confirmOpen}
@@ -194,14 +215,13 @@ function SkillDetailContent({
 
 // ── Tool detail ───────────────────────────────────────────────────────────────
 
-const PRESET_TOOL_INFO: Record<string, { name: string; description: string }> = {
-  "tool:word": { name: "Word", description: "Embed AI assistant into Microsoft Word" },
-};
-
 function ToolDetailContent({ toolKey }: { toolKey: string }) {
   const setActivePage = useLayoutStore((s) => s.setActivePage);
-  const info = PRESET_TOOL_INFO[toolKey];
+  const id = toolKey.slice("tool:".length);
+  const info = ALL_TOOL_INFOS.find((t) => t.id === id);
   if (!info) return null;
+
+  const categoryLabel = info.category === "built-in" ? "内置" : "技能工具";
 
   return (
     <div className="flex flex-col gap-5">
@@ -210,6 +230,26 @@ function ToolDetailContent({ toolKey }: { toolKey: string }) {
         name={info.name}
         onUse={() => setActivePage("chat")}
       />
+
+      <div className="flex flex-wrap gap-x-8 gap-y-3 text-[12px]">
+        <div className="flex flex-col gap-0.5">
+          <span className="text-foreground-tertiary">类型</span>
+          <span className="text-foreground-secondary">{categoryLabel}</span>
+        </div>
+        {info.skillName && (
+          <div className="flex flex-col gap-0.5">
+            <span className="text-foreground-tertiary">依赖 Skill</span>
+            <span className="text-foreground-secondary">{info.skillName}</span>
+          </div>
+        )}
+        {info.userVisible !== undefined && (
+          <div className="flex flex-col gap-0.5">
+            <span className="text-foreground-tertiary">用户可见</span>
+            <span className="text-foreground-secondary">{info.userVisible ? "是" : "否"}</span>
+          </div>
+        )}
+      </div>
+
       {info.description && (
         <div className="flex flex-col gap-1">
           <span className="text-[11px] font-medium uppercase tracking-wide text-foreground-tertiary">
@@ -227,6 +267,7 @@ function ToolDetailContent({ toolKey }: { toolKey: string }) {
 function ConnectorDetailContent({ serverId }: { serverId: string }) {
   const [server, setServer] = useState<McpServer | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const setSelectedKey = useExtensionStore((s) => s.setSelectedKey);
   const bumpConnectors = useExtensionStore((s) => s.bumpConnectors);
   const setActivePage = useLayoutStore((s) => s.setActivePage);
@@ -234,13 +275,6 @@ function ConnectorDetailContent({ serverId }: { serverId: string }) {
   useEffect(() => {
     mcpServerRepo.getById(serverId).then((s) => setServer(s ?? null));
   }, [serverId]);
-
-  const handleToggle = async () => {
-    if (!server) return;
-    const next = server.enabled ? 0 : 1;
-    await mcpServerRepo.update(server.id, { enabled: next });
-    setServer({ ...server, enabled: next });
-  };
 
   const handleDelete = async () => {
     setConfirmOpen(false);
@@ -258,13 +292,12 @@ function ConnectorDetailContent({ serverId }: { serverId: string }) {
       <DetailHeader
         icon={Blocks}
         name={server.name}
-        enabled={!!server.enabled}
-        onToggle={() => void handleToggle()}
         onUse={() => setActivePage("chat")}
+        onEdit={() => setEditOpen(true)}
         onDelete={() => setConfirmOpen(true)}
       />
 
-      <div className="flex gap-8 text-[12px]">
+      <div className="flex flex-wrap gap-x-8 gap-y-3 text-[12px]">
         <div className="flex flex-col gap-0.5">
           <span className="text-foreground-tertiary">类型</span>
           <span className="text-foreground-secondary">{server.type}</span>
@@ -275,6 +308,12 @@ function ConnectorDetailContent({ serverId }: { serverId: string }) {
             <span className="text-foreground-secondary">是</span>
           </div>
         )}
+        <div className="flex flex-col gap-0.5">
+          <span className="text-foreground-tertiary">创建时间</span>
+          <span className="text-foreground-secondary">
+            {new Date(server.created_at).toLocaleDateString("zh-CN")}
+          </span>
+        </div>
       </div>
 
       {(server.command ?? server.url) && (
@@ -287,6 +326,37 @@ function ConnectorDetailContent({ serverId }: { serverId: string }) {
           </code>
         </div>
       )}
+
+      {server.args && (
+        <div className="flex flex-col gap-1">
+          <span className="text-[11px] font-medium uppercase tracking-wide text-foreground-tertiary">
+            参数
+          </span>
+          <code className="break-all font-mono text-[12px] text-foreground-secondary">
+            {server.args}
+          </code>
+        </div>
+      )}
+
+      {server.env && (
+        <div className="flex flex-col gap-1">
+          <span className="text-[11px] font-medium uppercase tracking-wide text-foreground-tertiary">
+            环境变量
+          </span>
+          <pre className="whitespace-pre-wrap break-all rounded-xl border border-border bg-background-secondary px-4 py-3 font-mono text-[12px] leading-relaxed text-foreground-secondary">
+            {server.env}
+          </pre>
+        </div>
+      )}
+
+      <CreateMcpDialog
+        open={editOpen}
+        onOpenChange={(o) => {
+          setEditOpen(o);
+          if (!o) mcpServerRepo.getById(serverId).then((s) => setServer(s ?? null));
+        }}
+        initialServer={server}
+      />
 
       <DeleteDialog
         open={confirmOpen}
@@ -303,6 +373,7 @@ function ConnectorDetailContent({ serverId }: { serverId: string }) {
 function SubAgentDetailContent({ agentId }: { agentId: string }) {
   const [agent, setAgent] = useState<SubAgentDef | null>(null);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const setSelectedKey = useExtensionStore((s) => s.setSelectedKey);
   const bumpSubagents = useExtensionStore((s) => s.bumpSubagents);
   const setActivePage = useLayoutStore((s) => s.setActivePage);
@@ -310,13 +381,6 @@ function SubAgentDetailContent({ agentId }: { agentId: string }) {
   useEffect(() => {
     subAgentRepo.getById(agentId).then((a) => setAgent(a ?? null));
   }, [agentId]);
-
-  const handleToggle = async () => {
-    if (!agent) return;
-    const next = agent.enabled ? 0 : 1;
-    await subAgentRepo.update(agent.id, { enabled: next });
-    setAgent({ ...agent, enabled: next });
-  };
 
   const handleDelete = async () => {
     setConfirmOpen(false);
@@ -329,36 +393,103 @@ function SubAgentDetailContent({ agentId }: { agentId: string }) {
     return <div className="text-[13px] text-foreground-tertiary">加载中...</div>;
   }
 
+  let skillNames: string[] = [];
+  let toolIds: string[] = [];
+  let connectorIds: string[] = [];
+  try { skillNames = JSON.parse(agent.skill_names) as string[]; } catch { /* empty */ }
+  try { toolIds = JSON.parse(agent.tool_ids) as string[]; } catch { /* empty */ }
+  try { connectorIds = JSON.parse(agent.connector_ids) as string[]; } catch { /* empty */ }
+
   return (
     <div className="flex flex-col gap-5">
       <DetailHeader
         icon={Bot}
+        emoji={agent.icon || undefined}
         name={agent.name}
-        enabled={!!agent.enabled}
-        onToggle={() => void handleToggle()}
         onUse={() => setActivePage("chat")}
+        onEdit={() => setEditOpen(true)}
         onDelete={() => setConfirmOpen(true)}
       />
 
-      {agent.description && (
-        <div className="flex flex-col gap-1">
-          <span className="text-[11px] font-medium uppercase tracking-wide text-foreground-tertiary">
-            描述
-          </span>
-          <p className="text-[13px] leading-relaxed text-foreground-secondary">{agent.description}</p>
+      <div className="flex flex-wrap gap-x-8 gap-y-3 text-[12px]">
+        <div className="flex flex-col gap-0.5">
+          <span className="text-foreground-tertiary">添加者</span>
+          <span className="text-foreground-secondary">{agent.created_by}</span>
         </div>
-      )}
-
-      {agent.system_prompt && (
-        <div className="flex flex-col gap-1">
-          <span className="text-[11px] font-medium uppercase tracking-wide text-foreground-tertiary">
-            System Prompt
+        <div className="flex flex-col gap-0.5">
+          <span className="text-foreground-tertiary">更新时间</span>
+          <span className="text-foreground-secondary">
+            {new Date(agent.updated_at).toLocaleDateString("zh-CN")}
           </span>
+        </div>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <span className="text-[11px] font-medium uppercase tracking-wide text-foreground-tertiary">
+          描述
+        </span>
+        <p className="text-[13px] leading-relaxed text-foreground-secondary">
+          {agent.description || "—"}
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <span className="text-[11px] font-medium uppercase tracking-wide text-foreground-tertiary">
+          System Prompt
+        </span>
+        {agent.system_prompt ? (
           <pre className="max-h-[40vh] overflow-y-auto whitespace-pre-wrap break-words rounded-xl border border-border bg-background-secondary px-4 py-3 font-mono text-[12px] leading-relaxed text-foreground-secondary">
             {agent.system_prompt}
           </pre>
-        </div>
-      )}
+        ) : (
+          <p className="text-[13px] text-foreground-tertiary">—</p>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <span className="text-[11px] font-medium uppercase tracking-wide text-foreground-tertiary">
+          Skills
+        </span>
+        <p className="text-[13px] leading-relaxed text-foreground-secondary">
+          {skillNames.length > 0 ? skillNames.join(", ") : "—"}
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <span className="text-[11px] font-medium uppercase tracking-wide text-foreground-tertiary">
+          Tools
+        </span>
+        <p className="text-[13px] leading-relaxed text-foreground-secondary">
+          {toolIds.length > 0 ? toolIds.join(", ") : "—"}
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <span className="text-[11px] font-medium uppercase tracking-wide text-foreground-tertiary">
+          Connectors
+        </span>
+        <p className="text-[13px] leading-relaxed text-foreground-secondary">
+          {connectorIds.length > 0 ? connectorIds.join(", ") : "—"}
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        <span className="text-[11px] font-medium uppercase tracking-wide text-foreground-tertiary">
+          大模型
+        </span>
+        <p className="text-[13px] leading-relaxed text-foreground-secondary">
+          {agent.model_id || "—"}
+        </p>
+      </div>
+
+      <CreateSubAgentDialog
+        open={editOpen}
+        onOpenChange={(o) => {
+          setEditOpen(o);
+          if (!o) subAgentRepo.getById(agentId).then((a) => setAgent(a ?? null));
+        }}
+        initialAgent={agent}
+      />
 
       <DeleteDialog
         open={confirmOpen}
@@ -407,8 +538,6 @@ export function ExtDetailPanel() {
           description={skill.meta.description}
           content={skill.content}
           addedBy="内置"
-          enabled={enabledNames.includes(skill.meta.name)}
-          onToggle={() => void toggleSkillEnabled(skill.meta.name)}
           onUse={() => setActivePage("chat")}
         />
       );
@@ -425,8 +554,7 @@ export function ExtDetailPanel() {
           description={meta.description}
           content={skillContent}
           addedBy="用户"
-          enabled={enabledNames.includes(meta.name)}
-          onToggle={() => void toggleSkillEnabled(meta.name)}
+          folderName={folderName}
           onUse={() => setActivePage("chat")}
           onDelete={() => void deleteSkill(folderName, workspacePath).then(() => setSelectedKey(null))}
         />
@@ -454,7 +582,7 @@ export function ExtDetailPanel() {
     }
 
     return null;
-  }, [selectedKey, bundledSkills, externalSkills, enabledNames, toggleSkillEnabled, deleteSkill, setActivePage, setSelectedKey]);
+  }, [selectedKey, bundledSkills, externalSkills, enabledNames, toggleSkillEnabled, deleteSkill, setActivePage, setSelectedKey, workspacePath]);
 
   return (
     <div
