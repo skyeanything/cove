@@ -84,6 +84,7 @@ async function handleLayout(input: SettingsInput): Promise<string> {
       `- chatWidth: ${config.chatWidth}`,
       `- filePanelOpen: ${config.filePanelOpen}`,
       `- fileTreeOpen: ${config.fileTreeOpen}`,
+      `- filePreviewOpen: ${config.filePreviewOpen}`,
       `- fileTreeWidth: ${config.fileTreeWidth}`,
       `- filePreviewWidth: ${config.filePreviewWidth}`,
       `- fileTreeShowHidden: ${config.fileTreeShowHidden}`,
@@ -131,17 +132,16 @@ function setLayoutKey(
     if (key === "filePanelOpen" && open !== config.filePanelOpen) store.toggleFilePanel();
     return `${key} set to: ${open}`;
   }
-  if (key === "fileTreeOpen") {
-    const open = parseBool(value);
-    if (open === null) return `Invalid boolean: ${value}`;
-    store.setFileTreeOpen(open);
-    return `fileTreeOpen set to: ${open}`;
-  }
-  if (key === "fileTreeShowHidden") {
-    const show = parseBool(value);
-    if (show === null) return `Invalid boolean: ${value}`;
-    store.setFileTreeShowHidden(show);
-    return `fileTreeShowHidden set to: ${show}`;
+  const boolSetters: Record<string, (v: boolean) => void> = {
+    fileTreeOpen: (v) => store.setFileTreeOpen(v),
+    filePreviewOpen: (v) => store.setFilePreviewOpen(v),
+    fileTreeShowHidden: (v) => store.setFileTreeShowHidden(v),
+  };
+  if (Object.prototype.hasOwnProperty.call(boolSetters, key)) {
+    const b = parseBool(value);
+    if (b === null) return `Invalid boolean: ${value}`;
+    boolSetters[key]!(b);
+    return `${key} set to: ${b}`;
   }
   return `Unknown layout key: ${key}`;
 }

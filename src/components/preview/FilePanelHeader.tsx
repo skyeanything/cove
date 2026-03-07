@@ -1,7 +1,7 @@
 import { useTranslation } from "react-i18next";
 import { useLayoutStore } from "@/stores/layoutStore";
 import { Separator } from "@/components/ui/separator";
-import { PanelLeftClose, PanelLeft, X } from "lucide-react";
+import { PanelLeftClose, PanelLeft, PanelRightClose, PanelRight, X } from "lucide-react";
 
 /** Header bar shared by the file tree and preview columns */
 export function FilePanelHeader() {
@@ -9,6 +9,8 @@ export function FilePanelHeader() {
   const toggleFilePanel = useLayoutStore((s) => s.toggleFilePanel);
   const fileTreeOpen = useLayoutStore((s) => s.fileTreeOpen);
   const toggleFileTree = useLayoutStore((s) => s.toggleFileTree);
+  const filePreviewOpen = useLayoutStore((s) => s.filePreviewOpen);
+  const toggleFilePreview = useLayoutStore((s) => s.toggleFilePreview);
 
   return (
     <div className="shrink-0">
@@ -30,6 +32,18 @@ export function FilePanelHeader() {
               <PanelLeftClose className="size-4" strokeWidth={1.5} />
             ) : (
               <PanelLeft className="size-4" strokeWidth={1.5} />
+            )}
+          </button>
+          <button
+            type="button"
+            onClick={toggleFilePreview}
+            className="rounded p-1 text-muted-foreground hover:bg-background-tertiary hover:text-foreground transition-colors duration-150"
+            title={t(filePreviewOpen ? "preview.collapsePreview" : "preview.expandPreview")}
+          >
+            {filePreviewOpen ? (
+              <PanelRightClose className="size-4" strokeWidth={1.5} />
+            ) : (
+              <PanelRight className="size-4" strokeWidth={1.5} />
             )}
           </button>
           <button

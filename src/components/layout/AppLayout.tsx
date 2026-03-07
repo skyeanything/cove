@@ -40,6 +40,8 @@ export function AppLayout() {
   const confirmFilePanelClosed = useLayoutStore((s) => s.confirmFilePanelClosed);
   const confirmFilePanelOpened = useLayoutStore((s) => s.confirmFilePanelOpened);
   const fileTreeOpen = useLayoutStore((s) => s.fileTreeOpen);
+  const filePreviewOpen = useLayoutStore((s) => s.filePreviewOpen);
+  const selectedPath = useFilePreviewStore((s) => s.selectedPath);
   const fileTreeWidth = useLayoutStore((s) => s.fileTreeWidth);
   const setFileTreeWidth = useLayoutStore((s) => s.setFileTreeWidth);
 
@@ -254,27 +256,34 @@ export function AppLayout() {
               >
                 <FilePanelHeader />
                 <div className="flex min-h-0 flex-1">
-                  {fileTreeOpen && (
+                  {fileTreeOpen && (() => {
+                    const previewVisible = filePreviewOpen && selectedPath != null;
+                    return (
+                      <div
+                        className={`relative flex flex-col overflow-hidden${previewVisible ? " shrink-0" : " min-w-0 flex-1"}`}
+                        style={previewVisible ? { width: fileTreeWidth, minWidth: FILE_TREE_MIN } : undefined}
+                      >
+                        <FileTreePanel />
+                        {previewVisible && (
+                          <ResizeHandle
+                            side="left"
+                            currentWidth={fileTreeWidth}
+                            onResize={setFileTreeWidth}
+                            minWidth={FILE_TREE_MIN}
+                            maxWidth={FILE_TREE_MAX}
+                          />
+                        )}
+                      </div>
+                    );
+                  })()}
+                  {filePreviewOpen && selectedPath != null && (
                     <div
-                      className="relative flex shrink-0 flex-col overflow-hidden"
-                      style={{ width: fileTreeWidth, minWidth: FILE_TREE_MIN }}
+                      className={`relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden${fileTreeOpen ? " border-l border-border" : ""}`}
+                      style={{ minWidth: FILE_PREVIEW_MIN }}
                     >
-                      <FileTreePanel />
-                      <ResizeHandle
-                        side="left"
-                        currentWidth={fileTreeWidth}
-                        onResize={setFileTreeWidth}
-                        minWidth={FILE_TREE_MIN}
-                        maxWidth={FILE_TREE_MAX}
-                      />
+                      <FilePreviewPanel />
                     </div>
                   )}
-                  <div
-                    className={`relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden${fileTreeOpen ? " border-l border-border" : ""}`}
-                    style={{ minWidth: FILE_PREVIEW_MIN }}
-                  >
-                    <FilePreviewPanel />
-                  </div>
                 </div>
               </div>
             </div>

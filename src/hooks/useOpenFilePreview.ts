@@ -18,16 +18,17 @@ import { getPreviewKind } from "@/lib/preview-types";
 export function useOpenFilePreview() {
   const setSelected = useFilePreviewStore((s) => s.setSelected);
   const setFilePanelOpen = useLayoutStore((s) => s.setFilePanelOpen);
+  const setFilePreviewOpen = useLayoutStore((s) => s.setFilePreviewOpen);
   const workspaceRoot = useWorkspaceStore((s) => s.activeWorkspace?.path ?? null);
 
   const openPreview = useCallback(
     (path: string) => {
       setSelected(path);
-      if (!useLayoutStore.getState().filePanelOpen) {
-        setFilePanelOpen(true);
-      }
+      const state = useLayoutStore.getState();
+      if (!state.filePreviewOpen) setFilePreviewOpen(true);
+      if (!state.filePanelOpen) setFilePanelOpen(true);
     },
-    [setSelected, setFilePanelOpen],
+    [setSelected, setFilePanelOpen, setFilePreviewOpen],
   );
 
   const openExternal = useCallback(

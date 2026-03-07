@@ -12,6 +12,7 @@ vi.mock("@/lib/config", () => ({
     chatWidth: 640,
     filePanelOpen: true,
     fileTreeOpen: true,
+    filePreviewOpen: true,
     fileTreeWidth: 260,
     filePreviewWidth: 360,
     fileTreeShowHidden: true,
@@ -83,6 +84,15 @@ describe("useOpenFilePreview", () => {
 
       expect(useFilePreviewStore.getState().selectedPath).toBe("/abs/file.ts");
       expect(useLayoutStore.getState().filePanelOpen).toBe(true);
+    });
+
+    it("opens filePreviewOpen when preview sub-panel is closed", () => {
+      useLayoutStore.setState({ filePanelOpen: true, filePreviewOpen: false });
+      const { result } = renderHook(() => useOpenFilePreview());
+
+      act(() => result.current.openPreview("/abs/file.ts"));
+
+      expect(useLayoutStore.getState().filePreviewOpen).toBe(true);
     });
   });
 

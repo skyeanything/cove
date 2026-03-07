@@ -22,6 +22,7 @@ vi.mock("@/stores/layoutStore", () => ({
       setFileTreeWidth: vi.fn(),
       setFilePreviewWidth: vi.fn(),
       setFileTreeShowHidden: vi.fn(),
+      setFilePreviewOpen: vi.fn(),
     }),
   },
 }));

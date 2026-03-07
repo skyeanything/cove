@@ -66,6 +66,10 @@ export async function migrateConfigIfNeeded(): Promise<void> {
       typeof layoutState?.fileTreeOpen === "boolean"
         ? layoutState.fileTreeOpen
         : CONFIG_DEFAULTS.layout.fileTreeOpen,
+    filePreviewOpen:
+      typeof layoutState?.filePreviewOpen === "boolean"
+        ? layoutState.filePreviewOpen
+        : CONFIG_DEFAULTS.layout.filePreviewOpen,
     fileTreeWidth:
       typeof layoutState?.fileTreeWidth === "number"
         ? layoutState.fileTreeWidth
