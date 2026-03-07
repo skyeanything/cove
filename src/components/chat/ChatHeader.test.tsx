@@ -114,4 +114,16 @@ describe("ChatHeader — TrustModeToggle", () => {
     const btn = screen.getByTestId("trust-mode-toggle");
     expect(btn.className).toContain("text-amber-500");
   });
+
+  it("resets trust mode when conversation switches", () => {
+    usePermissionStore.getState().enableTrustMode("conv-1");
+    const { rerender } = render(<ChatHeader leftSidebarOpen={true} />);
+    expect(usePermissionStore.getState().isTrustMode("conv-1")).toBe(true);
+
+    // Switch to conv-2
+    mockActiveConversationId = "conv-2";
+    rerender(<ChatHeader leftSidebarOpen={true} />);
+
+    expect(usePermissionStore.getState().isTrustMode("conv-1")).toBe(false);
+  });
 });
