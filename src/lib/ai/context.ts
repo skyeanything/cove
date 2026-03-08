@@ -24,7 +24,9 @@ export function buildSystemPrompt(options: {
 
   if (options.officeAvailable) {
     parts.push(
-      "The office tool is available. Use the office tool for document operations (DOCX/PPTX/XLSX). Load the 'OfficeLLM' skill for detailed usage instructions.",
+      "The office tool is available for document operations (DOCX/PPTX/XLSX). " +
+      "Use office(command, args) for single operations; use cove_interpreter with the officellm bridge API for multi-step workflows. " +
+      "Load the 'OfficeLLM' skill for the command reference.",
     );
   }
 

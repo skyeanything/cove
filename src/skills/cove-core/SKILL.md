@@ -99,49 +99,37 @@ try {
 | `workspace.copyFile(src, dst)` | read + write to copy |
 | `workspace.appendFile(path, line)` | read + concat + write to append |
 
-### officellm patterns
+### officellm bridge API (multi-step workflows in cove_interpreter)
 
-- Always `JSON.parse()` the return value of `workspace.officellm()`.
+When officellm is available, a bridge API is auto-injected into the QuickJS runtime.
+Use it for multi-step workflows combining multiple operations on the same document.
+For single operations, use the `office` tool directly.
+
+**Session-based (multi-step):**
+```javascript
+var doc = officellm.open("report.docx");
+doc.call("replace-text", { find: "old", replace: "new" });
+doc.call("apply-format", { find: "Title", bold: true });
+doc.save();
+doc.close();
+```
+
+**Stateless (single operation):**
+```javascript
+var result = officellm.call("from-markdown", { i: "in.md", o: "out.docx" });
+console.log(JSON.stringify(result));
+```
+
+**Low-level workspace.officellm()** is also available for direct calls:
+```javascript
+var raw = JSON.parse(workspace.officellm("extract-text", { i: "report.docx" }));
+if (raw.status === "success") console.log(raw.data.text);
+```
+
+Rules:
 - Always check `status` before `open`. Always `close` when done.
-- For multi-step workflows: open -> operate -> save -> close.
-- Wrap officellm calls in try/catch; log the command name in error messages.
-
-```javascript
-try {
-  const res = JSON.parse(workspace.officellm("extract-text", { i: "report.docx" }));
-  if (res.status === "success") console.log(res.data.text);
-} catch (e) {
-  console.error(`officellm extract-text: ${e.message}`);
-}
-```
-
-## workspace.officellm API (advanced: multi-step programmatic workflows)
-
-When you need to combine multiple office operations in a single programmatic sequence
-(e.g., open -> multiple transforms -> save), use `workspace.officellm()` inside `cove_interpreter`.
-For single operations, prefer the `office` Tauri tool directly.
-
-### CLI mode (stateless, good for single operations)
-
-```javascript
-const res = JSON.parse(workspace.officellm("extract-text", { i: "report.docx" }));
-console.log(res.data.text);
-```
-
-### Server mode (persistent session, good for multiple operations on the same document)
-
-```javascript
-workspace.officellm("open", { path: "doc.docx" });        // open session
-workspace.officellm("replace-text", { find: "foo", replace: "bar" });
-const saved = JSON.parse(workspace.officellm("save", {})); // save
-workspace.officellm("close", {});                          // close session
-```
-
-`workspace.officellm` auto-routes:
-- `"open"` → starts a `serve --stdio` process
-- `"close"` → terminates the server process
-- `"status"` → returns current session info (pid, path, uptime)
-- any other cmd → JSON-RPC call if session is open, otherwise CLI subprocess
+- Wrap calls in try/catch; log the command name in error messages.
+- `workspace.officellm()` returns a JSON string; always `JSON.parse()` it.
 
 ## Limits
 - **Memory**: 64 MB  |  **Timeout**: 30s default (max 60s via `timeout` param)
@@ -201,15 +189,15 @@ All paths are relative to workspace root.
 
 ### Document operations (DOCX/PPTX/XLSX)
 
-1. **`office` Tauri tool** — preferred for all single operations
-2. **`cove_interpreter` + `workspace.officellm()`** — for multi-step programmatic workflows
+1. **`office` tool** — preferred for single operations: `office(command: "open", args: {path: "doc.docx"})`
+2. **`cove_interpreter` + officellm bridge** — for multi-step workflows: `officellm.open()` / `doc.call()` / `doc.save()` / `doc.close()`
 3. MUST load OfficeLLM skill (via the `skill` tool) before calling any command by name
 
 ### Common mistakes to avoid
 
-- Do NOT call `office` tool with `action:"call"` before loading the OfficeLLM skill — you will guess wrong command names
+- Do NOT call `office` tool before loading the OfficeLLM skill — you will guess wrong command names
 - Do NOT wrap a single office operation in `cove_interpreter` when the `office` tool can do it directly
-- Do NOT use `bash` to run officellm CLI when the `office` Tauri tool is available
+- Do NOT use `bash` to run officellm CLI — the binary is not in PATH
 - Do NOT use `bash` for JSON parsing or math — use `cove_interpreter`
 - Do NOT guess command parameters — load the skill first
 
@@ -218,8 +206,8 @@ All paths are relative to workspace root.
 ### Preflight checks (before acting)
 
 - **File exists?** Before `edit` or `write` (overwrite), read the file first. Before referencing a file path in any tool, verify it exists.
-- **Session state?** Before `workspace.officellm("open", ...)` or `office` tool `action:"open"`, check `status` first. If a session is active, close it before opening a new one. Never assume session state from earlier turns — check.
-- **Tool available?** Before using `office` or `bash` with `officellm`, run `detect` or `doctor` at least once per conversation. If a dependency is missing, tell the user and offer installation steps.
+- **Session state?** Before `office(command: "open", ...)` or `officellm.open()`, check `status` first. If a session is active, close it before opening a new one. Never assume session state from earlier turns — check.
+- **Tool available?** Before using `office`, run `office(command: "detect")` at least once per conversation. If unavailable, tell the user and offer installation steps.
 - **Workspace set?** If no workspace is selected, tell the user to set one before attempting file or interpreter operations.
 
 ### When to refuse or defer
@@ -231,14 +219,10 @@ All paths are relative to workspace root.
 
 ### Session coordination (officellm)
 
-The officellm server is a process-wide singleton. Three paths share (or don't share) one session:
-
-1. `workspace.officellm()` in cove_interpreter — shares Rust mutex
-2. `office` Tauri tool — shares Rust mutex
-3. `bash` + `officellm` CLI — independent process, no mutex coordination
+The officellm server is a process-wide singleton. Both the `office` tool and `cove_interpreter` share one session via the same Rust mutex.
 
 Rules:
-- Do NOT mix paths 1/2 with path 3 for server-mode operations
-- Always check status before open. Always close when done.
-- If open fails with "session already active", close first, then retry
-- Prefer path 2 (office Tauri tool) for single operations; path 1 for multi-step programmatic workflows
+- Always check `office(command: "status")` before `open`. Always `close` when done.
+- If open fails with "session already active", close first, then retry.
+- Do NOT use `bash` to run officellm CLI — it bypasses session coordination.
+- Prefer `office` tool for single operations; `cove_interpreter` + bridge for multi-step workflows.

@@ -13,6 +13,10 @@ mod tests;
 use console::{register_console_fn, stringify_value};
 use workspace::register_workspace_fns;
 
+/// OfficeLLM bridge: provides `officellm.open()` / `doc.call()` / etc.
+/// Auto-injected when officellm binary is available.
+const OFFICELLM_BRIDGE: &str = include_str!("../officellm_bridge.js");
+
 use rquickjs::{CaughtError, Context, Runtime};
 use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
@@ -94,6 +98,12 @@ pub(crate) fn run_js_inner(
         let _: rquickjs::Value = ctx
             .eval(b"workspace.stat = function(p) { return JSON.parse(workspace._statRaw(p)); };")
             .map_err(|e| format!("{e}"))?;
+
+        // Auto-inject officellm bridge when binary is available
+        if officellm_home.is_some() {
+            ctx.eval::<(), _>(OFFICELLM_BRIDGE.as_bytes())
+                .map_err(|e| format!("officellm bridge init: {e}"))?;
+        }
 
         let eval_result: Result<rquickjs::Value, _> = ctx.eval(code.as_bytes());
         let execution_ms = start.elapsed().as_millis() as u64;
