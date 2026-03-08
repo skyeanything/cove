@@ -27,15 +27,15 @@ pub(super) fn spawn_server(
     home: &std::path::Path,
     cwd: &std::path::Path,
 ) -> Result<(Child, SessionIO), String> {
-    super::super::init::wait_for_init();
-    let bin = super::super::detect::bin_path()?;
+    crate::officellm::init::wait_for_init();
+    let bin = crate::officellm::detect::bin_path()?;
 
     let mut cmd = Command::new(&bin);
     cmd.args(["serve", "--transport", "stdio"])
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
-    super::super::env::apply_env(&mut cmd, home);
+    crate::officellm::env::apply_env(&mut cmd, home);
     cmd.current_dir(cwd);
 
     let mut child = cmd
