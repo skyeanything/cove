@@ -1,440 +1,45 @@
-// FILE_SIZE_EXCEPTION: ToolCallBlock is a complex component with many tightly coupled sub-components
-import React, { useState, useEffect } from "react";
+import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  Wrench,
   CircleCheck,
   CircleX,
   Circle,
   Clock,
-  SquareTerminal,
-  FileDiff,
-  FileSearch,
-  FilePenLine,
   ChevronDown,
   ChevronRight,
   Shield,
-  Code,
 } from "lucide-react";
-import Prism from "prismjs";
-import { Highlight } from "prism-react-renderer";
 import { cn } from "@/lib/utils";
 import type { ToolCallInfo } from "@/stores/chatStore";
 import { usePermissionStore } from "@/stores/permissionStore";
 import type { PendingPermission } from "@/stores/permissionStore";
-import { FilePathChip } from "@/components/common/FilePathChip";
-import { extractFilePathsFromResult, extractPathFromDiffIntro } from "@/lib/extract-file-paths";
+import { ResultContent } from "./tool-call/ResultContent";
+import { ToolCallArgsDisplay } from "./tool-call/ArgsDisplay";
+import {
+  ToolCallIcon,
+  getToolHeaderSummary,
+  isBashSandboxed,
+  isToolResultRejected,
+  formatDuration,
+  DURATION_THRESHOLD_MS,
+} from "./tool-call/utils";
 
-import "prismjs/components/prism-bash";
+// Re-export for backward compatibility (tests import from this file)
+export { ResultContent } from "./tool-call/ResultContent";
+export { ToolCallArgsDisplay, StreamRevealText } from "./tool-call/ArgsDisplay";
+export {
+  BASH_HIGHLIGHT_THEME,
+  DURATION_THRESHOLD_MS,
+  REJECTED_PREFIXES,
+  TOOL_ICON_MAP,
+  ToolCallIcon,
+  extractDiffLines,
+  getToolHeaderSummary,
+  isBashSandboxed,
+  isToolResultRejected,
+} from "./tool-call/utils";
 
-export const BASH_HIGHLIGHT_THEME = {
-  plain: {
-    color: "#9ca3af",
-    backgroundColor: "transparent",
-  },
-  styles: [
-    {
-      types: ["comment"],
-      style: { color: "#9ca3af" },
-    },
-    {
-      types: ["keyword", "builtin", "function"],
-      style: { color: "#2563eb", fontWeight: "600" as const },
-    },
-    {
-      types: ["string", "attr-value", "char"],
-      style: { color: "#15803d" },
-    },
-    {
-      types: ["operator", "punctuation"],
-      style: { color: "#8b95a7" },
-    },
-    {
-      types: ["number", "boolean", "constant"],
-      style: { color: "#7c3aed" },
-    },
-  ],
-};
-
-/** 耗时超过此值（毫秒）才在 UI 展示 */
-export const DURATION_THRESHOLD_MS = 1000;
-
-/** 工具返回结果是否表示用户拒绝（未执行）——仅匹配工具实际返回的拒绝前缀 */
-export const REJECTED_PREFIXES = [
-  "用户拒绝了",
-  "该命令被拒绝执行",
-  "this skill is not enabled",
-];
-
-/** 判断是否为 write/edit 返回的带 diff 的结果（含 --- Diff ---） */
-export function extractDiffLines(text: string): { intro: string; diffLines: string[] } | null {
-  const idx = text.indexOf("--- Diff ---");
-  if (idx === -1) return null;
-  const intro = text.slice(0, idx).trim();
-  const after = text.slice(idx + "--- Diff ---".length).trimStart();
-  const diffLines = after.split("\n");
-  return { intro, diffLines };
-}
-
-/** 文件操作结果用 diff 样式渲染：+ 行绿底，- 行红底 */
-export function ResultContent({ result, toolName }: { result: unknown; toolName?: string }) {
-  const { t } = useTranslation();
-  const resultTextColorClass = toolName === "bash" ? "text-foreground" : "text-foreground-secondary";
-  if (toolName === "parse_document" && typeof result === "string") {
-    try {
-      const parsed = JSON.parse(result) as {
-        attachmentId?: string;
-        name?: string;
-        path?: string;
-        mode?: string;
-        chunkCount?: number;
-        truncated?: boolean;
-        warnings?: string[];
-        summary?: string;
-      };
-      const modeLabel =
-        parsed.mode === "summary"
-          ? "文档总结"
-          : parsed.mode === "chunks"
-            ? "分块读取"
-            : "文档全文";
-      return (
-        <div className="space-y-1">
-          <div className="rounded bg-background-tertiary/10 p-2 text-[11px] space-y-1">
-            <div><span className="text-foreground-secondary">附件 ID：</span>{parsed.attachmentId ?? "—"}</div>
-            <div><span className="text-foreground-secondary">文件名：</span>{parsed.name ?? "—"}</div>
-            <div className="break-all">
-              <span className="text-foreground-secondary">文件路径：</span>
-              {parsed.path ? <FilePathChip path={parsed.path} /> : "—"}
-            </div>
-            <div><span className="text-foreground-secondary">读取模式：</span>{modeLabel}</div>
-            <div><span className="text-foreground-secondary">分块数量：</span>{parsed.chunkCount ?? 0}</div>
-            <div><span className="text-foreground-secondary">是否截断：</span>{parsed.truncated ? "是" : "否"}</div>
-            {parsed.warnings && parsed.warnings.length > 0 && (
-              <div><span className="text-foreground-secondary">提示：</span>{parsed.warnings.join("；")}</div>
-            )}
-          </div>
-          {parsed.summary && (
-            <>
-              <div className="text-[11px] font-medium text-foreground-secondary">摘要预览</div>
-              <pre className="rounded bg-background-tertiary/50 p-2 text-[11px] overflow-x-auto max-h-[200px] overflow-y-auto whitespace-pre-wrap">
-                {parsed.summary}
-              </pre>
-            </>
-          )}
-        </div>
-      );
-    } catch {
-      // ignore and fallback
-    }
-  }
-  if (typeof result !== "string") {
-    return (
-      <pre className={cn("rounded bg-background-tertiary/50 p-2 text-[11px] overflow-x-auto max-h-[300px] overflow-y-auto", resultTextColorClass)}>
-        {JSON.stringify(result, null, 2)}
-      </pre>
-    );
-  }
-  const diff = extractDiffLines(result);
-  if (!diff) {
-    // Check for extractable file paths in tool results (diagram, office, etc.)
-    const extractedPaths = toolName ? extractFilePathsFromResult(toolName, result) : [];
-    if (extractedPaths.length > 0) {
-      return (
-        <div
-          className={cn(
-            "rounded bg-background-tertiary/50 p-2 text-[11px] overflow-x-auto max-h-[300px] overflow-y-auto whitespace-pre-wrap",
-            resultTextColorClass,
-          )}
-        >
-          {extractedPaths.reduce<{ lastEnd: number; nodes: React.ReactNode[] }>(
-            (acc, ep, i) => {
-              if (ep.start > acc.lastEnd) {
-                acc.nodes.push(<span key={`t${i}`}>{result.slice(acc.lastEnd, ep.start)}</span>);
-              }
-              acc.nodes.push(<FilePathChip key={`p${i}`} path={ep.path} compact />);
-              return { lastEnd: ep.end, nodes: acc.nodes };
-            },
-            { lastEnd: 0, nodes: [] },
-          ).nodes}
-          {extractedPaths[extractedPaths.length - 1]!.end < result.length && (
-            <span>{result.slice(extractedPaths[extractedPaths.length - 1]!.end)}</span>
-          )}
-        </div>
-      );
-    }
-    return (
-      <pre
-        className={cn(
-          "rounded bg-background-tertiary/50 p-2 text-[11px] overflow-x-auto max-h-[300px] overflow-y-auto whitespace-pre-wrap",
-          resultTextColorClass,
-        )}
-      >
-        {result}
-      </pre>
-    );
-  }
-  return (
-    <div className="space-y-1">
-      {diff.intro && (
-        <p className="text-[11px] text-muted-foreground mb-1">
-          {(() => {
-            const introPath = extractPathFromDiffIntro(diff.intro);
-            if (!introPath) return diff.intro;
-            const idx = diff.intro.indexOf(introPath);
-            return (
-              <>
-                {diff.intro.slice(0, idx)}
-                <FilePathChip path={introPath} compact />
-                {diff.intro.slice(idx + introPath.length)}
-              </>
-            );
-          })()}
-        </p>
-      )}
-      <div className="mb-1 text-[11px] font-medium uppercase text-foreground-secondary">{t("tool.content")}</div>
-      <div
-        className={cn(
-          "rounded bg-background-tertiary/50 p-2 text-[11px] overflow-x-auto max-h-[300px] overflow-y-auto font-mono",
-          resultTextColorClass,
-        )}
-      >
-        {diff.diffLines.map((line, i) => {
-          if (line.startsWith("+") && !line.startsWith("+++")) {
-            return (
-              <div key={i} className={cn("bg-success/15", resultTextColorClass)}>
-                {line}
-              </div>
-            );
-          }
-          if (line.startsWith("-") && !line.startsWith("---")) {
-            return (
-              <div key={i} className={cn("bg-destructive/15", resultTextColorClass)}>
-                {line}
-              </div>
-            );
-          }
-          return <div key={i}>{line}</div>;
-        })}
-      </div>
-    </div>
-  );
-}
-
-export function isToolResultRejected(result: unknown): boolean {
-  if (typeof result !== "string") return false;
-  const s = result.toLowerCase();
-  return REJECTED_PREFIXES.some((p) => s.startsWith(p.toLowerCase()));
-}
-
-export const TOOL_ICON_MAP: Record<string, typeof Wrench> = {
-  bash: SquareTerminal,
-  edit: FileDiff,
-  read: FileSearch,
-  write: FilePenLine,
-  cove_interpreter: Code,
-};
-
-export function ToolCallIcon({ toolName }: { toolName: string }) {
-  const Icon = TOOL_ICON_MAP[toolName] ?? Wrench;
-  return <Icon className="size-3.5 shrink-0 text-muted-foreground" strokeWidth={1.5} />;
-}
-
-/** 标题栏摘要：让用户一眼知道工具正在处理什么 */
-export function getToolHeaderSummary(toolName: string, args: Record<string, unknown> | undefined): React.ReactNode | null {
-  if (!args) return null;
-  if (toolName === "bash") {
-    const desc = args.description;
-    return typeof desc === "string" && desc.trim() ? desc.trim() : null;
-  }
-  if (toolName === "read" || toolName === "edit" || toolName === "write") {
-    const path = args.filePath;
-    if (typeof path === "string" && path.trim()) {
-      return <FilePathChip path={path.trim()} compact />;
-    }
-    return null;
-  }
-  if (toolName === "cove_interpreter") {
-    const desc = args.description;
-    return typeof desc === "string" && desc.trim() ? desc.trim() : null;
-  }
-  return null;
-}
-
-/** 检查 bash 结果是否包含 sandboxed 标记 */
-export function isBashSandboxed(result: unknown): boolean {
-  return typeof result === "string" && result.startsWith("[sandboxed]");
-}
-
-/** 流式展示文本：按行逐行显示，模拟输出效果 */
-export function StreamRevealText({ text, className = "" }: { text: string; className?: string }) {
-  const lines = text.split("\n");
-  const [visibleCount, setVisibleCount] = useState(0);
-
-  useEffect(() => {
-    if (visibleCount >= lines.length) return;
-    const t = setInterval(() => {
-      setVisibleCount((n) => Math.min(n + 1, lines.length));
-    }, 56);
-    return () => clearInterval(t);
-  }, [visibleCount, lines.length]);
-
-  const content = lines.slice(0, visibleCount).join("\n");
-  return <pre className={className}>{content}</pre>;
-}
-
-/** 按工具类型定制展示 arguments，避免整块 JSON；streamReveal 时按行流式展示 */
-export function ToolCallArgsDisplay({
-  toolName,
-  args,
-  streamReveal,
-}: {
-  toolName: string;
-  args: Record<string, unknown>;
-  streamReveal?: boolean;
-}) {
-  const { t } = useTranslation();
-  const preClass = "rounded bg-background-tertiary p-2 text-[11px] text-foreground-tertiary overflow-x-auto font-mono";
-  const bashPreClass =
-    "rounded bg-background-tertiary/50 px-3 py-2 text-[13px] leading-relaxed overflow-x-auto font-mono text-foreground-tertiary";
-  const renderPre = (content: string, extraClass = "") =>
-    streamReveal ? (
-      <StreamRevealText text={content} className={cn(preClass, extraClass)} />
-    ) : (
-      <pre className={cn(preClass, extraClass)}>{content}</pre>
-    );
-  const renderBashCommand = (command: string) =>
-    streamReveal ? (
-      <StreamRevealText text={command} className={bashPreClass} />
-    ) : (
-      <div className={bashPreClass}>
-        <Highlight prism={Prism} language="bash" code={command} theme={BASH_HIGHLIGHT_THEME}>
-          {({ tokens, getLineProps, getTokenProps }) => (
-            <span className="block whitespace-pre-wrap">
-              {tokens.map((line, i) => (
-                <span key={i} {...getLineProps({ line })} className="block">
-                  {line.map((token, k) => (
-                    <span key={k} {...getTokenProps({ token })} />
-                  ))}
-                </span>
-              ))}
-            </span>
-          )}
-        </Highlight>
-      </div>
-    );
-
-  if (toolName === "parse_document") {
-    const attachmentId = (args.attachmentId as string | undefined) ?? "—";
-    const mode = (args.mode as string | undefined) ?? "full";
-    const pageRange = args.pageRange as string | undefined;
-    const maxBytes = args.maxBytes as number | undefined;
-    const modeLabel =
-      mode === "summary"
-        ? "文档总结"
-        : mode === "chunks"
-          ? "分块读取"
-          : "文档全文";
-    return (
-      <div className="mb-2 space-y-1">
-        <div className="text-[11px] font-medium text-foreground-secondary">附件 ID</div>
-        {renderPre(attachmentId)}
-        <div className="text-[11px] font-medium text-foreground-secondary">读取模式</div>
-        {renderPre(modeLabel)}
-        {pageRange && (
-          <>
-            <div className="text-[11px] font-medium text-foreground-secondary">页码范围（仅 PDF）</div>
-            {renderPre(pageRange)}
-          </>
-        )}
-        {maxBytes != null && (
-          <>
-            <div className="text-[11px] font-medium text-foreground-secondary">最大读取字节</div>
-            {renderPre(String(maxBytes))}
-          </>
-        )}
-      </div>
-    );
-  }
-
-  if (toolName === "bash") {
-    const command = (args.command as string) ?? "—";
-    return <div className="mb-2">{renderBashCommand(command)}</div>;
-  }
-  if (toolName === "cove_interpreter") {
-    const code = (args.code as string) ?? "—";
-    return (
-      <div className="mb-2 space-y-1">
-        <div className="text-[11px] font-medium text-foreground-secondary">{t("tool.jsCode")}</div>
-        {renderPre(code)}
-      </div>
-    );
-  }
-  if (toolName === "read") {
-    const filePath = args.filePath as string | undefined;
-    const offset = args.offset as number | undefined;
-    const limit = args.limit as number | undefined;
-    const extra = [offset != null && `offset: ${offset}`, limit != null && `limit: ${limit}`].filter(Boolean).join(", ");
-    return (
-      <div className="mb-2 space-y-1">
-        <div className="text-[11px] font-medium text-foreground-secondary">{t("tool.path")}</div>
-        <div className="py-0.5">
-          {filePath ? <FilePathChip path={filePath} /> : <span className="text-[11px] text-foreground-tertiary">—</span>}
-          {extra && <span className="ml-1.5 text-[11px] text-foreground-tertiary">({extra})</span>}
-        </div>
-      </div>
-    );
-  }
-  if (toolName === "write") return null;
-  if (toolName === "edit") {
-    const filePath = args.filePath as string | undefined;
-    const oldString = args.oldString as string | undefined;
-    const newString = args.newString as string | undefined;
-    const snippet = (s: string, max = 80) => (s.length <= max ? s : s.slice(0, max) + "…");
-    return (
-      <div className="mb-2 space-y-1">
-        <div className="text-[11px] font-medium text-foreground-secondary">{t("tool.path")}</div>
-        <div className="py-0.5">
-          {filePath ? <FilePathChip path={filePath} /> : <span className="text-[11px] text-foreground-tertiary">—</span>}
-        </div>
-        {oldString != null && (
-          <>
-            <div className="mt-1 text-[11px] font-medium text-foreground-secondary">{t("tool.oldString")}</div>
-            {renderPre(snippet(oldString), "whitespace-pre-wrap break-all")}
-          </>
-        )}
-        {newString != null && (
-          <>
-            <div className="mt-1 text-[11px] font-medium text-foreground-secondary">{t("tool.newString")}</div>
-            {renderPre(snippet(newString), "whitespace-pre-wrap break-all")}
-          </>
-        )}
-      </div>
-    );
-  }
-  const jsonText = JSON.stringify(args, null, 2);
-  if (toolName === "skill") {
-    return (
-      <div className="mb-2">
-        <div className="text-[11px] font-medium text-foreground-secondary mb-1">{t("tool.arguments")}</div>
-        {streamReveal ? <StreamRevealText text={jsonText} className={preClass} /> : <pre className={preClass}>{jsonText}</pre>}
-      </div>
-    );
-  }
-  return (
-    <div className="mb-2">
-      <div className="text-[11px] font-medium text-foreground-secondary mb-1">{t("tool.arguments")}</div>
-      {streamReveal ? <StreamRevealText text={jsonText} className={preClass} /> : <pre className={preClass}>{jsonText}</pre>}
-    </div>
-  );
-}
-
-function formatDuration(ms: number): string {
-  if (ms >= 1000) return `${(ms / 1000).toFixed(1)} s`;
-  return `${ms} ms`;
-}
-
-/** 从工具参数取待确认的路径/命令，用于与 pendingAsk 匹配 */
+/** Get path/command from tool args for permission matching */
 function getPathOrCommand(toolName: string, args: Record<string, unknown>): string | undefined {
   if (toolName === "write" || toolName === "edit") return args.filePath as string | undefined;
   if (toolName === "bash") return args.command as string | undefined;
@@ -520,13 +125,11 @@ export function ToolCallBlock({ toolCall, pendingAsk }: { toolCall: ToolCallInfo
       >
         <div className="min-h-0 border-t border-border">
           <div className="px-3 py-2 text-[12px]">
-            {/* 阶段一：参数流式到达时原样展示 JSON */}
             {toolCall.argsJsonStream !== undefined ? (
               <pre className="rounded bg-background-tertiary p-2 text-[11px] font-mono text-muted-foreground min-h-[2rem] whitespace-pre-wrap break-all overflow-x-auto">
                 {toolCall.argsJsonStream || "\u00A0"}
               </pre>
             ) : (
-              /* 阶段二：流式结束后过渡到格式化展示 */
               <div style={{ animation: "fade-in 0.4s ease-out" }}>
                 {toolCall.toolName === "write" &&
                   toolCall.result === undefined &&
