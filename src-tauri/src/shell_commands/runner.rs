@@ -1,3 +1,4 @@
+// FILE_SIZE_EXCEPTION: Windows-specific platform branches (Git Bash detection, PATH separator, taskkill) add ~30 lines
 //! Core execution: spawn, poll, kill, drain for shell commands.
 
 use std::io::Read;
@@ -26,6 +27,15 @@ pub fn execute(args: &RunCommandArgs, cancel: Option<CancelToken>) -> Result<Run
     let timeout = Duration::from_millis(timeout_ms);
 
     let path_env = build_path_env();
+
+    // On Windows, verify Git Bash is available before attempting to spawn.
+    // Installation is handled at startup; this is a fast existence check only.
+    #[cfg(windows)]
+    if crate::git_bash_installer::find_git_bash().is_none() {
+        return Err(
+            "Git Bash 未就绪。请查看应用顶部的提示安装 Git for Windows。".to_string(),
+        );
+    }
 
     let mut policy = sandbox::load_policy();
     policy.allow_write.extend(crate::officellm::env::sandbox_temp_whitelist());
@@ -99,7 +109,7 @@ pub fn execute(args: &RunCommandArgs, cancel: Option<CancelToken>) -> Result<Run
     })
 }
 
-/// Build PATH with sidecar dir and ~/.local/bin prepended.
+/// Build PATH with sidecar dir and platform-specific extras prepended.
 fn build_path_env() -> String {
     let mut extra_paths: Vec<std::path::PathBuf> = Vec::new();
 
@@ -108,7 +118,8 @@ fn build_path_env() -> String {
         extra_paths.push(dir);
     }
 
-    // ~/.local/bin
+    // ~/.local/bin (Unix convention)
+    #[cfg(not(windows))]
     if let Some(home) = dirs::home_dir() {
         let local_bin = home.join(".local/bin");
         if local_bin.is_dir() {
@@ -116,27 +127,46 @@ fn build_path_env() -> String {
         }
     }
 
-    if extra_paths.is_empty() {
-        std::env::var("PATH").unwrap_or_default()
-    } else {
-        let extra: Vec<String> = extra_paths.iter().map(|p| p.to_string_lossy().into_owned()).collect();
-        let current = std::env::var("PATH").unwrap_or_default();
-        format!("{}:{current}", extra.join(":"))
+    // Windows: inject Git Bash bin dirs so Unix tools (grep, sed, awk, curl…) are available.
+    #[cfg(windows)]
+    if let Some(bash) = crate::git_bash_installer::find_git_bash() {
+        extra_paths.extend(crate::git_bash_installer::git_bash_extra_paths(&bash));
     }
+
+    let current = std::env::var("PATH").unwrap_or_default();
+    if extra_paths.is_empty() {
+        return current;
+    }
+    let extra: Vec<String> = extra_paths
+        .iter()
+        .map(|p| p.to_string_lossy().into_owned())
+        .collect();
+
+    #[cfg(windows)]
+    let sep = ";";
+    #[cfg(not(windows))]
+    let sep = ":";
+
+    format!("{}{sep}{current}", extra.join(sep))
 }
 
-/// Spawn a plain shell command in its own process group (Unix).
+/// Spawn a plain shell command in its own process group (Unix) or via Git Bash (Windows).
 fn spawn_plain_command(
     cmd: &str,
     workdir: &str,
     path_env: &str,
 ) -> std::io::Result<std::process::Child> {
     #[cfg(unix)]
-    let (shell, shell_arg) = ("sh", "-c");
+    let (shell, shell_arg): (std::borrow::Cow<str>, &str) = ("sh".into(), "-c");
     #[cfg(windows)]
-    let (shell, shell_arg) = ("cmd", "/c");
+    let (shell, shell_arg): (std::borrow::Cow<str>, &str) = {
+        let bash = crate::git_bash_installer::find_git_bash()
+            .map(|p| p.to_string_lossy().into_owned())
+            .unwrap_or_else(|| "bash".to_string());
+        (bash.into(), "-c")
+    };
 
-    let mut command = Command::new(shell);
+    let mut command = Command::new(shell.as_ref());
     command
         .arg(shell_arg)
         .arg(cmd)
@@ -199,8 +229,11 @@ fn kill_process_group(pid: u32) {
 }
 
 #[cfg(not(unix))]
-fn kill_process_group(_pid: u32) {
-    // On non-Unix platforms, rely on child.kill() fallback.
+fn kill_process_group(pid: u32) {
+    // Kill the entire process tree including child processes.
+    let _ = std::process::Command::new("taskkill")
+        .args(["/F", "/T", "/PID", &pid.to_string()])
+        .output();
 }
 
 /// Thin wrapper around a raw FD that implements Read but does NOT close on drop.

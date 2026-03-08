@@ -1,3 +1,4 @@
+// FILE_SIZE_EXCEPTION: GitBashBanner prop threading adds a few lines over 300
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { useLayoutStore } from "@/stores/layoutStore";
@@ -13,6 +14,7 @@ import { FileTreePanel } from "@/components/preview/FileTreePanel";
 import { FilePreviewPanel } from "@/components/preview/FilePreviewPanel";
 import { ResizeHandle } from "./ResizeHandle";
 import { WindowControls } from "./WindowControls";
+import { GitBashBanner } from "@/components/common/GitBashBanner";
 import { FloatingPreviewProvider } from "@/components/preview/FloatingPreviewPopup";
 import { openSettingsWindow } from "@/lib/settings-window";
 import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
@@ -25,7 +27,11 @@ const FILE_TREE_MIN = 200;
 const FILE_TREE_MAX = 480;
 const FILE_PREVIEW_MIN = 200;
 
-export function AppLayout() {
+interface AppLayoutProps {
+  gitBashError?: string | null;
+}
+
+export function AppLayout({ gitBashError }: AppLayoutProps) {
   const leftOpen = useLayoutStore((s) => s.leftSidebarOpen);
   const toggleLeft = useLayoutStore((s) => s.toggleLeftSidebar);
   const setActiveConversation = useDataStore((s) => s.setActiveConversation);
@@ -199,6 +205,11 @@ export function AppLayout() {
   return (
     <FloatingPreviewProvider>
     <div className="relative flex h-screen w-screen overflow-hidden bg-background">
+      {gitBashError && (
+        <div className="absolute inset-x-0 top-0 z-50">
+          <GitBashBanner message={gitBashError} />
+        </div>
+      )}
       <WindowControls onToggleSidebar={toggleLeft} onNewChat={handleNewChat} />
 
       {leftOpen ? (
