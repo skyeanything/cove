@@ -93,6 +93,21 @@ pub fn delete_skill(name: String) -> Result<(), String> {
     Ok(())
 }
 
+/// Read SKILL.md from an arbitrary user-selected folder path.
+/// Used by the import-from-folder flow via Tauri's native dialog.
+#[tauri::command]
+pub fn read_skill_from_path(folder_path: String) -> Result<String, String> {
+    let skill_path = PathBuf::from(&folder_path).join("SKILL.md");
+    if !skill_path.is_file() {
+        return Err(format!(
+            "SKILL.md not found in selected folder: {}",
+            folder_path
+        ));
+    }
+    fs::read_to_string(&skill_path)
+        .map_err(|e| format!("Failed to read SKILL.md: {e}"))
+}
+
 /// Read a single skill file content by name from ~/.cove/skills/{name}/SKILL.md
 #[tauri::command]
 pub fn read_skill(name: String) -> Result<String, String> {

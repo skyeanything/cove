@@ -240,6 +240,54 @@ pub fn open_with_app(args: OpenWithAppArgs) -> Result<(), FsError> {
 }
 
 // ---------------------------------------------------------------------------
+// create_file
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateFileArgs {
+    pub workspace_root: String,
+    /// 父目录相对工作区根的路径，空字符串表示工作区根
+    pub path: String,
+    /// 文件名（含扩展名），不可含路径分隔符
+    pub name: String,
+}
+
+#[tauri::command]
+pub fn create_file(app: tauri::AppHandle, args: CreateFileArgs) -> Result<(), FsError> {
+    let name = args.name.trim();
+    if name.is_empty() || name.contains('/') || name.contains('\\') {
+        return Err(FsError::NotAllowed("invalid file name".into()));
+    }
+    // Build parent path: use "." for workspace root so ensure_inside_workspace_exists works
+    let parent_rel = args.path.trim();
+    let parent_path = if parent_rel.is_empty() { "." } else { parent_rel };
+    // Validate parent exists and is inside workspace (same pattern as create_dir)
+    let parent_abs = ensure_inside_workspace_exists(&args.workspace_root, parent_path)?;
+    let new_file = parent_abs.join(name);
+    if new_file.exists() {
+        return Err(FsError::NotAllowed("already exists".into()));
+    }
+    fs::write(&new_file, "").map_err(FsError::from)?;
+    let rel_path = if parent_rel.is_empty() {
+        name.to_string()
+    } else {
+        format!("{}/{}", parent_rel, name)
+    };
+    use tauri::Emitter;
+    let _ = app.emit(
+        crate::workspace_watcher::EVENT_WORKSPACE_FILE_CHANGED,
+        crate::workspace_watcher::WorkspaceFileChangedPayload {
+            path: rel_path,
+            kind: crate::workspace_watcher::FileChangeKind::Create,
+        },
+    );
+    Ok(())
+}
+
+// FILE_SIZE_EXCEPTION: write.rs exceeds 300 lines — multiple Tauri FS commands in one file
+
+// ---------------------------------------------------------------------------
 // write_binary_file
 // ---------------------------------------------------------------------------
 

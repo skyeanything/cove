@@ -35,7 +35,7 @@ function CategorySection({
   );
 }
 
-export function SubAgentListContent() {
+export function SubAgentListContent({ searchQuery = "" }: { searchQuery?: string }) {
   const [agents, setAgents] = useState<SubAgentDef[]>([]);
   const [loaded, setLoaded] = useState(false);
   const selectedKey = useExtensionStore((s) => s.selectedKey);
@@ -62,10 +62,13 @@ export function SubAgentListContent() {
     );
   }
 
+  const q = searchQuery.trim().toLowerCase();
+  const filteredAgents = q ? agents.filter((a) => a.name.toLowerCase().includes(q)) : agents;
+
   return (
     <div className="flex flex-col gap-1 p-2">
-      <CategorySection title="我的" count={agents.length}>
-        {agents.map((agent) => {
+      <CategorySection title="我的" count={filteredAgents.length}>
+        {filteredAgents.map((agent) => {
           const key = `subagent:${agent.id}`;
           const isSelected = selectedKey === key;
           return (
@@ -99,10 +102,13 @@ export function SubAgentListContent() {
         })}
       </CategorySection>
 
-      {agents.length === 0 && (
+      {agents.length === 0 && !q && (
         <div className="px-2 py-3 text-[12px] text-foreground-tertiary">
-          暂无 SubAgent，点击 + 新建
+          暂无 Agent，点击 + 新建
         </div>
+      )}
+      {q && filteredAgents.length === 0 && (
+        <div className="px-2 py-3 text-[12px] text-foreground-tertiary">无匹配结果</div>
       )}
     </div>
   );

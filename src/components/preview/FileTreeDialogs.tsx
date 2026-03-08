@@ -30,6 +30,13 @@ interface FileTreeDialogsProps {
   setNewFolderError: (error: string | null) => void;
   handleNewFolderConfirm: () => void;
   handleNewFolderCancel: () => void;
+  newMarkdownParentPath: string | null;
+  newMarkdownName: string;
+  setNewMarkdownName: (name: string) => void;
+  newMarkdownError: string | null;
+  setNewMarkdownError: (error: string | null) => void;
+  handleNewMarkdownConfirm: () => void;
+  handleNewMarkdownCancel: () => void;
   t: (key: string, options?: Record<string, string>) => string;
 }
 
@@ -44,6 +51,13 @@ export function FileTreeDialogs({
   setNewFolderError,
   handleNewFolderConfirm,
   handleNewFolderCancel,
+  newMarkdownParentPath,
+  newMarkdownName,
+  setNewMarkdownName,
+  newMarkdownError,
+  setNewMarkdownError,
+  handleNewMarkdownConfirm,
+  handleNewMarkdownCancel,
   t,
 }: FileTreeDialogsProps) {
   return (
@@ -91,6 +105,38 @@ export function FileTreeDialogs({
               {t("workspace.cancel")}
             </Button>
             <Button variant="brand" className="rounded" onClick={handleNewFolderConfirm} disabled={!newFolderName.trim()}>
+              {t("explorer.create")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={newMarkdownParentPath !== null} onOpenChange={(open) => { if (!open) handleNewMarkdownCancel(); }}>
+        <DialogContent className="sm:max-w-xs rounded" hideOverlay>
+          <DialogHeader>
+            <DialogTitle>{t("explorer.newMarkdown")}</DialogTitle>
+          </DialogHeader>
+          <Input
+            value={newMarkdownName}
+            onChange={(e) => {
+              setNewMarkdownName(e.target.value);
+              setNewMarkdownError(null);
+            }}
+            placeholder="untitled.md"
+            className="rounded shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleNewMarkdownConfirm();
+              if (e.key === "Escape") handleNewMarkdownCancel();
+            }}
+          />
+          {newMarkdownError && (
+            <p className="text-[12px] -mt-2 -mb-2 text-destructive">{newMarkdownError}</p>
+          )}
+          <DialogFooter>
+            <Button variant="outline" className="rounded" onClick={handleNewMarkdownCancel}>
+              {t("workspace.cancel")}
+            </Button>
+            <Button variant="brand" className="rounded" onClick={handleNewMarkdownConfirm} disabled={!newMarkdownName.trim()}>
               {t("explorer.create")}
             </Button>
           </DialogFooter>

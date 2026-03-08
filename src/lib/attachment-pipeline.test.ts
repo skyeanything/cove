@@ -50,7 +50,10 @@ describe("processAttachment", () => {
   });
 
   it("handles save failure gracefully", async () => {
-    mockInvoke.mockRejectedValueOnce(new Error("Save failed"));
+    // workspace save fails, fallback to save_attachment_file also fails
+    mockInvoke
+      .mockRejectedValueOnce(new Error("Workspace save failed"))
+      .mockRejectedValueOnce(new Error("Save failed"));
 
     const result = await processAttachment("/tmp/missing.pdf", "/ws");
 

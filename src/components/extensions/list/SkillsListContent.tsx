@@ -157,7 +157,7 @@ function SkillItemRow({
   );
 }
 
-export function SkillsListContent() {
+export function SkillsListContent({ searchQuery = "" }: { searchQuery?: string }) {
   const externalSkills = useSkillsStore((s) => s.externalSkills);
   const enabledNames = useSkillsStore((s) => s.enabledSkillNames);
   const toggleSkillEnabled = useSkillsStore((s) => s.toggleSkillEnabled);
@@ -167,6 +167,8 @@ export function SkillsListContent() {
   const toggleExpanded = useExtensionStore((s) => s.toggleExpanded);
 
   const builtInMetas = useMemo(() => listSkills(), []);
+
+  const q = searchQuery.trim().toLowerCase();
 
   // "我的" — user-created (cove source)
   const mySkills = useMemo<SkillRow[]>(
@@ -178,8 +180,9 @@ export function SkillsListContent() {
           icon: s.skill.meta.emoji ?? "📦",
           name: s.skill.meta.name,
           resourcePaths: s.resourcePaths,
-        })),
-    [externalSkills],
+        }))
+        .filter((s) => !q || s.name.toLowerCase().includes(q)),
+    [externalSkills, q],
   );
 
   // "公共" — discovered from other sources
@@ -192,20 +195,23 @@ export function SkillsListContent() {
           icon: s.skill.meta.emoji ?? "📦",
           name: s.skill.meta.name,
           resourcePaths: s.resourcePaths,
-        })),
-    [externalSkills],
+        }))
+        .filter((s) => !q || s.name.toLowerCase().includes(q)),
+    [externalSkills, q],
   );
 
   // "预设" — built-in
   const presetSkills = useMemo<SkillRow[]>(
     () =>
-      builtInMetas.map((s) => ({
-        key: `builtin:${s.name}`,
-        icon: s.emoji ?? "🛠️",
-        name: s.name,
-        resourcePaths: [],
-      })),
-    [builtInMetas],
+      builtInMetas
+        .map((s) => ({
+          key: `builtin:${s.name}`,
+          icon: s.emoji ?? "🛠️",
+          name: s.name,
+          resourcePaths: [],
+        }))
+        .filter((s) => !q || s.name.toLowerCase().includes(q)),
+    [builtInMetas, q],
   );
 
   const renderRow = (item: SkillRow) => (
@@ -221,6 +227,8 @@ export function SkillsListContent() {
     />
   );
 
+  const isEmpty = mySkills.length === 0 && publicSkills.length === 0 && presetSkills.length === 0;
+
   return (
     <div className="flex flex-col gap-1 p-2">
       <CategorySection title="我的" count={mySkills.length}>
@@ -229,9 +237,12 @@ export function SkillsListContent() {
       <CategorySection title="公共" count={publicSkills.length}>
         {publicSkills.map(renderRow)}
       </CategorySection>
-      <CategorySection title="预设" count={presetSkills.length}>
+      <CategorySection title="内置" count={presetSkills.length}>
         {presetSkills.map(renderRow)}
       </CategorySection>
+      {q && isEmpty && (
+        <div className="px-2 py-3 text-[12px] text-foreground-tertiary">无匹配结果</div>
+      )}
     </div>
   );
 }

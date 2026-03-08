@@ -113,6 +113,8 @@
     "deleteConfirmTitle": "Delete",
     "deleteConfirmDescription": "Are you sure you want to delete \"{{name}}\"? This cannot be undone.",
     "folderAlreadyExists": "A folder with this name already exists.",
+    "fileAlreadyExists": "A file with this name already exists.",
+    "newMarkdown": "New Markdown",
     "setContextAnchor": "Set as AI Context",
     "contextAnchorActive": "AI Context",
     "search": "Search files"
@@ -153,7 +155,13 @@
     "csvCols": "columns",
     "csvTruncated": "showing {{rows}} rows x {{cols}} columns",
     "dirItems": "items",
-    "dirLabel": "folder"
+    "dirLabel": "folder",
+    "autoSaving": "Saving…",
+    "autoSaved": "Saved",
+    "autoSaveError": "Save failed",
+    "history": "Version History",
+    "historyEmpty": "No history yet",
+    "restore": "Restore"
   },
   "common": {
     "settings": "Settings"
@@ -227,16 +235,17 @@
     "newString": "New string:",
     "jsCode": "JavaScript code:",
     "sandboxed": "Sandboxed",
-    "loading": "Loading tools…"
+    "loading": "Loading tools…",
+    "awaitingAuth": "Awaiting auth"
   },
   "permission": {
-    "title": "Confirmation required",
+    "title": "Authorization required",
     "write": "About to write file",
     "edit": "About to edit file",
     "bash": "About to run command",
-    "allow": "Allow",
+    "allow": "Allow once",
     "deny": "Deny",
-    "alwaysAllow": "Always allow (this session)"
+    "alwaysAllow": "Always allow this session"
   },
   "skills": {
     "title": "Skills",
@@ -339,7 +348,7 @@
     "default": "Default",
     "selectDirectory": "Select Directory...",
     "removeTitle": "Remove workspace",
-    "removeDescription": "Remove {{name}} from the workspace list? This won't delete any files on disk.",
+    "removeDescription": "Remove \"{{name}}\" from workspace list? Associated chat history will also be deleted. The folder itself is not affected.",
     "cancel": "Cancel",
     "remove": "Remove",
     "removeButtonTitle": "Remove workspace",

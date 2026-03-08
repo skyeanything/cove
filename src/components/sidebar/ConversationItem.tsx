@@ -22,6 +22,7 @@ interface ConversationItemProps {
   conversation: Conversation;
   active: boolean;
   isStreaming: boolean;
+  hasUnread: boolean;
   isEditing: boolean;
   editingTitle: string;
   onEditingTitleChange: (v: string) => void;
@@ -37,6 +38,7 @@ export function ConversationItem({
   conversation,
   active,
   isStreaming,
+  hasUnread,
   isEditing,
   editingTitle,
   onEditingTitleChange,
@@ -108,8 +110,8 @@ export function ConversationItem({
               : "text-sidebar-foreground/80 hover:bg-sidebar-accent/50",
           )}
         >
-          {/* Status dot — outline by default, solid green only when streaming */}
-          <div className="flex size-4 shrink-0 items-center justify-center">
+          {/* Status dot — outline by default, solid green when streaming, red badge when unread */}
+          <div className="relative flex size-4 shrink-0 items-center justify-center">
             <span
               className={cn(
                 "block size-[7px] rounded-full transition-colors duration-300",
@@ -118,6 +120,9 @@ export function ConversationItem({
                   : "border border-foreground/20",
               )}
             />
+            {hasUnread && !isStreaming && (
+              <span className="absolute right-0 top-0 block size-1.5 rounded-full bg-red-500" />
+            )}
           </div>
 
           <span className="min-w-0 truncate">{conversation.title || t("sidebar.untitled")}</span>

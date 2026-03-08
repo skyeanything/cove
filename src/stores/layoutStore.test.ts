@@ -32,7 +32,7 @@ describe("layoutStore", () => {
     });
 
     it("toggles from false to true", () => {
-      useLayoutStore.setState({ leftSidebarOpen: false });
+      useLayoutStore.setState({ leftSidebarMode: "hidden", leftSidebarOpen: false });
       useLayoutStore.getState().toggleLeftSidebar();
       expect(useLayoutStore.getState().leftSidebarOpen).toBe(true);
     });
@@ -162,6 +162,7 @@ describe("layoutStore", () => {
   describe("init", () => {
     it("loads state from config", async () => {
       vi.mocked(readConfig).mockResolvedValue({
+        leftSidebarMode: "hidden",
         leftSidebarOpen: false,
         leftSidebarWidth: 200,
         chatWidth: 500,

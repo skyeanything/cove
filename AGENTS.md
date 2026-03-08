@@ -2,7 +2,7 @@
 
 > 所有 AI 辅助开发工具（Claude Code、Cursor、Copilot 等）在开始工作前必须按以下顺序阅读文档。
 
-## 必读顺序
+## 必
 
 1. **`.agent/workflows/worktree-parallel.md`** — Git Worktree 并行开发流程（新功能必须在独立 worktree 中开发）
 2. **`.agent/workflows/agent-defaults.md`** — Agent 默认行为（KISS、Review 角色、PR Review 输出规则）

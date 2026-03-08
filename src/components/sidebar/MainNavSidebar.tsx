@@ -25,22 +25,15 @@ export function MainNavSidebar() {
   const setActivePage = useLayoutStore((s) => s.setActivePage);
   const setActiveConversation = useDataStore((s) => s.setActiveConversation);
 
-  const selectWorkspace = useWorkspaceStore((s) => s.select);
   const activeWorkspace = useWorkspaceStore((s) => s.activeWorkspace);
   const setWorkspaceSelectorOpen = useLayoutStore((s) => s.setWorkspaceSelectorOpen);
-  const isWorkspaceMode = activePage === "workspace";
 
   const handleNewChat = useCallback(() => {
     setActiveConversation(null);
     useChatStore.getState().reset();
     useFilePreviewStore.getState().clearSelection();
-
-    if (isWorkspaceMode && activeWorkspace && !activeWorkspace.is_default) {
-      selectWorkspace(activeWorkspace.id, null);
-    } else {
-      setActivePage("chat");
-    }
-  }, [setActiveConversation, setActivePage, isWorkspaceMode, activeWorkspace, selectWorkspace]);
+    setActivePage("chat");
+  }, [setActiveConversation, setActivePage]);
 
   const handleNavClick = useCallback(
     (page: ActivePage) => {

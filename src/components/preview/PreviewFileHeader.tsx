@@ -3,6 +3,7 @@ import { ChevronDown, ExternalLink } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { openPath } from "@tauri-apps/plugin-opener";
 import { useTranslation } from "react-i18next";
+import type { ReactNode } from "react";
 import { BreadcrumbNav } from "./BreadcrumbNav";
 
 export interface OfficeAppInfo {
@@ -81,10 +82,13 @@ export function PreviewFileHeader({
   path,
   workspaceRoot,
   officeApps,
+  children,
 }: {
   path: string;
   workspaceRoot: string | null;
   officeApps: OfficeAppInfo[];
+  /** Extra controls rendered before the open-externally button (e.g. HistoryPopover) */
+  children?: ReactNode;
 }) {
   const { t } = useTranslation();
   const openExternally = useOpenExternally(workspaceRoot, path);
@@ -110,6 +114,7 @@ export function PreviewFileHeader({
         <BreadcrumbNav path={path} />
       </div>
       <div className="relative flex shrink-0 items-center gap-1" ref={dropdownRef}>
+        {children}
         {matchingApps.length > 0 && matchingApps[0] ? (
           <>
             {/* 主按钮：用第一个匹配的 app 打开 */}

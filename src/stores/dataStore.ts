@@ -17,6 +17,11 @@ interface DataState {
   messages: Message[];
   activeConversationId: string | null;
 
+  // Unread tracking (in-memory only, clears on select)
+  unreadIds: Set<string>;
+  markUnread: (id: string) => void;
+  clearUnread: (id: string) => void;
+
   // Loading state
   initialized: boolean;
   initError: string | null;
@@ -49,8 +54,21 @@ export const useDataStore = create<DataState>()((set, get) => ({
   prompts: [],
   messages: [],
   activeConversationId: null,
+  unreadIds: new Set<string>(),
   initialized: false,
   initError: null,
+
+  markUnread(id) {
+    set((s) => ({ unreadIds: new Set([...s.unreadIds, id]) }));
+  },
+
+  clearUnread(id) {
+    set((s) => {
+      const next = new Set(s.unreadIds);
+      next.delete(id);
+      return { unreadIds: next };
+    });
+  },
 
   async init() {
     try {
@@ -100,7 +118,11 @@ export const useDataStore = create<DataState>()((set, get) => ({
       if (id) localStorage.setItem("office_chat_active_conversation_id", id);
       else localStorage.removeItem("office_chat_active_conversation_id");
     }
-    set({ activeConversationId: id, messages: [] });
+    set((s) => {
+      const next = new Set(s.unreadIds);
+      if (id) next.delete(id);
+      return { activeConversationId: id, messages: [], unreadIds: next };
+    });
     if (id) {
       get().loadMessages(id);
       // 切换对话时自动同步对话关联的工作区

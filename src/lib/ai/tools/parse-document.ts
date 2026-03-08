@@ -110,14 +110,27 @@ export const parseDocumentTool = tool({
     }
 
     if (filePath) {
-      const activeWorkspace = useWorkspaceStore.getState().activeWorkspace;
+      const { activeWorkspace, workspaces } = useWorkspaceStore.getState();
       if (!activeWorkspace) {
         return "No active workspace. Select a workspace directory first.";
+      }
+      // For absolute paths, find the most specific workspace that contains the file.
+      // This handles the case where the file lives in a non-active workspace.
+      let workspaceRoot = activeWorkspace.path;
+      if (filePath.startsWith("/")) {
+        let bestLen = -1;
+        for (const ws of workspaces) {
+          const normalized = ws.path.endsWith("/") ? ws.path : ws.path + "/";
+          if ((filePath === ws.path || filePath.startsWith(normalized)) && ws.path.length > bestLen) {
+            bestLen = ws.path.length;
+            workspaceRoot = ws.path;
+          }
+        }
       }
       try {
         const parsed = await invoke<ReadOfficeTextResult>("read_office_text", {
           args: {
-            workspaceRoot: activeWorkspace.path,
+            workspaceRoot,
             path: filePath,
             maxChars: maxBytes ? Math.max(4096, maxBytes) : undefined,
             pageRange: pageRange ?? undefined,
@@ -131,6 +144,10 @@ export const parseDocumentTool = tool({
         }, mode, chunkSize, maxChunks);
         return JSON.stringify(payload, null, 2);
       } catch (error) {
+        if (typeof error === "object" && error !== null && "kind" in error &&
+            (error as { kind: string }).kind === "OutsideWorkspace") {
+          return `该文件不在任何已知工作区内，无法读取：${filePath}`;
+        }
         return `Failed to parse file: ${error instanceof Error ? error.message : String(error)}`;
       }
     }

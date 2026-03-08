@@ -84,3 +84,13 @@ workspace.officellm("close", {});
 ```
 
 For the full command reference (~100 commands), run `doctor` and read the resource guides at `<home>/skills/resources/`.
+
+## File Output Rule
+
+Whenever a file is successfully written to disk (save, export, pack, convert, etc.), output the absolute path as a clickable markdown link:
+
+```
+[filename.docx](file:///absolute/path/to/filename.docx)
+```
+
+Always use the absolute path. Apply this to every generated, edited, or saved file.

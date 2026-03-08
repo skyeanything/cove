@@ -13,7 +13,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: "skills", icon: Wand2, label: "Skills" },
   { id: "tools", icon: Wrench, label: "Tools" },
   { id: "connectors", icon: Blocks, label: "Connectors" },
-  { id: "subagent", icon: Bot, label: "SubAgents" },
+  { id: "subagent", icon: Bot, label: "Agents" },
 ];
 
 export function ExtNavPanel() {

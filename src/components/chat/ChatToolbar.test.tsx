@@ -5,9 +5,6 @@ import userEvent from "@testing-library/user-event";
 import { ChatToolbar } from "./ChatToolbar";
 
 // Mock child components to isolate ChatToolbar
-vi.mock("./ContextRing", () => ({
-  ContextRing: ({ percent }: { percent: number }) => <span data-testid="context-ring">{percent}%</span>,
-}));
 vi.mock("./ToolbarIcon", () => ({
   ToolbarIcon: ({ title, onClick }: { title: string; onClick?: () => void }) => (
     <button data-testid={`toolbar-${title}`} onClick={onClick}>{title}</button>
@@ -29,8 +26,8 @@ afterEach(cleanup);
 const defaultProps = {
   isStreaming: false,
   canSend: true,
-  contextPercent: 42,
-  contextTooltip: "42% used",
+  webSearchEnabled: false,
+  onWebSearchToggle: vi.fn(),
   modelSelectorOpen: false,
   onModelSelectorOpenChange: vi.fn(),
   onAttachFiles: vi.fn(),
@@ -46,7 +43,7 @@ describe("ChatToolbar", () => {
 
   it("renders web search button", () => {
     render(<ChatToolbar {...defaultProps} />);
-    expect(screen.getByTestId("toolbar-chat.webSearch")).toBeTruthy();
+    expect(screen.getByTitle("chat.webSearch")).toBeTruthy();
   });
 
   it("renders skills popover", () => {
@@ -57,11 +54,6 @@ describe("ChatToolbar", () => {
   it("renders model selector", () => {
     render(<ChatToolbar {...defaultProps} />);
     expect(screen.getByTestId("model-selector")).toBeTruthy();
-  });
-
-  it("renders context ring with percent", () => {
-    render(<ChatToolbar {...defaultProps} />);
-    expect(screen.getByTestId("context-ring").textContent).toContain("42%");
   });
 
   it("renders send button when not streaming", () => {
@@ -100,5 +92,12 @@ describe("ChatToolbar", () => {
     render(<ChatToolbar {...defaultProps} />);
     await user.click(screen.getByTestId("toolbar-chat.attachFiles"));
     expect(defaultProps.onAttachFiles).toHaveBeenCalledTimes(1);
+  });
+
+  it("calls onWebSearchToggle when web search button clicked", async () => {
+    const user = userEvent.setup();
+    render(<ChatToolbar {...defaultProps} />);
+    await user.click(screen.getByTitle("chat.webSearch"));
+    expect(defaultProps.onWebSearchToggle).toHaveBeenCalledTimes(1);
   });
 });

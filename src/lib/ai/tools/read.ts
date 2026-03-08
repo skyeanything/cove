@@ -2,6 +2,7 @@ import { tool } from "ai";
 import { z } from "zod/v4";
 import { invoke } from "@tauri-apps/api/core";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
+import { useFilePreviewStore } from "@/stores/filePreviewStore";
 import { useDataStore } from "@/stores/dataStore";
 import { recordRead } from "../file-time";
 import { isOfficeReadable } from "./office-extensions";
@@ -64,10 +65,11 @@ export const readTool = tool({
   }),
   execute: async ({ filePath, offset, limit }) => {
     const activeWorkspace = useWorkspaceStore.getState().activeWorkspace;
-    if (!activeWorkspace) {
+    const selectedWorkspaceRoot = useFilePreviewStore.getState().selectedWorkspaceRoot;
+    const workspaceRoot = selectedWorkspaceRoot ?? activeWorkspace?.path;
+    if (!workspaceRoot) {
       return "请先在输入框上方选择工作区目录，再使用 read 工具。";
     }
-    const workspaceRoot = activeWorkspace.path;
     const sessionId = useDataStore.getState().activeConversationId;
     const resolved = filePath.startsWith("/") ? filePath : `${workspaceRoot}/${filePath}`.replace(/\/+/g, "/");
 

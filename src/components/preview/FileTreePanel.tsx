@@ -16,6 +16,7 @@ import {
 import {
   Plus,
   FolderPlus,
+  FileText,
   FolderOpen,
   ChevronDown,
   ChevronRight,
@@ -316,6 +317,7 @@ function WorkspaceRootNode({
     onSelectFile: handleLocalSelectFile,
     onLoadChildren,
     onNewFolder: dialogs.onNewFolder,
+    onNewMarkdown: dialogs.onNewMarkdown,
     onCopy: clipboard.onCopy,
     onCut: clipboard.onCut,
     onPaste: clipboard.onPaste,
@@ -382,6 +384,10 @@ function WorkspaceRootNode({
             <FolderPlus className="size-4" strokeWidth={1.5} />
             {t("explorer.newFolder")}
           </ContextMenuItem>
+          <ContextMenuItem className="gap-2 text-[13px]" onClick={() => dialogs.onNewMarkdown("")}>
+            <FileText className="size-4" strokeWidth={1.5} />
+            {t("explorer.newMarkdown")}
+          </ContextMenuItem>
           <ContextMenuSeparator />
           <ContextMenuItem className="gap-2 text-[13px]" onClick={() => onRevealInFinder("")}>
             <FileUp className="size-4" strokeWidth={1.5} />
@@ -418,7 +424,7 @@ function WorkspaceRootNode({
           {filteredRootEntries === null ? (
             <div className="py-2 text-center text-[13px] text-muted-foreground">{t("preview.loading")}</div>
           ) : filteredRootEntries.length === 0 ? (
-            <div className="py-2 text-center text-[13px] text-muted-foreground">{t("preview.emptyDir")}</div>
+            <div className="py-2 pl-14 text-[13px] text-muted-foreground">{t("preview.emptyDir")}</div>
           ) : (
             filteredRootEntries.map((entry) => (
               <FileTreeItem key={entry.path} entry={entry} {...sharedItemProps} />
@@ -439,6 +445,13 @@ function WorkspaceRootNode({
         setNewFolderError={dialogs.setNewFolderError}
         handleNewFolderConfirm={dialogs.handleNewFolderConfirm}
         handleNewFolderCancel={dialogs.handleNewFolderCancel}
+        newMarkdownParentPath={dialogs.newMarkdownParentPath}
+        newMarkdownName={dialogs.newMarkdownName}
+        setNewMarkdownName={dialogs.setNewMarkdownName}
+        newMarkdownError={dialogs.newMarkdownError}
+        setNewMarkdownError={dialogs.setNewMarkdownError}
+        handleNewMarkdownConfirm={dialogs.handleNewMarkdownConfirm}
+        handleNewMarkdownCancel={dialogs.handleNewMarkdownCancel}
         t={t}
       />
     </div>

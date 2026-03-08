@@ -6,6 +6,7 @@ import {
   Folder,
   FolderOpen,
   FolderPlus,
+  FileText,
   Pencil,
   FileUp,
   Copy,
@@ -45,6 +46,7 @@ export function FileTreeItem({
   onSelectFile,
   onLoadChildren,
   onNewFolder,
+  onNewMarkdown,
   onCopy,
   onCut,
   onPaste,
@@ -76,6 +78,7 @@ export function FileTreeItem({
   onSelectFile: (e: React.MouseEvent, path: string, isDir: boolean, name: string) => void;
   onLoadChildren: (path: string, entries: ListDirEntry[]) => void;
   onNewFolder: (parentPath: string) => void;
+  onNewMarkdown: (parentPath: string) => void;
   onCopy?: (path: string) => void;
   onCut?: (path: string) => void;
   onPaste?: (targetDirPath: string) => void;
@@ -236,6 +239,10 @@ export function FileTreeItem({
                 <FolderPlus className="size-4" strokeWidth={1.5} />
                 {t("explorer.newFolder")}
               </ContextMenuItem>
+              <ContextMenuItem className="gap-2 text-[13px]" onClick={() => onNewMarkdown(path)}>
+                <FileText className="size-4" strokeWidth={1.5} />
+                {t("explorer.newMarkdown")}
+              </ContextMenuItem>
               <ContextMenuSeparator />
             </>
           )}
@@ -300,6 +307,7 @@ export function FileTreeItem({
               onSelectFile={onSelectFile}
               onLoadChildren={onLoadChildren}
               onNewFolder={onNewFolder}
+              onNewMarkdown={onNewMarkdown}
               onCopy={onCopy}
               onCut={onCut}
               onPaste={onPaste}

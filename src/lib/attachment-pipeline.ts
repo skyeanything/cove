@@ -55,12 +55,19 @@ export async function processAttachment(
     let saved: { path: string; name: string; size: number; previewDataUrl?: string };
 
     if (workspacePath) {
-      const result = await invoke<SaveToWorkspaceResult>(
-        "save_attachment_to_workspace",
-        { args: { sourcePath, workspaceRoot: workspacePath } },
-      );
-      saved = result;
-      draft.workspace_path = result.path;
+      try {
+        const result = await invoke<SaveToWorkspaceResult>(
+          "save_attachment_to_workspace",
+          { args: { sourcePath, workspaceRoot: workspacePath } },
+        );
+        saved = result;
+        draft.workspace_path = result.path;
+      } catch {
+        // Workspace path unavailable — fall back to standard attachment storage
+        saved = await invoke<SaveAppDataResult>("save_attachment_file", {
+          args: { sourcePath },
+        });
+      }
     } else {
       saved = await invoke<SaveAppDataResult>("save_attachment_file", {
         args: { sourcePath },

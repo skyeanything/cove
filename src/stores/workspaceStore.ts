@@ -13,6 +13,20 @@ export function extractName(path: string): string {
   return segments[segments.length - 1] || path;
 }
 
+/** 返回一组绝对路径的最近公共祖先目录。 */
+export function findCommonAncestor(paths: string[]): string {
+  if (!paths.length) return "";
+  const split = paths.map((p) => p.split("/"));
+  const minLen = Math.min(...split.map((p) => p.length));
+  const common: string[] = [];
+  for (let i = 0; i < minLen; i++) {
+    const seg = split[0]![i];
+    if (split.every((p) => p[i] === seg)) common.push(seg!);
+    else break;
+  }
+  return common.join("/") || "/";
+}
+
 interface WorkspaceState {
   /** All saved workspaces */
   workspaces: Workspace[];
@@ -38,6 +52,15 @@ interface WorkspaceState {
   setDefault: (id: string) => Promise<void>;
   /** Check if a target path is inside the active workspace */
   containsPath: (target: string) => boolean;
+  /**
+   * Auto-detect and activate the workspace from a list of absolute file paths.
+   * Single folder → that folder. Multi-folder → LCA of all parent dirs.
+   * Creates a new workspace entry if the path is not yet registered.
+   */
+  autoDetectFromPaths: (
+    filePaths: string[],
+    conversationId?: string | null,
+  ) => Promise<void>;
 }
 
 export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
@@ -174,5 +197,33 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
     if (!ws) return false;
     const normalized = ws.path.endsWith("/") ? ws.path : ws.path + "/";
     return target === ws.path || target.startsWith(normalized);
+  },
+
+  async autoDetectFromPaths(filePaths, conversationId) {
+    if (!filePaths.length) return;
+
+    // Derive unique parent directories from selected file paths
+    const parentDirs = [
+      ...new Set(filePaths.map((p) => p.substring(0, p.lastIndexOf("/")))),
+    ].filter(Boolean);
+
+    if (!parentDirs.length) return;
+
+    // Compute target workspace: single folder or LCA of multiple
+    const targetDir =
+      parentDirs.length === 1 ? parentDirs[0]! : findCommonAncestor(parentDirs);
+
+    if (!targetDir) return;
+
+    // Reuse an already-registered workspace if path matches exactly
+    let ws = get().workspaces.find((w) => w.path === targetDir);
+    if (!ws) {
+      ws = await get().add(targetDir);
+    }
+
+    // Skip if already active
+    if (get().activeWorkspace?.id === ws.id) return;
+
+    await get().select(ws.id, conversationId ?? null);
   },
 }));

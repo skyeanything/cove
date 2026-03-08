@@ -113,6 +113,8 @@
     "deleteConfirmTitle": "删除",
     "deleteConfirmDescription": "确定要删除「{{name}}」吗？此操作无法撤销。",
     "folderAlreadyExists": "该名称已存在，请使用其他名称",
+    "fileAlreadyExists": "同名文件已存在。",
+    "newMarkdown": "新建 Markdown",
     "setContextAnchor": "设为 AI 上下文",
     "contextAnchorActive": "AI 上下文",
     "search": "搜索文件"
@@ -153,7 +155,13 @@
     "csvCols": "列",
     "csvTruncated": "显示 {{rows}} 行 x {{cols}} 列",
     "dirItems": "项",
-    "dirLabel": "文件夹"
+    "dirLabel": "文件夹",
+    "autoSaving": "保存中…",
+    "autoSaved": "已保存",
+    "autoSaveError": "保存失败",
+    "history": "历史版本",
+    "historyEmpty": "暂无历史记录",
+    "restore": "恢复"
   },
   "common": {
     "settings": "设置"
@@ -227,16 +235,17 @@
     "newString": "新字符串：",
     "jsCode": "JavaScript 代码：",
     "sandboxed": "已沙箱化",
-    "loading": "正在加载工具…"
+    "loading": "正在加载工具…",
+    "awaitingAuth": "待授权"
   },
   "permission": {
-    "title": "需要确认",
+    "title": "需要授权",
     "write": "将要写入文件",
     "edit": "将要编辑文件",
     "bash": "将要执行命令",
-    "allow": "允许",
+    "allow": "允许一次",
     "deny": "拒绝",
-    "alwaysAllow": "始终允许（本会话）"
+    "alwaysAllow": "本会话始终允许"
   },
   "skills": {
     "title": "技能",
@@ -339,7 +348,7 @@
     "default": "默认",
     "selectDirectory": "选择目录…",
     "removeTitle": "移除工作目录",
-    "removeDescription": "从工作目录列表中移除「{{name}}」？不会删除磁盘上的任何文件。",
+    "removeDescription": "从工作区列表中移除「{{name}}」？关联的聊天记录也将一并删除，磁盘上的文件夹不受影响。",
     "cancel": "取消",
     "remove": "移除",
     "removeButtonTitle": "从列表中移除",

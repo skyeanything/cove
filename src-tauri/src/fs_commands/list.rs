@@ -107,8 +107,8 @@ pub fn list_dir(args: ListDirArgs) -> Result<Vec<ListDirEntry>, FsError> {
     }
     entries.sort_by(|a, b| {
         match (a.is_dir, b.is_dir) {
-            (true, false) => std::cmp::Ordering::Less,
-            (false, true) => std::cmp::Ordering::Greater,
+            (true, false) => std::cmp::Ordering::Greater,
+            (false, true) => std::cmp::Ordering::Less,
             _ => a.name.to_lowercase().cmp(&b.name.to_lowercase()),
         }
     });

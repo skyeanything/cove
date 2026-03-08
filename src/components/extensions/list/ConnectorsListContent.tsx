@@ -35,7 +35,7 @@ function CategorySection({
   );
 }
 
-export function ConnectorsListContent() {
+export function ConnectorsListContent({ searchQuery = "" }: { searchQuery?: string }) {
   const [servers, setServers] = useState<McpServer[]>([]);
   const [loaded, setLoaded] = useState(false);
   const selectedKey = useExtensionStore((s) => s.selectedKey);
@@ -62,7 +62,8 @@ export function ConnectorsListContent() {
     );
   }
 
-  const myServers = servers;
+  const q = searchQuery.trim().toLowerCase();
+  const myServers = q ? servers.filter((s) => s.name.toLowerCase().includes(q)) : servers;
 
   return (
     <div className="flex flex-col gap-1 p-2">
@@ -100,10 +101,13 @@ export function ConnectorsListContent() {
         })}
       </CategorySection>
 
-      {servers.length === 0 && (
+      {servers.length === 0 && !q && (
         <div className="px-2 py-3 text-[12px] text-foreground-tertiary">
           暂无 Connector，点击 + 新建
         </div>
+      )}
+      {q && myServers.length === 0 && (
+        <div className="px-2 py-3 text-[12px] text-foreground-tertiary">无匹配结果</div>
       )}
     </div>
   );

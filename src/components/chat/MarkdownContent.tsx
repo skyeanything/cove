@@ -1,15 +1,25 @@
 import "katex/dist/katex.min.css";
 import React, { useEffect } from "react";
-import ReactMarkdown from "react-markdown";
+import ReactMarkdown, { defaultUrlTransform } from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import type { Components } from "react-markdown";
 import { CodeBlock, reactNodeToDisplayString } from "./CodeBlock";
+import { FileChip } from "./FileChip";
 
 const remarkPlugins = [remarkGfm, remarkBreaks, remarkMath];
 const rehypePluginsBase = [rehypeKatex];
+
+/**
+ * react-markdown v10 默认只允许 http/https/mailto/tel 协议，会把 file:// strip 成空字符串。
+ * 加白名单保留 file://，其余仍走默认安全过滤。
+ */
+function urlTransform(url: string): string {
+  if (url.startsWith("file://")) return url;
+  return defaultUrlTransform(url);
+}
 
 const markdownComponents: Components = {
   p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
@@ -51,16 +61,27 @@ const markdownComponents: Components = {
     }
     return <code {...props}>{safeChildren}</code>;
   },
-  a: ({ href, children }) => (
-    <a
-      href={href}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="text-brand hover:underline"
-    >
-      {children}
-    </a>
-  ),
+  a: ({ href, children }) => {
+    if (href?.startsWith("file://")) {
+      const filePath = decodeURIComponent(href.replace(/^file:\/\//, ""));
+      const displayName =
+        typeof children === "string"
+          ? children
+          : reactNodeToDisplayString(children ?? "");
+      const name = displayName || filePath.split("/").pop() || filePath;
+      return <FileChip path={filePath} name={name} />;
+    }
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="text-brand hover:underline"
+      >
+        {children}
+      </a>
+    );
+  },
   span: ({ className, children, ...props }: { className?: string; children?: React.ReactNode }) => {
     if (className?.includes("streaming-cursor-placeholder")) {
       return (
@@ -89,6 +110,7 @@ const SettledMarkdown = React.memo(function SettledMarkdown({ source }: { source
       remarkPlugins={remarkPlugins}
       rehypePlugins={rehypePluginsBase}
       components={markdownComponents as Components}
+      urlTransform={urlTransform}
       skipHtml
     >
       {source}
@@ -206,6 +228,7 @@ export function MarkdownContent({ source, className, trailingCursor }: MarkdownC
         remarkPlugins={remarkPlugins}
         rehypePlugins={rehypePluginsBase}
         components={markdownComponents as Components}
+        urlTransform={urlTransform}
         skipHtml
       >
         {normalizedSource}

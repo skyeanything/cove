@@ -308,7 +308,7 @@ describe("ToolCallBlock", () => {
     expect(container.textContent).not.toContain("0.5 s");
   });
 
-  it("collapses and expands on click", async () => {
+  it("starts collapsed when not loading, expands on click", async () => {
     const { container } = render(
       <ToolCallBlock
         toolCall={makeToolCall({ args: { command: "echo hi", description: "echo" } })}
@@ -316,13 +316,34 @@ describe("ToolCallBlock", () => {
       />,
     );
     const grid = container.querySelector("[style]") as HTMLElement;
-    expect(grid.style.gridTemplateRows).toBe("1fr");
-    // Click the header button to collapse
+    expect(grid.style.gridTemplateRows).toBe("0fr");
+    // Click the header button to expand
     const headerBtn = container.querySelector("button") as HTMLElement;
     await fireEvent.click(headerBtn);
-    // After click, state toggles open -> closed
     const gridAfter = container.querySelector("[style]") as HTMLElement;
-    expect(gridAfter.style.gridTemplateRows).toBe("0fr");
+    expect(gridAfter.style.gridTemplateRows).toBe("1fr");
+  });
+
+  it("starts expanded when isLoading", () => {
+    const { container } = render(
+      <ToolCallBlock
+        toolCall={makeToolCall({ isLoading: true })}
+        pendingAsk={null}
+      />,
+    );
+    const grid = container.querySelector("[style]") as HTMLElement;
+    expect(grid.style.gridTemplateRows).toBe("1fr");
+  });
+
+  it("starts collapsed when isDone", () => {
+    const { container } = render(
+      <ToolCallBlock
+        toolCall={makeToolCall({ isLoading: false, result: "ok" })}
+        pendingAsk={null}
+      />,
+    );
+    const grid = container.querySelector("[style]") as HTMLElement;
+    expect(grid.style.gridTemplateRows).toBe("0fr");
   });
 
   it("shows permission bar when pending ask matches", () => {
@@ -342,7 +363,8 @@ describe("ToolCallBlock", () => {
         pendingAsk={pendingAsk}
       />,
     );
-    expect(container.textContent).toContain("permission.title");
+    expect(container.textContent).toContain("tool.awaitingAuth");
+    expect(container.textContent).toContain("permission.bash");
     expect(container.textContent).toContain("permission.deny");
     expect(container.textContent).toContain("permission.allow");
     expect(container.textContent).toContain("permission.alwaysAllow");

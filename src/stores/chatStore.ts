@@ -234,8 +234,9 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       const modelMessages = toModelMessages(updatedMessages, { summaryUpTo: compressed.summaryUpTo ?? get().summaryUpTo ?? undefined });
       const fetchBlock = await getFetchBlockForText(trimmedContent);
       const wsPath = useWorkspaceStore.getState().activeWorkspace?.path;
-      const fileContextBlock = wsPath
-        ? await buildFileContextBlock(useFilePreviewStore.getState().selectedEntries, wsPath)
+      const { selectedEntries, selectedWorkspaceRoot } = useFilePreviewStore.getState();
+      const fileContextBlock = (wsPath || selectedWorkspaceRoot)
+        ? await buildFileContextBlock(selectedEntries, wsPath ?? selectedWorkspaceRoot!, selectedWorkspaceRoot ?? undefined)
         : "";
 
       if (readyAttachments.length > 0) {
@@ -257,8 +258,9 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         injectFetchBlockIntoLastUserMessage(modelMessages, fetchBlock + fileContextBlock);
       }
 
+      const effectiveWsPath = selectedWorkspaceRoot ?? wsPath;
       const { streamResult, finalError } = await runStreamLoop(
-        { provider, modelId, modelMessages, workspacePath: wsPath, abortSignal: abortController.signal, runMetrics, labelBase: `send:${provider.type}/${modelId}` },
+        { provider, modelId, modelMessages, workspacePath: effectiveWsPath, abortSignal: abortController.signal, runMetrics, labelBase: `send:${provider.type}/${modelId}` },
         { onUpdate: (s) => set(s), onRateLimitRetry: (attempt) => set({ error: i18n.t("chat.rateLimitRetry", { attempt }) }) },
       );
       if (finalError) { set({ error: finalError, ...STREAM_RESET }); return; }
@@ -273,6 +275,9 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       set((state) => ({ messages: [...state.messages, { ...assistantMsg, created_at: new Date().toISOString() }], ...STREAM_RESET }));
       // SOUL: fire-and-forget post-conversation tasks (summary + observation)
       runPostConversationTasks(conversationId, get().messages, getModel(provider, modelId));
+      if (conversationId !== useDataStore.getState().activeConversationId) {
+        useDataStore.getState().markUnread(conversationId);
+      }
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") {
         reportAgentRunMetrics(runMetrics, { aborted: true });
@@ -340,8 +345,9 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       const lastUserContent = last?.role === "user" ? (last.content ?? "") : "";
       const regenFetchBlock = await getFetchBlockForText(lastUserContent);
       const regenWsPath = useWorkspaceStore.getState().activeWorkspace?.path;
-      const regenFileCtx = regenWsPath
-        ? await buildFileContextBlock(useFilePreviewStore.getState().selectedEntries, regenWsPath)
+      const { selectedEntries: regenEntries, selectedWorkspaceRoot: regenSelWsRoot } = useFilePreviewStore.getState();
+      const regenFileCtx = (regenWsPath || regenSelWsRoot)
+        ? await buildFileContextBlock(regenEntries, regenWsPath ?? regenSelWsRoot!, regenSelWsRoot ?? undefined)
         : "";
       injectFetchBlockIntoLastUserMessage(modelMessages, regenFetchBlock + regenFileCtx);
 
@@ -360,6 +366,9 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       await messageRepo.create(assistantMsg);
       set((state) => ({ messages: [...state.messages, { ...assistantMsg, created_at: new Date().toISOString() }], ...STREAM_RESET }));
       runPostConversationTasks(conversationId, get().messages, getModel(provider, modelId));
+      if (conversationId !== useDataStore.getState().activeConversationId) {
+        useDataStore.getState().markUnread(conversationId);
+      }
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") {
         reportAgentRunMetrics(runMetrics, { aborted: true });
@@ -416,8 +425,9 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       const modelMessages = toModelMessages(updatedMessages, { summaryUpTo: compressed.summaryUpTo ?? get().summaryUpTo ?? undefined });
       const editFetchBlock = await getFetchBlockForText(newContent);
       const editWsPath = useWorkspaceStore.getState().activeWorkspace?.path;
-      const editFileCtx = editWsPath
-        ? await buildFileContextBlock(useFilePreviewStore.getState().selectedEntries, editWsPath)
+      const { selectedEntries: editEntries, selectedWorkspaceRoot: editSelWsRoot } = useFilePreviewStore.getState();
+      const editFileCtx = (editWsPath || editSelWsRoot)
+        ? await buildFileContextBlock(editEntries, editWsPath ?? editSelWsRoot!, editSelWsRoot ?? undefined)
         : "";
       injectFetchBlockIntoLastUserMessage(modelMessages, editFetchBlock + editFileCtx);
 
@@ -436,6 +446,9 @@ export const useChatStore = create<ChatState>()((set, get) => ({
       await messageRepo.create(assistantMsg);
       set((state) => ({ messages: [...state.messages, { ...assistantMsg, created_at: new Date().toISOString() }], ...STREAM_RESET }));
       runPostConversationTasks(conversationId, get().messages, getModel(provider, modelId));
+      if (conversationId !== useDataStore.getState().activeConversationId) {
+        useDataStore.getState().markUnread(conversationId);
+      }
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") {
         reportAgentRunMetrics(runMetrics, { aborted: true });

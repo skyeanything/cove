@@ -2,6 +2,7 @@
 
 mod copy;
 mod detection;
+mod history;
 mod list;
 mod office;
 mod office_read;
@@ -24,6 +25,7 @@ mod tests_read;
 mod tests_validation;
 
 pub use copy::*;
+pub use history::*;
 pub use list::*;
 pub use office::*;
 pub use office_read::*;

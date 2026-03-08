@@ -2,14 +2,7 @@ import { useState } from "react";
 import { ChevronRight, Wrench } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useExtensionStore } from "@/stores/extensionStore";
-
-interface ToolRow {
-  key: string;
-  icon: string;
-  name: string;
-  description: string;
-  enabled: boolean;
-}
+import { ALL_TOOL_INFOS, type ToolInfo } from "@/lib/ai/tools/tool-meta";
 
 function CategorySection({
   title,
@@ -40,49 +33,52 @@ function CategorySection({
   );
 }
 
-// Built-in tool/plugin entries
-const PRESET_TOOLS: ToolRow[] = [
-  {
-    key: "tool:word",
-    icon: "📝",
-    name: "Word",
-    description: "Embed AI assistant into Microsoft Word",
-    enabled: true,
-  },
-];
-
-export function ToolsListContent() {
+export function ToolsListContent({ searchQuery = "" }: { searchQuery?: string }) {
   const selectedKey = useExtensionStore((s) => s.selectedKey);
   const setSelectedKey = useExtensionStore((s) => s.setSelectedKey);
 
+  const q = searchQuery.trim().toLowerCase();
+  const builtIn = ALL_TOOL_INFOS.filter(
+    (i) => i.category === "built-in" && (!q || i.name.toLowerCase().includes(q)),
+  );
+  const skillBundled = ALL_TOOL_INFOS.filter(
+    (i) => i.category === "skill-bundled" && (!q || i.name.toLowerCase().includes(q)),
+  );
+
+  const renderRow = (info: ToolInfo) => {
+    const key = `tool:${info.id}`;
+    const isSelected = selectedKey === key;
+    return (
+      <div
+        key={key}
+        onClick={() => setSelectedKey(key)}
+        className={cn(
+          "flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 transition-colors",
+          isSelected ? "bg-background-tertiary" : "hover:bg-background-tertiary/60",
+        )}
+      >
+        <span className="w-4 shrink-0" />
+        <Wrench className="size-[14px] shrink-0 text-foreground-secondary" strokeWidth={1.5} />
+        <span className="min-w-0 flex-1 truncate text-[13px] text-foreground">
+          {info.name}
+        </span>
+      </div>
+    );
+  };
+
+  const isEmpty = builtIn.length === 0 && skillBundled.length === 0;
+
   return (
     <div className="flex flex-col gap-1 p-2">
-      <CategorySection title="预设" count={PRESET_TOOLS.length}>
-        {PRESET_TOOLS.map((tool) => {
-          const isSelected = selectedKey === tool.key;
-          return (
-            <div
-              key={tool.key}
-              onClick={() => setSelectedKey(tool.key)}
-              className={cn(
-                "flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 transition-colors",
-                isSelected ? "bg-background-tertiary" : "hover:bg-background-tertiary/60",
-              )}
-            >
-              <span className="w-4 shrink-0" />
-              <Wrench className="size-[14px] shrink-0 text-foreground-secondary" strokeWidth={1.5} />
-              <span
-                className={cn(
-                  "min-w-0 flex-1 truncate text-[13px]",
-                  tool.enabled ? "text-foreground" : "text-foreground-secondary",
-                )}
-              >
-                {tool.name}
-              </span>
-            </div>
-          );
-        })}
+      <CategorySection title="内置" count={builtIn.length}>
+        {builtIn.map(renderRow)}
       </CategorySection>
+      <CategorySection title="技能工具" count={skillBundled.length}>
+        {skillBundled.map(renderRow)}
+      </CategorySection>
+      {q && isEmpty && (
+        <div className="px-2 py-3 text-[12px] text-foreground-tertiary">无匹配结果</div>
+      )}
     </div>
   );
 }
