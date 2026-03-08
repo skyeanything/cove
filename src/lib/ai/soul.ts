@@ -65,12 +65,12 @@ export function findPrivateFile(
 }
 
 /** Per-file character limits for system prompt injection. */
-const SOUL_SIZE_LIMITS: Record<string, number> = {
+export const SOUL_SIZE_LIMITS: Record<string, number> = {
   "SOUL.md": 4000,
   "observations.md": 6000,
   "patterns.md": 4000,
 };
-const DEFAULT_PRIVATE_LIMIT = 3000;
+export const DEFAULT_PRIVATE_LIMIT = 3000;
 
 /**
  * Truncate content to a character limit.

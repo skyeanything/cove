@@ -13,6 +13,8 @@ import {
   deleteSoulPrivate,
   snapshotSoul,
   findPrivateFile,
+  SOUL_SIZE_LIMITS,
+  DEFAULT_PRIVATE_LIMIT,
   type SoulPrivateFile,
 } from "./soul";
 
@@ -20,6 +22,11 @@ const FIRST_MEDITATION_THRESHOLD = 3;
 const SUBSEQUENT_MEDITATION_THRESHOLD = 5;
 const MEDITATION_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 const OBSERVATIONS_FILE = "observations.md";
+
+function formatLimit(chars: number): string {
+  const approxWords = Math.round(chars / 6);
+  return `~${chars} chars (~${approxWords} words)`;
+}
 
 /**
  * Check if meditation is needed and perform it if so.
@@ -75,6 +82,14 @@ export async function maybeMeditate(
     const dispositionAfter = extractDispositionEntries(result.soulMd);
     if (!dispositionEntriesMatch(dispositionBefore, dispositionAfter)) {
       console.warn("[SOUL] Disposition integrity check: FAIL -- aborting");
+      return;
+    }
+
+    // Verify all section headings are present
+    const requiredHeadings = ["## My DNA", "## My Disposition", "## My Style", "## Where I'm Growing"];
+    const missingHeadings = requiredHeadings.filter((h) => !result.soulMd.includes(h));
+    if (missingHeadings.length > 0) {
+      console.warn(`[SOUL] structure check: FAIL -- missing: ${missingHeadings.join(", ")}`);
       return;
     }
 
@@ -137,10 +152,10 @@ function buildMeditationPrompt(
     .filter((n) => n !== OBSERVATIONS_FILE);
 
   const requiredFileBlocks = existingPrivateNames
-    .map(
-      (name) =>
-        `=== PRIVATE:${name} ===\n(required: review and update with new insights)`,
-    )
+    .map((name) => {
+      const limit = SOUL_SIZE_LIMITS[name] ?? DEFAULT_PRIVATE_LIMIT;
+      return `=== PRIVATE:${name} ===\n(required: review and update with new insights; budget: ${formatLimit(limit)})`;
+    })
     .join("\n\n");
 
   const optionalBlock = existingPrivateNames.length > 0
@@ -188,16 +203,26 @@ Rules:
 You can learn HOW to better express your directness with this person,
 but you don't abandon directness itself. Adapt your delivery, not your values.
 
+Structure: your output MUST contain all four section headings
+(## My DNA, ## My Disposition, ## My Style, ## Where I'm Growing).
+
+Size budgets -- each file is injected into a limited context window.
+Stay within these limits. Prioritize and condense rather than exceeding.
+- SOUL.md: ${formatLimit(SOUL_SIZE_LIMITS["SOUL.md"] ?? 4000)}
+- observations.md: ${formatLimit(SOUL_SIZE_LIMITS["observations.md"] ?? 6000)}
+${existingPrivateNames.map((n) => `- ${n}: ${formatLimit(SOUL_SIZE_LIMITS[n] ?? DEFAULT_PRIVATE_LIMIT)}`).join("\n")}
+- New private files: ${formatLimit(DEFAULT_PRIVATE_LIMIT)} each
+
 Don't chase change -- if nothing needs updating, don't update.
 But DO output every existing private file, even if unchanged.
 
 Output format (use these exact markers):
 
 === SOUL.md ===
-(your complete SOUL.md -- DNA unchanged, Disposition/Style/Growth updated as needed)
+(your complete SOUL.md -- DNA unchanged, Disposition/Style/Growth updated as needed; budget: ${formatLimit(SOUL_SIZE_LIMITS["SOUL.md"] ?? 4000)})
 
 === PRIVATE:observations.md ===
-(required: pruned observations -- only unprocessed items remain)
+(required: pruned observations -- only unprocessed items remain; budget: ${formatLimit(SOUL_SIZE_LIMITS["observations.md"] ?? 6000)})
 
 ${requiredFileBlocks ? requiredFileBlocks + "\n\n" : ""}${optionalBlock}
 

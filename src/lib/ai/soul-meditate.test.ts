@@ -7,6 +7,8 @@ vi.mock("./soul", () => ({
   deleteSoulPrivate: vi.fn(),
   snapshotSoul: vi.fn(),
   findPrivateFile: vi.fn(),
+  SOUL_SIZE_LIMITS: { "SOUL.md": 4000, "observations.md": 6000, "patterns.md": 4000 },
+  DEFAULT_PRIVATE_LIMIT: 3000,
 }));
 
 import {
@@ -243,6 +245,38 @@ describe("maybeMeditate", () => {
       expect.stringContaining("model omitted patterns.md"),
     );
     spy.mockRestore();
+  });
+
+  it("aborts when section heading is missing", async () => {
+    mockSoul("- a\n- b\n- c");
+    // Output missing "## Where I'm Growing"
+    const incomplete = `# Who I Am\n\n${DNA}\n\n${DISPOSITION}\n\n${STYLE}`;
+    generateFn.mockResolvedValue(
+      `=== SOUL.md ===\n${incomplete}\n\n=== PRIVATE:observations.md ===\n- obs\n`,
+    );
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await maybeMeditate(generateFn);
+    expect(writeSoul).not.toHaveBeenCalled();
+    expect(spy).toHaveBeenCalledWith(
+      expect.stringContaining("structure check: FAIL"),
+    );
+    expect(spy).toHaveBeenCalledWith(
+      expect.stringContaining("## Where I'm Growing"),
+    );
+    spy.mockRestore();
+  });
+
+  it("includes size budget in meditation prompt", async () => {
+    mockSoul("- a\n- b\n- c");
+    generateFn.mockResolvedValue(
+      `=== SOUL.md ===\n${PUBLIC_SOUL}\n\n=== PRIVATE:observations.md ===\n- obs\n`,
+    );
+    await maybeMeditate(generateFn);
+    const prompt = generateFn.mock.calls[0]?.[0] ?? "";
+    expect(prompt).toContain("Size budgets");
+    expect(prompt).toContain("~4000 chars");
+    expect(prompt).toContain("~6000 chars");
+    expect(prompt).toContain("budget:");
   });
 
   it("does not carry forward files explicitly deleted by model", async () => {
