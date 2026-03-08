@@ -80,6 +80,19 @@ export async function maybeMeditate(
 
     console.info("[SOUL] integrity checks: PASS");
 
+    // Carry forward any existing private files the model omitted
+    const resultFileNames = new Set(result.privateFiles.map((f) => f.name));
+    const deletedNames = new Set(result.deleteFiles);
+    for (const existing of soul.private) {
+      if (existing.name === OBSERVATIONS_FILE) continue;
+      if (resultFileNames.has(existing.name)) continue;
+      if (deletedNames.has(existing.name)) continue;
+      console.warn(
+        `[SOUL] model omitted ${existing.name} -- carrying forward`,
+      );
+      result.privateFiles.push(existing);
+    }
+
     // Write updated SOUL.md with meditation timestamp (strip old markers first)
     const cleaned = result.soulMd
       .replace(/\n<!-- last-meditation:\S+ -->/g, "")
@@ -118,6 +131,22 @@ function buildMeditationPrompt(
     .map((f) => `--- ${f.name} ---\n${f.content}`)
     .join("\n\n");
 
+  // Build dynamic output format: existing private files are required
+  const existingPrivateNames = privateFiles
+    .map((f) => f.name)
+    .filter((n) => n !== OBSERVATIONS_FILE);
+
+  const requiredFileBlocks = existingPrivateNames
+    .map(
+      (name) =>
+        `=== PRIVATE:${name} ===\n(required: review and update with new insights)`,
+    )
+    .join("\n\n");
+
+  const optionalBlock = existingPrivateNames.length > 0
+    ? `=== PRIVATE:<new-file>.md ===\n(optional: create additional files to organize your understanding)`
+    : `=== PRIVATE:patterns.md ===\n(optional: create if you have patterns to organize)\n\n=== PRIVATE:<new-file>.md ===\n(optional: create additional files to organize your understanding)`;
+
   return `You have a quiet moment.
 
 Read yourself -- your DNA, your disposition, your style, your growth direction:
@@ -141,8 +170,15 @@ Rules:
   These annotations describe how you express this trait with THIS person.
 - Style: rewrite freely based on what you've learned.
 - Growth: rewrite freely.
-- observations.md: move internalized items to other files with a
-  [date -> destination] trace. NEVER delete observations -- only move them.
+- Existing private files: review each one against new observations.
+  Update with new insights and always include in output.
+  Do not silently drop existing files.
+- observations.md is a processing inbox, not an archive.
+  Once an observation has been internalized into Disposition/Style/Growth
+  or distilled into patterns.md / another private file, REPLACE IT with
+  a one-line summary (e.g. "[condensed -> patterns.md: prefers X]").
+  If even the summary adds no value, remove the line entirely.
+  The goal is to keep observations.md short.
 - You may create new files (e.g., patterns.md, relationship.md) to
   organize your understanding. File names and structure are your choice.
 - Technical preferences, project conventions, and factual information
@@ -153,6 +189,7 @@ You can learn HOW to better express your directness with this person,
 but you don't abandon directness itself. Adapt your delivery, not your values.
 
 Don't chase change -- if nothing needs updating, don't update.
+But DO output every existing private file, even if unchanged.
 
 Output format (use these exact markers):
 
@@ -160,15 +197,14 @@ Output format (use these exact markers):
 (your complete SOUL.md -- DNA unchanged, Disposition/Style/Growth updated as needed)
 
 === PRIVATE:observations.md ===
-(updated observations.md with internalized items moved out)
+(required: pruned observations -- only unprocessed items remain)
 
-=== PRIVATE:patterns.md ===
-(optional: create if you have patterns to organize)
+${requiredFileBlocks ? requiredFileBlocks + "\n\n" : ""}${optionalBlock}
 
 === DELETE:filename.md ===
 (optional: mark a private file for deletion)
 
-Only include files you want to write. Always include SOUL.md and observations.md.`;
+Always include SOUL.md, observations.md, and all existing private files.`;
 }
 
 function parseMeditationResult(raw: string): MeditationResult | null {

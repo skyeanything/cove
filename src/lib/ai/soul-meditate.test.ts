@@ -219,4 +219,49 @@ describe("maybeMeditate", () => {
     );
     spy.mockRestore();
   });
+
+  it("carries forward existing private files omitted by model", async () => {
+    const obsFile = { name: "observations.md", content: "- a\n- b\n- c" };
+    const patternsFile = { name: "patterns.md", content: "# Patterns\n- old pattern\n" };
+    vi.mocked(readSoul).mockResolvedValue({
+      public: PUBLIC_SOUL,
+      private: [obsFile, patternsFile],
+    });
+    vi.mocked(findPrivateFile).mockReturnValue(obsFile);
+    // Model output omits patterns.md entirely
+    generateFn.mockResolvedValue(
+      `=== SOUL.md ===\n${PUBLIC_SOUL}\n\n=== PRIVATE:observations.md ===\n- remaining\n`,
+    );
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    await maybeMeditate(generateFn);
+    // patterns.md should be carried forward with original content
+    expect(writeSoulPrivate).toHaveBeenCalledWith(
+      "patterns.md",
+      "# Patterns\n- old pattern\n",
+    );
+    expect(spy).toHaveBeenCalledWith(
+      expect.stringContaining("model omitted patterns.md"),
+    );
+    spy.mockRestore();
+  });
+
+  it("does not carry forward files explicitly deleted by model", async () => {
+    const obsFile = { name: "observations.md", content: "- a\n- b\n- c" };
+    const oldFile = { name: "old.md", content: "outdated content\n" };
+    vi.mocked(readSoul).mockResolvedValue({
+      public: PUBLIC_SOUL,
+      private: [obsFile, oldFile],
+    });
+    vi.mocked(findPrivateFile).mockReturnValue(obsFile);
+    // Model explicitly deletes old.md
+    generateFn.mockResolvedValue(
+      `=== SOUL.md ===\n${PUBLIC_SOUL}\n\n=== PRIVATE:observations.md ===\n- obs\n\n=== DELETE:old.md ===\n`,
+    );
+    await maybeMeditate(generateFn);
+    expect(deleteSoulPrivate).toHaveBeenCalledWith("old.md");
+    // Should NOT carry forward a deleted file
+    const writePrivateCalls = vi.mocked(writeSoulPrivate).mock.calls;
+    const wroteOld = writePrivateCalls.some(([name]) => name === "old.md");
+    expect(wroteOld).toBe(false);
+  });
 });
