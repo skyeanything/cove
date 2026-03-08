@@ -12,11 +12,11 @@ import {
 } from "@/lib/ai/skills/loader";
 import { useSkillsStore } from "@/stores/skillsStore";
 
-/** 来源优先级：cove(0) > claude(1) > 其他含内置(2) */
+/** 来源优先级：cove(0) > claude/office-bundled(1) > 其他含内置(2) */
 export function sourcePriority(source: string): number {
   const s = source.toLowerCase();
   if (s === "cove") return 0;
-  if (s === "claude") return 1;
+  if (s === "claude" || s === "office-bundled") return 1;
   return 2;
 }
 
