@@ -66,14 +66,20 @@ describe("sourcePriority", () => {
     expect(sourcePriority("claude")).toBe(1);
   });
 
+  it("returns 1 for office-bundled", () => {
+    expect(sourcePriority("office-bundled")).toBe(1);
+  });
+
   it("returns 2 for other / app", () => {
     expect(sourcePriority("other")).toBe(2);
     expect(sourcePriority("app")).toBe(2);
+    expect(sourcePriority("office")).toBe(2);
   });
 
   it("is case-insensitive", () => {
     expect(sourcePriority("Cove")).toBe(0);
     expect(sourcePriority("CLAUDE")).toBe(1);
+    expect(sourcePriority("Office-Bundled")).toBe(1);
   });
 });
 
