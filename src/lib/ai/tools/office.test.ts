@@ -38,19 +38,9 @@ async function exec(input: ExecInput) {
   return officeTool.execute!(input, {} as ExecOptions);
 }
 
-const OK_RESULT = { status: "success", data: "ok", error: null, metrics: null };
-
-/** Setup mock that captures a specific field from the invoke payload. */
-function captureCallField<T>(field: string): { get: () => T } {
-  let value: T;
-  setupTauriMocks({
-    officellm_call: (payload) => {
-      value = (payload as Record<string, T>)?.[field];
-      return OK_RESULT;
-    },
-  });
-  return { get: () => value };
-}
+const jsResult = (output: string) => ({
+  output, result: "", error: null, executionMs: 5,
+});
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
@@ -62,403 +52,247 @@ beforeEach(() => {
 // ── detect ────────────────────────────────────────────────────────────────────
 
 describe("officeTool – detect", () => {
-  it("returns version and path when office tool is available", async () => {
+  it("returns version and path when available", async () => {
     setupTauriMocks({
-      officellm_detect: () => ({ available: true, version: "2.1.0", path: "/usr/bin/officellm", bundled: false }),
+      officellm_detect: () => ({
+        available: true, version: "2.1.0", path: "/usr/bin/officellm", bundled: false,
+      }),
     });
-
-    const result = await exec({ action: "detect" });
+    const result = await exec({ command: "detect" });
     expect(result).toContain("available");
     expect(result).toContain("2.1.0");
     expect(result).toContain("/usr/bin/officellm");
     expect(result).toContain("bundled=false");
   });
 
-  it("returns not-installed message when available is false", async () => {
+  it("returns not-installed message when unavailable", async () => {
     setupTauriMocks({
-      officellm_detect: () => ({ available: false, version: null, path: null, bundled: false }),
+      officellm_detect: () => ({
+        available: false, version: null, path: null, bundled: false,
+      }),
     });
-
-    const result = await exec({ action: "detect" });
+    const result = await exec({ command: "detect" });
     expect(result).toContain("not installed");
+  });
+
+  it("handles detect invoke error", async () => {
+    setupTauriMocks({
+      officellm_detect: () => { throw new Error("IPC error"); },
+    });
+    const result = await exec({ command: "detect" });
+    expect(result).toContain("detect failed");
+    expect(result).toContain("IPC error");
+  });
+
+  it("does not require workspace for detect", async () => {
+    withNoWorkspace();
+    setupTauriMocks({
+      officellm_detect: () => ({
+        available: true, version: "1.0", path: "/bin/officellm", bundled: true,
+      }),
+    });
+    const result = await exec({ command: "detect" });
+    expect(result).toContain("available");
   });
 });
 
 // ── doctor ────────────────────────────────────────────────────────────────────
 
 describe("officeTool – doctor", () => {
-  it("returns JSON stringified data on success", async () => {
+  it("returns JSON data on success", async () => {
     const data = {
       visual_pipeline_ready: true,
       dependencies: [
-        { name: "libreoffice", available: true, required: true, path: "/usr/bin/libreoffice" },
-        { name: "pdftoppm", available: true, required: true, path: "/usr/bin/pdftoppm" },
-        { name: "quarto", available: false, required: false },
+        { name: "libreoffice", available: true, required: true },
       ],
     };
     setupTauriMocks({
       officellm_doctor: () => ({ status: "success", data, error: null, metrics: null }),
     });
-
-    const result = await exec({ action: "doctor" });
+    const result = await exec({ command: "doctor" });
     expect(result).toBe(JSON.stringify(data));
   });
 
-  it("returns enhanced error message when doctor status is error", async () => {
+  it("returns error when doctor status is error", async () => {
     setupTauriMocks({
       officellm_doctor: () => ({
-        status: "error",
-        data: null,
-        error: "officellm binary not found",
-        metrics: null,
+        status: "error", data: null, error: "binary not found", metrics: null,
       }),
     });
-
-    const result = await exec({ action: "doctor" });
-    expect(result).toContain("Error running doctor");
-    expect(result).toContain("officellm binary not found");
-    expect(result).toContain("[Hint]");
+    const result = await exec({ command: "doctor" });
+    expect(result).toContain("Error");
+    expect(result).toContain("binary not found");
   });
 
   it("returns 'unknown' when error field is null", async () => {
     setupTauriMocks({
       officellm_doctor: () => ({
-        status: "error",
-        data: null,
-        error: null,
-        metrics: null,
+        status: "error", data: null, error: null, metrics: null,
       }),
     });
-
-    const result = await exec({ action: "doctor" });
-    expect(result).toContain("Error running doctor");
+    const result = await exec({ command: "doctor" });
+    expect(result).toContain("Error");
     expect(result).toContain("unknown");
   });
+
+  it("handles doctor invoke error", async () => {
+    setupTauriMocks({
+      officellm_doctor: () => { throw new Error("timeout"); },
+    });
+    const result = await exec({ command: "doctor" });
+    expect(result).toContain("doctor failed");
+    expect(result).toContain("timeout");
+  });
 });
 
-// ── open ──────────────────────────────────────────────────────────────────────
+// ── QuickJS-routed commands ──────────────────────────────────────────────────
 
-describe("officeTool – open", () => {
-  it("returns error when path is not provided", async () => {
-    setupTauriMocks({ officellm_open: () => undefined });
-    const result = await exec({ action: "open" });
-    expect(result).toContain("Error");
-    expect(result).toContain("path");
-  });
-
-  it("prepends workspace root for relative paths", async () => {
-    let capturedPath: string | undefined;
-    setupTauriMocks({
-      officellm_open: (payload) => {
-        capturedPath = (payload as { path?: string })?.path;
-        return undefined;
-      },
-    });
-
-    const result = await exec({ action: "open", path: "docs/report.docx" });
-    expect(capturedPath).toBe("/workspace/docs/report.docx");
-    expect(result).toContain("/workspace/docs/report.docx");
-  });
-
-  it("uses absolute path as-is without prepending workspace", async () => {
-    let capturedPath: string | undefined;
-    setupTauriMocks({
-      officellm_open: (payload) => {
-        capturedPath = (payload as { path?: string })?.path;
-        return undefined;
-      },
-    });
-
-    const result = await exec({ action: "open", path: "/absolute/path/doc.docx" });
-    expect(capturedPath).toBe("/absolute/path/doc.docx");
-    expect(result).toContain("/absolute/path/doc.docx");
-  });
-
-  it("treats Windows drive-letter paths as absolute", async () => {
-    let capturedPath: string | undefined;
-    setupTauriMocks({
-      officellm_open: (payload) => {
-        capturedPath = (payload as { path?: string })?.path;
-        return undefined;
-      },
-    });
-
-    await exec({ action: "open", path: "C:\\docs\\report.docx" });
-    expect(capturedPath).toBe("C:\\docs\\report.docx");
-  });
-
-  it("treats UNC paths as absolute", async () => {
-    let capturedPath: string | undefined;
-    setupTauriMocks({
-      officellm_open: (payload) => {
-        capturedPath = (payload as { path?: string })?.path;
-        return undefined;
-      },
-    });
-
-    await exec({ action: "open", path: "\\\\server\\share\\doc.docx" });
-    expect(capturedPath).toBe("\\\\server\\share\\doc.docx");
-  });
-
-  it("uses path as-is when workspace is null and path is relative", async () => {
+describe("officeTool – QuickJS commands", () => {
+  it("requires workspace for non-detect/doctor commands", async () => {
     withNoWorkspace();
-    let capturedPath: string | undefined;
+    const result = await exec({ command: "open", args: { path: "doc.docx" } });
+    expect(result).toContain("Error");
+    expect(result).toContain("workspace");
+  });
+
+  it("generates JS code and invokes run_js for open", async () => {
+    let capturedArgs: Record<string, unknown> = {};
     setupTauriMocks({
-      officellm_open: (payload) => {
-        capturedPath = (payload as { path?: string })?.path;
-        return undefined;
+      run_js: (payload) => {
+        capturedArgs = (payload as { args: Record<string, unknown> }).args;
+        return jsResult('{"status":"success"}');
       },
     });
-
-    await exec({ action: "open", path: "relative/doc.docx" });
-    expect(capturedPath).toBe("relative/doc.docx");
+    const result = await exec({ command: "open", args: { path: "doc.docx" } });
+    expect(capturedArgs.workspaceRoot).toBe("/workspace");
+    expect(capturedArgs.code).toContain('workspace.officellm("open"');
+    expect(capturedArgs.code).toContain('"path":"doc.docx"');
+    expect(result).toBe("open: success");
   });
 
-  it("rejects open when a session is already active", async () => {
+  it("returns no-session message for status with null data", async () => {
     setupTauriMocks({
-      officellm_status: () => ({
-        documentPath: "/workspace/existing.docx",
-        pid: 9999,
-        uptimeSecs: 120,
-      }),
-      officellm_open: () => undefined,
+      run_js: () => jsResult('{"status":"success","data":null}'),
     });
-
-    const result = await exec({ action: "open", path: "new.docx" });
-    expect(result).toContain("Error");
-    expect(result).toContain("session is already active");
-    expect(result).toContain("existing.docx");
-    expect(result).toContain("action:'close'");
-  });
-});
-
-// ── call ──────────────────────────────────────────────────────────────────────
-
-describe("officeTool – call", () => {
-  it("returns error when command is not provided", async () => {
-    setupTauriMocks({ officellm_call: () => ({ status: "success", data: null, error: null, metrics: null }) });
-    const result = await exec({ action: "call" });
-    expect(result).toContain("Error");
-    expect(result).toContain("command");
+    const result = await exec({ command: "status" });
+    expect(result).toBe("No active document session.");
   });
 
-  it("returns enhanced error message when status is error", async () => {
+  it("returns session info for status with data", async () => {
     setupTauriMocks({
-      officellm_call: () => ({
-        status: "error",
-        data: null,
-        error: "command not recognized",
-        metrics: null,
-      }),
+      run_js: () => jsResult('{"status":"success","data":{"path":"doc.docx","modified":false}}'),
     });
-
-    const result = await exec({ action: "call", command: "unknownCmd" });
-    expect(result).toContain("Error");
-    expect(result).toContain("command not recognized");
-    expect(result).toContain("[Hint]");
+    const result = await exec({ command: "status" });
+    expect(result).toBe('{"path":"doc.docx","modified":false}');
   });
 
-  it("returns JSON stringified data on success", async () => {
-    const data = { slides: 5, title: "My Presentation" };
+  it("formats save result with file path for UI extraction", async () => {
     setupTauriMocks({
-      officellm_call: () => ({
-        status: "success",
-        data,
-        error: null,
-        metrics: null,
-      }),
+      run_js: () => jsResult('{"status":"success","data":"/workspace/report.docx"}'),
     });
-
-    const result = await exec({ action: "call", command: "getInfo", args: [] });
-    expect(result).toContain(JSON.stringify(data));
+    const result = await exec({ command: "save" });
+    expect(result).toBe("Document saved to: /workspace/report.docx");
   });
 
-  it("passes legacy array args to invoke", async () => {
-    const cap = captureCallField<unknown>("args");
-    await exec({ action: "call", command: "addSlide", args: ["--position", "2"] });
-    expect(cap.get()).toEqual(["--position", "2"]);
-  });
-
-  it("converts object args to CLI-style array", async () => {
-    const cap = captureCallField<unknown>("args");
-    await exec({ action: "call", command: "addSlide", args: { title: "New", position: "2" } });
-    expect(cap.get()).toEqual(["--title", "New", "--position", "2"]);
-  });
-
-  it("converts single-char keys to short flags and resolves path args", async () => {
-    const cap = captureCallField<unknown>("args");
-    await exec({ action: "call", command: "extract-text", args: { i: "doc.docx" } });
-    expect(cap.get()).toEqual(["-i", "/workspace/doc.docx"]);
-  });
-
-  it("resolves relative path args to workspace root", async () => {
-    const cap = captureCallField<unknown>("args");
-    await exec({ action: "call", command: "convert", args: { input: "report.docx", output: "out.pdf" } });
-    expect(cap.get()).toEqual(["--input", "/workspace/report.docx", "--output", "/workspace/out.pdf"]);
-  });
-
-  it("does not resolve absolute path args (Unix or Windows)", async () => {
-    const cap = captureCallField<unknown>("args");
-    await exec({ action: "call", command: "convert", args: { input: "/abs/report.docx" } });
-    expect(cap.get()).toEqual(["--input", "/abs/report.docx"]);
-
-    const cap2 = captureCallField<unknown>("args");
-    await exec({ action: "call", command: "convert", args: { input: "D:\\files\\report.docx" } });
-    expect(cap2.get()).toEqual(["--input", "D:\\files\\report.docx"]);
-  });
-
-  it("does not resolve non-path arg keys", async () => {
-    const cap = captureCallField<unknown>("args");
-    await exec({ action: "call", command: "addSlide", args: { title: "New Slide" } });
-    expect(cap.get()).toEqual(["--title", "New Slide"]);
-  });
-
-  it("passes workdir to invoke", async () => {
-    const cap = captureCallField<unknown>("workdir");
-    await exec({ action: "call", command: "test", args: [] });
-    expect(cap.get()).toBe("/workspace");
-  });
-
-  it("passes '/' as workdir when no workspace", async () => {
-    withNoWorkspace();
-    const cap = captureCallField<unknown>("workdir");
-    await exec({ action: "call", command: "test", args: [] });
-    expect(cap.get()).toBe("/");
-  });
-});
-
-// ── save ──────────────────────────────────────────────────────────────────────
-
-describe("officeTool – save", () => {
-  it("returns 'Document saved.' when no path is provided", async () => {
+  it("passes args correctly for command calls", async () => {
+    let capturedCode = "";
     setupTauriMocks({
-      officellm_save: () => ({ status: "success", data: null, error: null, metrics: null }),
-    });
-
-    const result = await exec({ action: "save" });
-    expect(result).toBe("Document saved.");
-  });
-
-  it("returns 'Document saved to: {path}' when path is provided", async () => {
-    setupTauriMocks({
-      officellm_save: () => ({ status: "success", data: null, error: null, metrics: null }),
-    });
-
-    const result = await exec({ action: "save", path: "/output/result.docx" });
-    expect(result).toBe("Document saved to: /output/result.docx");
-  });
-
-  it("returns error message when save status is error", async () => {
-    setupTauriMocks({
-      officellm_save: () => ({
-        status: "error",
-        data: null,
-        error: "disk full",
-        metrics: null,
-      }),
-    });
-
-    const result = await exec({ action: "save", path: "/output/fail.docx" });
-    expect(result).toContain("Error");
-    expect(result).toContain("disk full");
-  });
-
-  it("resolves relative save-as path to workspace root", async () => {
-    let capturedPath: unknown;
-    setupTauriMocks({
-      officellm_save: (payload) => {
-        capturedPath = (payload as { path?: unknown })?.path;
-        return { status: "success", data: null, error: null, metrics: null };
+      run_js: (payload) => {
+        capturedCode = ((payload as { args: { code: string } }).args).code;
+        return jsResult('{"status":"success","data":{"modified":true}}');
       },
     });
-    const result = await exec({ action: "save", path: "output/result.docx" });
-    expect(capturedPath).toBe("/workspace/output/result.docx");
-    expect(result).toContain("/workspace/output/result.docx");
-  });
-
-  it("does not resolve absolute save-as paths (Unix or Windows)", async () => {
-    let capturedPath: unknown;
-    const saveMock = (payload: unknown) => {
-      capturedPath = (payload as { path?: unknown })?.path;
-      return { status: "success" as const, data: null, error: null, metrics: null };
-    };
-    setupTauriMocks({ officellm_save: saveMock });
-    await exec({ action: "save", path: "/abs/result.docx" });
-    expect(capturedPath).toBe("/abs/result.docx");
-
-    setupTauriMocks({ officellm_save: saveMock });
-    await exec({ action: "save", path: "C:\\output\\result.docx" });
-    expect(capturedPath).toBe("C:\\output\\result.docx");
-  });
-});
-
-// ── close ─────────────────────────────────────────────────────────────────────
-
-describe("officeTool – close", () => {
-  it("returns 'Session closed.' on success", async () => {
-    setupTauriMocks({
-      officellm_close: () => undefined,
+    const result = await exec({
+      command: "replace-text", args: { find: "old", replace: "new" },
     });
-
-    const result = await exec({ action: "close" });
-    expect(result).toBe("Session closed.");
+    expect(capturedCode).toContain('"replace-text"');
+    expect(capturedCode).toContain('"find":"old"');
+    expect(capturedCode).toContain('"replace":"new"');
+    expect(result).toBe('{"modified":true}');
   });
-});
 
-// ── status ────────────────────────────────────────────────────────────────────
-
-describe("officeTool – status", () => {
-  it("returns no-session message when invoke returns null", async () => {
+  it("returns formatted data from successful command", async () => {
     setupTauriMocks({
-      officellm_status: () => null,
+      run_js: () => jsResult('{"status":"success","data":{"slides":5}}'),
     });
-
-    const result = await exec({ action: "status" });
-    expect(result).toContain("No active office session");
+    const result = await exec({ command: "get-info" });
+    expect(result).toBe('{"slides":5}');
   });
 
-  it("returns session info when active session exists", async () => {
+  it("returns string data directly", async () => {
     setupTauriMocks({
-      officellm_status: () => ({
-        documentPath: "/tmp/report.docx",
-        pid: 12345,
-        uptimeSecs: 42,
+      run_js: () => jsResult('{"status":"success","data":"extracted text content"}'),
+    });
+    const result = await exec({ command: "extract-text", args: { i: "doc.docx" } });
+    expect(result).toBe("extracted text content");
+  });
+
+  it("returns error from officellm", async () => {
+    setupTauriMocks({
+      run_js: () => jsResult('{"status":"error","error":"no active session"}'),
+    });
+    const result = await exec({ command: "save" });
+    expect(result).toContain("Error");
+    expect(result).toContain("no active session");
+  });
+
+  it("returns JS execution error", async () => {
+    setupTauriMocks({
+      run_js: () => ({
+        output: "", result: "", error: "officellm not installed", executionMs: 5,
       }),
     });
-
-    const result = await exec({ action: "status" });
-    expect(result).toContain("/tmp/report.docx");
-    expect(result).toContain("12345");
-    expect(result).toContain("42");
-  });
-});
-
-// ── error handling ────────────────────────────────────────────────────────────
-
-describe("officeTool – invoke error handling", () => {
-  it("catches Error thrown by invoke and returns enhanced error", async () => {
-    setupTauriMocks({
-      officellm_detect: () => {
-        throw new Error("IPC channel closed");
-      },
-    });
-
-    const result = await exec({ action: "detect" });
-    expect(result).toContain("Office tool error");
-    expect(result).toContain("IPC channel closed");
-    expect(result).toContain("[Hint]");
+    const result = await exec({ command: "open", args: { path: "doc.docx" } });
+    expect(result).toContain("Error");
+    expect(result).toContain("officellm not installed");
   });
 
-  it("handles non-Error thrown values with hint", async () => {
+  it("handles run_js invoke error", async () => {
     setupTauriMocks({
-      officellm_close: () => {
-        throw "unexpected failure";
+      run_js: () => { throw new Error("backend unreachable"); },
+    });
+    const result = await exec({ command: "open", args: { path: "doc.docx" } });
+    expect(result).toContain("office error");
+    expect(result).toContain("backend unreachable");
+  });
+
+  it("uses empty args when none provided", async () => {
+    let capturedCode = "";
+    setupTauriMocks({
+      run_js: (payload) => {
+        capturedCode = ((payload as { args: { code: string } }).args).code;
+        return jsResult('{"status":"success"}');
       },
     });
+    await exec({ command: "close" });
+    expect(capturedCode).toContain("{}");
+  });
 
-    const result = await exec({ action: "close" });
-    expect(result).toContain("Office tool error");
-    expect(result).toContain("unexpected failure");
-    expect(result).toContain("[Hint]");
+  it("sets 30s timeout for run_js", async () => {
+    let capturedTimeout: unknown;
+    setupTauriMocks({
+      run_js: (payload) => {
+        capturedTimeout = ((payload as { args: { timeoutMs: number } }).args).timeoutMs;
+        return jsResult('{"status":"success"}');
+      },
+    });
+    await exec({ command: "status" });
+    expect(capturedTimeout).toBe(30_000);
+  });
+
+  it("handles non-JSON output gracefully", async () => {
+    setupTauriMocks({
+      run_js: () => jsResult("plain text output"),
+    });
+    const result = await exec({ command: "some-cmd" });
+    expect(result).toBe("plain text output");
+  });
+
+  it("returns fallback when output is empty", async () => {
+    setupTauriMocks({
+      run_js: () => jsResult(""),
+    });
+    const result = await exec({ command: "some-cmd" });
+    expect(result).toBe("some-cmd: done");
   });
 });

@@ -38,12 +38,12 @@ describe("getAgentTools", () => {
         "skill_resource",
       ]),
     );
-    // cove_interpreter is now built-in, should always appear
+    // cove_interpreter and diagram are built-in, should always appear
     expect(keys).toContain("cove_interpreter");
+    expect(keys).toContain("diagram");
     // skill-bundled tools should not appear without their skill enabled
     expect(keys).not.toContain("write_skill");
     expect(keys).not.toContain("office");
-    expect(keys).not.toContain("diagram");
     // spawn_agent should not appear without subAgentContext
     expect(keys).not.toContain("spawn_agent");
   });
@@ -58,29 +58,29 @@ describe("getAgentTools", () => {
     expect(Object.keys(tools)).not.toContain("write_skill");
   });
 
-  it("includes office and diagram when OfficeLLM skill enabled and runtime available", () => {
+  it("includes office when OfficeLLM skill enabled and runtime available", () => {
     const tools = getAgentTools(["OfficeLLM"], { runtimeAvailability: { office: true } });
-    const keys = Object.keys(tools);
-    expect(keys).toContain("office");
-    expect(keys).toContain("diagram");
+    expect(Object.keys(tools)).toContain("office");
   });
 
-  it("does not include office or diagram when runtime not available", () => {
+  it("does not include office when runtime not available", () => {
     const tools = getAgentTools(["OfficeLLM"], { runtimeAvailability: { office: false } });
     expect(Object.keys(tools)).not.toContain("office");
-    expect(Object.keys(tools)).not.toContain("diagram");
   });
 
-  it("does not include office or diagram when OfficeLLM skill not enabled", () => {
+  it("does not include office when OfficeLLM skill not enabled", () => {
     const tools = getAgentTools([], { runtimeAvailability: { office: true } });
     expect(Object.keys(tools)).not.toContain("office");
-    expect(Object.keys(tools)).not.toContain("diagram");
   });
 
-  it("does not include office or diagram when runtimeAvailability omitted", () => {
+  it("does not include office when runtimeAvailability omitted", () => {
     const tools = getAgentTools(["OfficeLLM"]);
     expect(Object.keys(tools)).not.toContain("office");
-    expect(Object.keys(tools)).not.toContain("diagram");
+  });
+
+  it("diagram is always available as built-in regardless of skills", () => {
+    const tools = getAgentTools([]);
+    expect(Object.keys(tools)).toContain("diagram");
   });
 
   it("includes all skill-bundled tools when all conditions met", () => {

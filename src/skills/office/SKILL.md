@@ -1,21 +1,26 @@
 ---
 name: OfficeLLM
-description: Bootstrap for bundled office tool — Tauri tool for document operations (DOCX/PPTX/XLSX).
+description: OfficeLLM command reference for document operations (DOCX/PPTX/XLSX).
 emoji: "📄"
 always: false
 ---
 
-# Office (Bundled Tauri Tool)
+# OfficeLLM Command Reference
 
-ALWAYS use the `office` Tauri tool for document operations. Do NOT use `bash` to call `officellm` directly — the binary is not in PATH. All operations go through dedicated Tauri IPC commands via the `office` tool.
+## Two entry points
 
-## QuickJS API
+**Single operations** -- use the `office` tool:
+```
+office(command: "open", args: {path: "doc.docx"})
+office(command: "replace-text", args: {find: "old", replace: "new"})
+office(command: "save")
+office(command: "close")
+office(command: "from-markdown", args: {i: "in.md", o: "out.docx"})
+```
 
-In `cove_interpreter`, use the `officellm` global object for document operations:
-
+**Multi-step workflows** -- use `cove_interpreter` with the officellm bridge:
 ```javascript
 var doc = officellm.open("report.docx");
-var text = doc.call("extract-text");
 doc.call("replace-text", { find: "old", replace: "new" });
 doc.call("apply-format", { find: "Important", bold: true });
 doc.save("report-updated.docx");
@@ -23,7 +28,6 @@ doc.close();
 ```
 
 Batch operations via `doc.execute()`:
-
 ```javascript
 doc.execute([
   { op: "ReplaceText", target: "Draft", payload: "Final" },
@@ -31,7 +35,7 @@ doc.execute([
 ], { atomic: true, dryRun: true });
 ```
 
-Stateless commands (no open document needed): `officellm.call("from-markdown", { i: "in.md", o: "out.docx" })`.
+Stateless (no open needed): `officellm.call("from-markdown", { i: "in.md", o: "out.docx" })`.
 
 ## Loading the Full Command Reference
 

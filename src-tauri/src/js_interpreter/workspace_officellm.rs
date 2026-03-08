@@ -16,12 +16,22 @@ pub(super) fn register_officellm<'js>(
     let f = Function::new(
         ctx.clone(),
         move |cmd: String, mut args: HashMap<String, String>| -> rquickjs::Result<String> {
-            for key in &["i", "input", "path"] {
+            for key in &["i", "input"] {
                 if let Some(v) = args.get(*key) {
                     let abs = ensure_inside_workspace_exists(&wr, v)
                         .map_err(|e| js_err(&format!("{e:?}")))?;
                     args.insert(key.to_string(), abs.to_string_lossy().into_owned());
                 }
+            }
+            // "path" is input for most commands but output for "save" (save-as)
+            if let Some(v) = args.get("path") {
+                let abs = if cmd == "save" {
+                    ensure_inside_workspace_may_not_exist(&wr, v)
+                } else {
+                    ensure_inside_workspace_exists(&wr, v)
+                }
+                .map_err(|e| js_err(&format!("{e:?}")))?;
+                args.insert("path".to_string(), abs.to_string_lossy().into_owned());
             }
             for key in &["o", "output"] {
                 if let Some(v) = args.get(*key) {

@@ -39,6 +39,7 @@ All tools are available by default. Category determines gating.
 | Fetch URL | Fetch content from a URL as text |
 | Parse Document | Parse document files into structured text |
 | Cove Interpreter | Run JS in a sandboxed QuickJS interpreter |
+| Diagram | Render Mermaid diagrams to PNG images |
 | Settings | Read and modify application settings via chat |
 | Recall | Search conversation archive by topic (internal, not user-visible) |
 | Recall Detail | Retrieve original messages from a past conversation (internal, not user-visible) |
@@ -48,7 +49,6 @@ All tools are available by default. Category determines gating.
 | Tool | Skill | Description |
 |------|-------|-------------|
 | Office | OfficeLLM | Interact with office documents (DOCX/PPTX/XLSX) |
-| Diagram | OfficeLLM | Render diagrams to images |
 | Create Skill | skill-creator | Save a skill to user's Cove skill directory |
 
 View all tools in Settings > Tools.
