@@ -1,4 +1,5 @@
 mod attachment_commands;
+mod git_bash_installer;
 mod clipboard_commands;
 mod config_commands;
 mod cookie_commands;
@@ -109,6 +110,26 @@ pub fn run() {
         }
       });
 
+      // Windows: detect/install Git Bash in background; push result to frontend.
+      #[cfg(windows)]
+      {
+        let app_handle = app.handle().clone();
+        let _ = app_handle.emit("git-bash-status", serde_json::json!({ "status": "checking" }));
+        std::thread::spawn(move || {
+          match git_bash_installer::ensure_git_bash() {
+            Ok(_) => {
+              let _ = app_handle.emit("git-bash-status", serde_json::json!({ "status": "ready" }));
+            }
+            Err(msg) => {
+              let _ = app_handle.emit("git-bash-status", serde_json::json!({
+                "status": "failed",
+                "message": msg
+              }));
+            }
+          }
+        });
+      }
+
       Ok(())
     })
     .invoke_handler(tauri::generate_handler![
@@ -165,6 +186,7 @@ pub fn run() {
       soul_backup::import_soul,
       soul_backup::soul_health,
       soul_backup::reset_soul,
+      git_bash_installer::check_git_bash_status,
       config_commands::read_config,
       config_commands::write_config,
       docx_commands::docx_to_pdf,
