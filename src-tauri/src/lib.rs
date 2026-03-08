@@ -196,6 +196,7 @@ pub fn run() {
       officellm::officellm_init,
       officellm::officellm_call,
       officellm::officellm_open,
+      officellm::officellm_create,
       officellm::officellm_save,
       officellm::officellm_close,
       officellm::officellm_status,

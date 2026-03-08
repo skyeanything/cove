@@ -12,6 +12,8 @@ always: false
 **Single operations** -- use the `office` tool:
 ```
 office(command: "open", args: {path: "doc.docx"})
+office(command: "create")
+office(command: "create", args: {markdown: "# Title\n\nContent"})
 office(command: "replace-text", args: {find: "old", replace: "new"})
 office(command: "save")
 office(command: "close")
@@ -20,10 +22,17 @@ office(command: "from-markdown", args: {i: "in.md", o: "out.docx"})
 
 **Multi-step workflows** -- use `cove_interpreter` with the officellm bridge:
 ```javascript
+// Edit existing document
 var doc = officellm.open("report.docx");
 doc.call("replace-text", { find: "old", replace: "new" });
 doc.call("apply-format", { find: "Important", bold: true });
 doc.save("report-updated.docx");
+doc.close();
+
+// Create new document from scratch
+var doc = officellm.create({ markdown: "# Report\n\nContent here" });
+doc.call("apply-format", { find: "Report", bold: true });
+doc.save("report.docx");  // create documents require a path on save
 doc.close();
 ```
 

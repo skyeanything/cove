@@ -52,7 +52,7 @@ export const officeTool = tool({
   description:
     "Operate on Office documents (DOCX/PPTX/XLSX) via officellm. " +
     "Pass a command name and optional args object. " +
-    "Commands: detect, doctor, open, close, save, status, or any document command. " +
+    "Commands: detect, doctor, open, create, close, save, status, or any document command. " +
     "IMPORTANT: Load the OfficeLLM skill first to get correct command names. " +
     "Examples: {command: 'open', args: {path: 'doc.docx'}}, " +
     "{command: 'replace-text', args: {find: 'old', replace: 'new'}}, " +
@@ -61,7 +61,7 @@ export const officeTool = tool({
     command: z
       .string()
       .describe(
-        "officellm command: open, close, save, status, detect, doctor, or any document command",
+        "officellm command: open, create, close, save, status, detect, doctor, or any document command",
       ),
     args: z
       .record(z.string(), z.string())

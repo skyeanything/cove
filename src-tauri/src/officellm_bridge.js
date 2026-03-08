@@ -70,6 +70,10 @@ var officellm = (function() {
       invoke("open", { path: path });
       return createSession();
     },
+    create: function(params) {
+      invoke("create", convertParams(params || {}));
+      return createSession();
+    },
     call: function(command, params) {
       return invoke(command, convertParams(params || {}));
     }

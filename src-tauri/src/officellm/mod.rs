@@ -63,6 +63,20 @@ pub async fn officellm_save(path: Option<String>) -> Result<CommandResult, Strin
         .map_err(|e| format!("后台线程错误: {e}"))?
 }
 
+/// Server 模式：创建内存文档
+#[tauri::command]
+pub async fn officellm_create(
+    app: tauri::AppHandle,
+    params: serde_json::Value,
+    workdir: String,
+) -> Result<(), String> {
+    let home = compute_home(&app)?;
+    let wd = std::path::PathBuf::from(&workdir);
+    tauri::async_runtime::spawn_blocking(move || server::create(&params, &home, &wd))
+        .await
+        .map_err(|e| format!("后台线程错误: {e}"))?
+}
+
 /// Server 模式：关闭会话
 #[tauri::command]
 pub async fn officellm_close() -> Result<(), String> {
