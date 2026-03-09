@@ -18,6 +18,9 @@ vi.mock("./skill", () => ({
 vi.mock("./spawn-agent", () => ({
   createSpawnAgentTool: vi.fn(() => ({ _id: "spawn_agent" })),
 }));
+vi.mock("./meditate", () => ({
+  createMeditateTool: vi.fn(() => ({ _id: "meditate" })),
+}));
 
 import { getAgentTools } from "./index";
 import type { SubAgentContext } from "../sub-agent";
@@ -92,6 +95,18 @@ describe("getAgentTools", () => {
     expect(keys).toContain("write_skill");
     expect(keys).toContain("office");
     expect(keys).toContain("diagram");
+  });
+
+  describe("meditate", () => {
+    it("includes meditate when generateFn provided", () => {
+      const tools = getAgentTools([], { generateFn: async () => ({ text: "", finishReason: "stop" }) });
+      expect(Object.keys(tools)).toContain("meditate");
+    });
+
+    it("does not include meditate when generateFn omitted", () => {
+      const tools = getAgentTools([]);
+      expect(Object.keys(tools)).not.toContain("meditate");
+    });
   });
 
   describe("spawn_agent", () => {

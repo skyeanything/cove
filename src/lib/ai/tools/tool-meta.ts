@@ -27,6 +27,7 @@ export const ALL_TOOL_INFOS: ToolInfo[] = [
   { id: "write_skill", name: "Create Skill", description: "Save a skill to the user's Cove skill directory.", category: "skill-bundled", skillName: "skill-creator", userVisible: false },
   { id: "office", name: "Office", description: "Interact with office documents via OfficeLLM.", category: "skill-bundled", skillName: "OfficeLLM", runtimeCheck: "office", userVisible: true },
   { id: "diagram", name: "Diagram", description: "Render Mermaid diagrams to PNG images.", category: "built-in", userVisible: true },
+  { id: "meditate", name: "Meditate", description: "Reflect on observations and update soul.", category: "built-in", userVisible: false },
   { id: "settings", name: "Settings", description: "Read and modify application settings.", category: "built-in", userVisible: true },
 ];
 

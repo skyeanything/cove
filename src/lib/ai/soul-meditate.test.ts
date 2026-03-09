@@ -19,7 +19,7 @@ import {
   snapshotSoul,
   findPrivateFile,
 } from "./soul";
-import { maybeMeditate, type MeditateGenResult } from "./soul-meditate";
+import { maybeMeditate, forceMeditate, type MeditateGenResult } from "./soul-meditate";
 
 const DNA = "## My DNA\n\nThese are the things I don't negotiate on:\n\nI pursue understanding.";
 const DISPOSITION = "## My Disposition\n\nHigh inertia.\n\n- I lean toward directness\n- I'd rather push back";
@@ -164,7 +164,7 @@ describe("maybeMeditate", () => {
     await maybeMeditate(generateFn);
     expect(writeSoul).not.toHaveBeenCalled();
     expect(spy).toHaveBeenCalledWith(
-      expect.stringContaining("DNA integrity check: FAIL"),
+      expect.stringContaining("DNA integrity check failed"),
     );
     spy.mockRestore();
   });
@@ -182,7 +182,7 @@ describe("maybeMeditate", () => {
     await maybeMeditate(generateFn);
     expect(writeSoul).not.toHaveBeenCalled();
     expect(spy).toHaveBeenCalledWith(
-      expect.stringContaining("Disposition integrity check: FAIL"),
+      expect.stringContaining("Disposition integrity check failed"),
     );
     spy.mockRestore();
   });
@@ -221,7 +221,7 @@ describe("maybeMeditate", () => {
     await maybeMeditate(generateFn);
     expect(writeSoul).not.toHaveBeenCalled();
     expect(spy).toHaveBeenCalledWith(
-      expect.stringContaining("meditation parse failed"),
+      expect.stringContaining("Parse failed"),
     );
     spy.mockRestore();
   });
@@ -262,10 +262,7 @@ describe("maybeMeditate", () => {
     await maybeMeditate(generateFn);
     expect(writeSoul).not.toHaveBeenCalled();
     expect(spy).toHaveBeenCalledWith(
-      expect.stringContaining("structure check: FAIL"),
-    );
-    expect(spy).toHaveBeenCalledWith(
-      expect.stringContaining("## Where I'm Growing"),
+      expect.stringContaining("Missing sections"),
     );
     spy.mockRestore();
   });
@@ -316,5 +313,126 @@ describe("maybeMeditate", () => {
     const writePrivateCalls = vi.mocked(writeSoulPrivate).mock.calls;
     const wroteOld = writePrivateCalls.some(([name]) => name === "old.md");
     expect(wroteOld).toBe(false);
+  });
+});
+
+describe("forceMeditate", () => {
+  const generateFn = vi.fn<(p: string) => Promise<MeditateGenResult>>();
+
+  function genResult(text: string, finishReason = "stop"): MeditateGenResult {
+    return { text, finishReason };
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(snapshotSoul).mockResolvedValue("2026-03-09T12-00-00Z");
+    vi.mocked(writeSoul).mockResolvedValue(undefined);
+    vi.mocked(writeSoulPrivate).mockResolvedValue(undefined);
+    vi.mocked(deleteSoulPrivate).mockResolvedValue(undefined);
+  });
+
+  function mockSoulForForce(obsContent: string) {
+    const obsFile = { name: "observations.md", content: obsContent };
+    vi.mocked(readSoul).mockResolvedValue({
+      public: PUBLIC_SOUL,
+      private: [obsFile],
+    });
+    vi.mocked(findPrivateFile).mockReturnValue(obsFile);
+  }
+
+  it("bypasses threshold and cooldown", async () => {
+    // Only 1 observation + recent meditation marker -- maybeMeditate would skip
+    const obsFile = { name: "observations.md", content: "- one" };
+    vi.mocked(readSoul).mockResolvedValue({
+      public: PUBLIC_SOUL + `\n<!-- last-meditation:${new Date().toISOString()} -->`,
+      private: [obsFile],
+    });
+    vi.mocked(findPrivateFile).mockReturnValue(obsFile);
+    generateFn.mockResolvedValue(genResult(
+      `=== SOUL.md ===\n${PUBLIC_SOUL}\n\n=== PRIVATE:observations.md ===\n- processed\n`,
+    ));
+    const outcome = await forceMeditate(generateFn);
+    expect(outcome.success).toBe(true);
+    expect(generateFn).toHaveBeenCalled();
+  });
+
+  it("returns structured outcome on success", async () => {
+    mockSoulForForce("- a\n- b\n- c");
+    generateFn.mockResolvedValue(genResult(
+      `=== SOUL.md ===\n${PUBLIC_SOUL}\n\n=== PRIVATE:observations.md ===\n- kept\n\n=== PRIVATE:patterns.md ===\n- p1\n`,
+    ));
+    const outcome = await forceMeditate(generateFn);
+    expect(outcome.success).toBe(true);
+    expect(outcome.snapshotTimestamp).toBe("2026-03-09T12-00-00Z");
+    expect(outcome.updatedFiles).toContain("SOUL.md");
+    expect(outcome.updatedFiles).toContain("observations.md");
+    expect(outcome.updatedFiles).toContain("patterns.md");
+  });
+
+  it("returns error when no observations", async () => {
+    vi.mocked(readSoul).mockResolvedValue({ public: PUBLIC_SOUL, private: [] });
+    vi.mocked(findPrivateFile).mockReturnValue(undefined);
+    const outcome = await forceMeditate(generateFn);
+    expect(outcome.success).toBe(false);
+    expect(outcome.error).toBe("No observations");
+  });
+
+  it("returns error on parse failure", async () => {
+    mockSoulForForce("- a\n- b");
+    generateFn.mockResolvedValue(genResult("no markers at all"));
+    const outcome = await forceMeditate(generateFn);
+    expect(outcome.success).toBe(false);
+    expect(outcome.error).toBe("Parse failed");
+    expect(outcome.snapshotTimestamp).toBe("2026-03-09T12-00-00Z");
+  });
+
+  it("returns error on DNA integrity failure", async () => {
+    mockSoulForForce("- a");
+    generateFn.mockResolvedValue(genResult(
+      `=== SOUL.md ===\n# Who I Am\n\n## My DNA\n\nMODIFIED\n\n${DISPOSITION}\n\n${STYLE}\n\n${GROWTH}\n\n=== PRIVATE:observations.md ===\n- a\n`,
+    ));
+    const outcome = await forceMeditate(generateFn);
+    expect(outcome.success).toBe(false);
+    expect(outcome.error).toContain("DNA");
+  });
+
+  it("returns error on missing section headings", async () => {
+    mockSoulForForce("- a");
+    const incomplete = `# Who I Am\n\n${DNA}\n\n${DISPOSITION}\n\n${STYLE}`;
+    generateFn.mockResolvedValue(genResult(
+      `=== SOUL.md ===\n${incomplete}\n\n=== PRIVATE:observations.md ===\n- a\n`,
+    ));
+    const outcome = await forceMeditate(generateFn);
+    expect(outcome.success).toBe(false);
+    expect(outcome.error).toContain("Missing sections");
+  });
+
+  it("returns structured error when snapshotSoul fails", async () => {
+    mockSoulForForce("- a\n- b");
+    vi.mocked(snapshotSoul).mockRejectedValue(new Error("disk full"));
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const outcome = await forceMeditate(generateFn);
+    expect(outcome.success).toBe(false);
+    expect(outcome.error).toContain("disk full");
+    expect(outcome.snapshotTimestamp).toBeUndefined();
+    expect(generateFn).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
+  it("serializes concurrent calls", async () => {
+    mockSoulForForce("- a\n- b");
+    let callCount = 0;
+    generateFn.mockImplementation(async () => {
+      callCount++;
+      await new Promise((r) => setTimeout(r, 10));
+      return genResult(`=== SOUL.md ===\n${PUBLIC_SOUL}\n\n=== PRIVATE:observations.md ===\n- done\n`);
+    });
+    const [r1, r2] = await Promise.all([
+      forceMeditate(generateFn),
+      forceMeditate(generateFn),
+    ]);
+    expect(r1.success).toBe(true);
+    expect(r2.success).toBe(true);
+    expect(callCount).toBe(2);
   });
 });

@@ -13,6 +13,7 @@ import { diagramTool } from "./diagram";
 import { createSpawnAgentTool } from "./spawn-agent";
 import { recallTool, recallDetailTool } from "./recall";
 import { settingsTool } from "./settings";
+import { createMeditateTool } from "./meditate";
 import { ALL_TOOL_INFOS } from "./tool-meta";
 import type { SubAgentContext } from "../sub-agent";
 
@@ -46,6 +47,7 @@ export function getAgentTools(
     runtimeAvailability?: Record<string, boolean>;
     subAgentContext?: SubAgentContext;
     conversationId?: string;
+    generateFn?: (prompt: string) => Promise<import("../soul-meditate").MeditateGenResult>;
   },
 ): ToolRecord {
   const tools: ToolRecord = {};
@@ -60,6 +62,10 @@ export function getAgentTools(
         tools.skill = createSkillTool(enabledSkillNames);
       } else if (info.id === "skill_resource") {
         tools.skill_resource = createSkillResourceTool(enabledSkillNames);
+      } else if (info.id === "meditate") {
+        if (options?.generateFn) {
+          tools.meditate = createMeditateTool(options.generateFn);
+        }
       } else if (info.id === "spawn_agent") {
         // spawn_agent requires a SubAgentContext and depth headroom
         const ctx = options?.subAgentContext;

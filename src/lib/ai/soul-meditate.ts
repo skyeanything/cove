@@ -2,7 +2,8 @@
  * Meditation distillation: cove reflects on accumulated observations
  * and distills them into refined SOUL updates.
  *
- * Triggered at conversation start when enough observations have accumulated.
+ * Triggered at conversation start when enough observations have accumulated,
+ * or manually via the meditate tool.
  * DNA section is immutable. Disposition entry text is immutable (annotations allowed).
  */
 
@@ -23,9 +24,39 @@ const SUBSEQUENT_MEDITATION_THRESHOLD = 5;
 const MEDITATION_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 const OBSERVATIONS_FILE = "observations.md";
 
+export interface MeditationOutcome {
+  success: boolean;
+  error?: string;
+  snapshotTimestamp?: string;
+  updatedFiles?: string[];
+}
+
+/** Concurrency guard: serialize meditation runs */
+let meditationLock: Promise<MeditationOutcome> | null = null;
+
 function formatLimit(chars: number): string {
   const approxWords = Math.round(chars / 6);
   return `~${chars} chars (~${approxWords} words)`;
+}
+
+/**
+ * Force-run meditation regardless of threshold/cooldown.
+ * Returns structured outcome. Serialized via concurrency guard.
+ */
+export async function forceMeditate(
+  generateFn: (prompt: string) => Promise<MeditateGenResult>,
+): Promise<MeditationOutcome> {
+  const run = async (): Promise<MeditationOutcome> => {
+    if (meditationLock) await meditationLock.catch(() => {});
+    return doMeditate(generateFn);
+  };
+  const promise = run();
+  meditationLock = promise;
+  try {
+    return await promise;
+  } finally {
+    if (meditationLock === promise) meditationLock = null;
+  }
 }
 
 /**
@@ -44,7 +75,6 @@ export async function maybeMeditate(
   const obsFile = findPrivateFile(soul.private, OBSERVATIONS_FILE);
   if (!obsFile?.content) return;
 
-  // Check cooldown from SOUL.md marker
   const lastMeditation = extractLastMeditationTime(soul.public);
   if (lastMeditation && Date.now() - lastMeditation < MEDITATION_COOLDOWN_MS) {
     return;
@@ -60,66 +90,70 @@ export async function maybeMeditate(
     `[SOUL] meditation triggered: ${observationCount} observations (threshold: ${threshold})`,
   );
 
-  const snapshotTs = await snapshotSoul();
-  console.info(`[SOUL] snapshot saved: ${snapshotTs}`);
+  const outcome = await forceMeditate(generateFn);
+  if (!outcome.success) {
+    console.warn(`[SOUL] auto-meditation failed: ${outcome.error}`);
+  }
+}
 
-  const dnaBefore = extractDnaSection(soul.public);
-  const dispositionBefore = extractDispositionEntries(soul.public);
-  const prompt = buildMeditationPrompt(soul.public, soul.private);
+async function doMeditate(
+  generateFn: (prompt: string) => Promise<MeditateGenResult>,
+): Promise<MeditationOutcome> {
+  const soul = await readSoul();
+  const obsFile = findPrivateFile(soul.private, OBSERVATIONS_FILE);
+  if (!obsFile?.content) {
+    return { success: false, error: "No observations" };
+  }
 
+  let snapshotTs: string | undefined;
   try {
+    snapshotTs = await snapshotSoul();
+    console.info(`[SOUL] snapshot saved: ${snapshotTs}`);
+
+    const dnaBefore = extractDnaSection(soul.public);
+    const dispositionBefore = extractDispositionEntries(soul.public);
+    const prompt = buildMeditationPrompt(soul.public, soul.private);
     const { text: raw, finishReason } = await generateFn(prompt);
 
     if (finishReason === "length") {
       console.warn("[SOUL] meditation output truncated (finishReason=length) -- aborting");
-      return;
+      return { success: false, error: "Output truncated", snapshotTimestamp: snapshotTs };
     }
 
     const result = parseMeditationResult(raw);
 
     if (!result) {
-      console.warn("[SOUL] meditation parse failed -- aborting");
-      return;
+      return { success: false, error: "Parse failed", snapshotTimestamp: snapshotTs };
     }
 
-    // Verify DNA integrity
     const dnaAfter = extractDnaSection(result.soulMd);
     if (dnaBefore !== dnaAfter) {
-      console.warn("[SOUL] DNA integrity check: FAIL -- aborting");
-      return;
+      return { success: false, error: "DNA integrity check failed", snapshotTimestamp: snapshotTs };
     }
 
-    // Verify Disposition entry text integrity
     const dispositionAfter = extractDispositionEntries(result.soulMd);
     if (!dispositionEntriesMatch(dispositionBefore, dispositionAfter)) {
-      console.warn("[SOUL] Disposition integrity check: FAIL -- aborting");
-      return;
+      return { success: false, error: "Disposition integrity check failed", snapshotTimestamp: snapshotTs };
     }
 
-    // Verify all section headings are present
     const requiredHeadings = ["## My DNA", "## My Disposition", "## My Style", "## Where I'm Growing"];
     const missingHeadings = requiredHeadings.filter((h) => !result.soulMd.includes(h));
     if (missingHeadings.length > 0) {
-      console.warn(`[SOUL] structure check: FAIL -- missing: ${missingHeadings.join(", ")}`);
-      return;
+      return { success: false, error: `Missing sections: ${missingHeadings.join(", ")}`, snapshotTimestamp: snapshotTs };
     }
 
     console.info("[SOUL] integrity checks: PASS");
 
-    // Carry forward any existing private files the model omitted
     const resultFileNames = new Set(result.privateFiles.map((f) => f.name));
     const deletedNames = new Set(result.deleteFiles);
     for (const existing of soul.private) {
       if (existing.name === OBSERVATIONS_FILE) continue;
       if (resultFileNames.has(existing.name)) continue;
       if (deletedNames.has(existing.name)) continue;
-      console.warn(
-        `[SOUL] model omitted ${existing.name} -- carrying forward`,
-      );
+      console.warn(`[SOUL] model omitted ${existing.name} -- carrying forward`);
       result.privateFiles.push(existing);
     }
 
-    // Write updated SOUL.md with meditation timestamp (strip old markers first)
     const cleaned = result.soulMd
       .replace(/\n<!-- last-meditation:\S+ -->/g, "")
       .replace(/\n<!-- soul-format:\d+ -->/g, "");
@@ -127,19 +161,22 @@ export async function maybeMeditate(
     const fmtMarker = "\n<!-- soul-format:1 -->";
     await writeSoul(cleaned.trimEnd() + tsMarker + fmtMarker + "\n");
 
-    // Write private files
+    const updatedFiles = ["SOUL.md"];
     for (const file of result.privateFiles) {
       await writeSoulPrivate(file.name, file.content);
+      updatedFiles.push(file.name);
     }
 
-    // Delete files marked for deletion
     for (const name of result.deleteFiles) {
       await deleteSoulPrivate(name);
     }
 
     console.info("[SOUL] meditation complete");
+    return { success: true, snapshotTimestamp: snapshotTs, updatedFiles };
   } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
     console.error("[SOUL] meditation failed:", e);
+    return { success: false, error: msg, snapshotTimestamp: snapshotTs };
   }
 }
 
