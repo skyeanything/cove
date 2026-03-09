@@ -12,9 +12,15 @@ export const settingsTool = tool({
 - provider: enabled, api_key, base_url (use provider_type to identify)
 - assistant: name, model, temperature, top_p, max_tokens, frequency_penalty, presence_penalty, tools_enabled, web_search_enabled, system_instruction, trust_mode (use assistant_name to identify)
 
-Actions: get (single key), set (change value), list (show all in category)`,
+Actions:
+- get: read a single key
+- set: change a value
+- list: show all in category
+- validate: test provider connection and list available models with capabilities (provider only)
+- fetch_models: refresh cached model list from provider API (provider only)
+- probe: detect model capabilities (tool_calling, reasoning) via lightweight API calls (provider only, requires model_id)`,
   inputSchema: z.object({
-    action: z.enum(["get", "set", "list"]),
+    action: z.enum(["get", "set", "list", "validate", "fetch_models", "probe"]),
     category: z.enum([
       "appearance",
       "layout",
@@ -33,6 +39,10 @@ Actions: get (single key), set (change value), list (show all in category)`,
       .string()
       .optional()
       .describe("Assistant name (for assistant category)"),
+    model_id: z
+      .string()
+      .optional()
+      .describe("Model ID within provider (for probe action)"),
   }),
   execute: async (input) => {
     try {

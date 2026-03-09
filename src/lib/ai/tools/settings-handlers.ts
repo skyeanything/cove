@@ -16,17 +16,17 @@ import {
 import { useDataStore } from "@/stores/dataStore";
 import { usePermissionStore } from "@/stores/permissionStore";
 import { assistantRepo } from "@/db/repos/assistantRepo";
-import { verifyApiKey } from "@/lib/ai/model-verify";
-import { emit } from "@tauri-apps/api/event";
 import { i18n } from "@/i18n";
+import { handleProvider } from "./settings-provider-handler";
 
-interface SettingsInput {
-  action: "get" | "set" | "list";
+export interface SettingsInput {
+  action: string;
   category: string;
   key?: string;
   value?: string;
   provider_type?: string;
   assistant_name?: string;
+  model_id?: string;
 }
 
 export async function handleSettings(input: SettingsInput): Promise<string> {
@@ -224,73 +224,6 @@ async function handleSkills(input: SettingsInput): Promise<string> {
   return `Unknown action: ${input.action}`;
 }
 
-async function handleProvider(input: SettingsInput): Promise<string> {
-  const providers = useDataStore.getState().providers;
-
-  if (input.action === "list" || (input.action === "get" && !input.key)) {
-    if (providers.length === 0) return "No providers configured.";
-    const lines = providers.map(
-      (p) =>
-        `- ${p.name} (type: ${p.type}, enabled: ${!!p.enabled}, api_key: ${maskApiKey(p.api_key)})`,
-    );
-    return `Providers:\n${lines.join("\n")}`;
-  }
-
-  const provider = input.provider_type
-    ? providers.find((p) => p.type === input.provider_type)
-    : null;
-
-  if (input.action === "get") {
-    if (!provider) {
-      return `Provider not found: ${input.provider_type}. Available: ${providers.map((p) => p.type).join(", ")}`;
-    }
-    if (!input.key)
-      return `${provider.name}: type=${provider.type}, enabled=${!!provider.enabled}, api_key=${maskApiKey(provider.api_key)}`;
-    if (input.key === "enabled") return `enabled: ${!!provider.enabled}`;
-    if (input.key === "api_key")
-      return `api_key: ${maskApiKey(provider.api_key)}`;
-    if (input.key === "base_url")
-      return `base_url: ${provider.base_url ?? "(default)"}`;
-    return `Unknown key: ${input.key}`;
-  }
-
-  if (input.action === "set") {
-    if (!provider) {
-      return `Provider not found: ${input.provider_type}. Available: ${providers.map((p) => p.type).join(", ")}`;
-    }
-    if (input.key === "enabled") {
-      const enabled = parseBool(input.value ?? "");
-      if (enabled === null) return `Invalid boolean: ${input.value}`;
-      await useDataStore.getState().updateProvider(provider.id, {
-        enabled: enabled ? 1 : 0,
-      });
-      if (!enabled) await emit("provider-disabled", { providerId: provider.id });
-      return `Provider ${provider.name} ${enabled ? "enabled" : "disabled"}.`;
-    }
-    if (input.key === "api_key") {
-      if (!input.value) return "API key value is required.";
-      try {
-        await verifyApiKey({ ...provider, api_key: input.value });
-      } catch (err) {
-        return `API key verification failed: ${err instanceof Error ? err.message : String(err)}`;
-      }
-      await useDataStore.getState().updateProvider(provider.id, {
-        api_key: input.value,
-      });
-      return `API key updated for ${provider.name}.`;
-    }
-    if (input.key === "base_url") {
-      await useDataStore.getState().updateProvider(provider.id, {
-        base_url: input.value ?? "",
-      });
-      return `Base URL updated for ${provider.name}.`;
-    }
-    return `Unknown key: ${input.key}`;
-  }
-
-  return `Unknown action: ${input.action}`;
-}
-
 async function handleAssistant(input: SettingsInput): Promise<string> {
   const assistants = useDataStore.getState().assistants;
 
@@ -388,13 +321,9 @@ async function setAssistantKey(
 
 const TRUTHY = new Set(["true", "1", "yes", "on"]);
 const FALSY = new Set(["false", "0", "no", "off"]);
-function parseBool(value: string): boolean | null {
+export function parseBool(value: string): boolean | null {
   const v = value.toLowerCase();
   return TRUTHY.has(v) ? true : FALSY.has(v) ? false : null;
 }
 
 function parseNumber(v: string): number | null { const n = Number(v); return isNaN(n) ? null : n; }
-
-function maskApiKey(k: string | undefined): string {
-  return !k ? "(not set)" : k.length <= 8 ? "****" : `${k.slice(0, 4)}...${k.slice(-4)}`;
-}
