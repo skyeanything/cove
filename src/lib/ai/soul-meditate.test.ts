@@ -384,6 +384,18 @@ describe("forceMeditate", () => {
     expect(outcome.error).toContain("Missing sections");
   });
 
+  it("returns structured error when snapshotSoul fails", async () => {
+    mockSoulForForce("- a\n- b");
+    vi.mocked(snapshotSoul).mockRejectedValue(new Error("disk full"));
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const outcome = await forceMeditate(generateFn);
+    expect(outcome.success).toBe(false);
+    expect(outcome.error).toContain("disk full");
+    expect(outcome.snapshotTimestamp).toBeUndefined();
+    expect(generateFn).not.toHaveBeenCalled();
+    spy.mockRestore();
+  });
+
   it("serializes concurrent calls", async () => {
     mockSoulForForce("- a\n- b");
     let callCount = 0;

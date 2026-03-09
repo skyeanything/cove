@@ -100,14 +100,14 @@ async function doMeditate(
     return { success: false, error: "No observations" };
   }
 
-  const snapshotTs = await snapshotSoul();
-  console.info(`[SOUL] snapshot saved: ${snapshotTs}`);
-
-  const dnaBefore = extractDnaSection(soul.public);
-  const dispositionBefore = extractDispositionEntries(soul.public);
-  const prompt = buildMeditationPrompt(soul.public, soul.private);
-
+  let snapshotTs: string | undefined;
   try {
+    snapshotTs = await snapshotSoul();
+    console.info(`[SOUL] snapshot saved: ${snapshotTs}`);
+
+    const dnaBefore = extractDnaSection(soul.public);
+    const dispositionBefore = extractDispositionEntries(soul.public);
+    const prompt = buildMeditationPrompt(soul.public, soul.private);
     const raw = await generateFn(prompt);
     const result = parseMeditationResult(raw);
 

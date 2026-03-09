@@ -80,7 +80,6 @@ export async function runStreamLoop(
     const baseTools = getAgentTools(enabledSkillNames, {
       runtimeAvailability: { office: officeAvailable },
       conversationId,
-      generateFn: meditateGen,
     });
     const subAgentContext: SubAgentContext = {
       model,
