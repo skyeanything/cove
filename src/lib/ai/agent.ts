@@ -8,7 +8,7 @@ export interface AgentOptions {
   model: LanguageModel;
   messages: ModelMessage[];
   system?: string;
-  tools: ToolRecord;
+  tools?: ToolRecord;
   abortSignal?: AbortSignal;
   maxSteps?: number;
   /** 最大输出 token 数，来自 Provider 模型选项时可传入 */
@@ -208,13 +208,13 @@ const DEFAULT_MAX_STEPS = 30;
 
 export function runAgent(options: AgentOptions) {
   const maxSteps = options.maxSteps ?? DEFAULT_MAX_STEPS;
+  const hasTools = options.tools && Object.keys(options.tools).length > 0;
 
   return streamText({
     model: options.model,
     system: options.system ?? buildSystemPrompt({}),
     messages: options.messages,
-    tools: options.tools,
-    stopWhen: stepCountIs(maxSteps),
+    ...(hasTools ? { tools: options.tools, stopWhen: stepCountIs(maxSteps) } : {}),
     abortSignal: options.abortSignal,
     ...(options.maxOutputTokens != null && options.maxOutputTokens > 0
       ? { maxOutputTokens: options.maxOutputTokens }

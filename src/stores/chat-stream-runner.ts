@@ -67,25 +67,35 @@ export async function runStreamLoop(
   const meditateGen = async (p: string) => (await generateText({ model, prompt: p, maxOutputTokens: 1000 })).text;
   maybeMeditate(meditateGen).catch((e) => console.error("[SOUL] meditation error:", e));
 
-  // Build base tools first (without spawn_agent) to use as parentTools
-  const baseTools = getAgentTools(enabledSkillNames, {
-    runtimeAvailability: { office: officeAvailable },
-    conversationId,
-  });
-  const subAgentContext: SubAgentContext = {
-    model,
-    parentTools: baseTools,
-    enabledSkillNames,
-    abortSignal,
-    workspacePath,
-    currentDepth: 0,
-    maxDepth: 2,
-  };
-  const tools = getAgentTools(enabledSkillNames, {
-    runtimeAvailability: { office: officeAvailable },
-    subAgentContext,
-    conversationId,
-  });
+  // Determine if model supports tool calling:
+  // - Explicit true/false from model options takes precedence
+  // - Ollama defaults to false (most local models lack tool support)
+  // - All other providers default to true
+  const supportsTools = modelOption?.tool_calling === true
+    || (modelOption?.tool_calling !== false && provider.type !== "ollama");
+
+  // Build tools only if model supports tool calling
+  let tools: ReturnType<typeof getAgentTools> = {};
+  if (supportsTools) {
+    const baseTools = getAgentTools(enabledSkillNames, {
+      runtimeAvailability: { office: officeAvailable },
+      conversationId,
+    });
+    const subAgentContext: SubAgentContext = {
+      model,
+      parentTools: baseTools,
+      enabledSkillNames,
+      abortSignal,
+      workspacePath,
+      currentDepth: 0,
+      maxDepth: 2,
+    };
+    tools = getAgentTools(enabledSkillNames, {
+      runtimeAvailability: { office: officeAvailable },
+      subAgentContext,
+      conversationId,
+    });
+  }
 
   let streamResult: StreamResult | null = null;
   for (let attempt = 1; attempt <= RETRYABLE_ATTEMPTS; attempt++) {

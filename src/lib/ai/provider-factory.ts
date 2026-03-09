@@ -74,7 +74,9 @@ export function getModel(provider: Provider, modelId: string): LanguageModel {
         apiKey: "ollama",
         baseURL: `${provider.base_url || "http://localhost:11434"}/v1`,
       });
-      return ollama(modelId);
+      // Use .chat() to force Chat Completions API (/v1/chat/completions).
+      // Default (modelId) uses Responses API (/v1/responses) which Ollama doesn't fully support.
+      return ollama.chat(modelId);
     }
 
     case "tencent-cloud": {
