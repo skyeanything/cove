@@ -28,22 +28,38 @@ import type { UserContent } from "ai";
 
 export type { ToolCallInfo, DraftAttachment, MessagePart };
 
+/** Per-conversation lock to prevent overlapping compression runs */
+const compressingConvIds = new Set<string>();
+
 /** Fire-and-forget: compress context after response completes so the NEXT turn benefits.
- * Runs asynchronously — does not block the current response. */
+ * Serialized per conversation — skips if a compression is already running for this convId.
+ * Scoped write — only updates store if the conversation is still active and message count
+ * hasn't changed (user hasn't sent another message while compressing). */
 function compressInBackground(
   convId: string, provider: Provider, modelId: string,
-  setFn: (s: Partial<ChatState>) => void,
+  getFn: () => ChatState, setFn: (s: Partial<ChatState>) => void,
 ): void {
+  if (compressingConvIds.has(convId)) return;
+  compressingConvIds.add(convId);
+  const msgCountAtStart = getFn().messages.length;
   void (async () => {
     const msgs = await messageRepo.getByConversation(convId);
     const opt = getModelOption(provider, modelId);
     const ctxWin = opt?.context_window ?? 128_000;
     const result = await maybeCompressContext(msgs, convId, ctxWin, getModel(provider, modelId));
     if (result.compressed) {
-      console.log(`[context-compression] Background compress done: ${msgs.length} → ${result.messages.length} messages`);
-      setFn({ messages: result.messages, summaryUpTo: result.summaryUpTo ?? null });
+      // Only update store if same conversation is active and no new messages were added
+      const activeId = useDataStore.getState().activeConversationId;
+      const currentCount = getFn().messages.length;
+      if (activeId === convId && currentCount === msgCountAtStart) {
+        console.log(`[context-compression] Background compress done: ${msgs.length} → ${result.messages.length} messages`);
+        setFn({ messages: result.messages, summaryUpTo: result.summaryUpTo ?? null });
+      } else {
+        console.log(`[context-compression] Background compress done but skipped store update (conversation moved on)`);
+      }
     }
-  })().catch((err) => console.warn("[context-compression] Background compress failed:", err));
+  })().catch((err) => console.warn("[context-compression] Background compress failed:", err))
+    .finally(() => compressingConvIds.delete(convId));
 }
 
 interface ChatState {
@@ -233,7 +249,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         set((state) => ({ messages: [...state.messages, { ...assistantMsg, created_at: new Date().toISOString() }] }));
       }
       useStreamStore.getState().endStream(conversationId);
-      compressInBackground(conversationId, provider, modelId, set);
+      compressInBackground(conversationId, provider, modelId, get, set);
       messageRepo.getByConversation(conversationId).then((msgs) =>
         runPostConversationTasks(conversationId, msgs, getModel(provider, modelId)),
       ).catch(() => {});
@@ -321,7 +337,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         set((state) => ({ messages: [...state.messages, { ...assistantMsg, created_at: new Date().toISOString() }] }));
       }
       useStreamStore.getState().endStream(conversationId);
-      compressInBackground(conversationId, provider, modelId, set);
+      compressInBackground(conversationId, provider, modelId, get, set);
       messageRepo.getByConversation(conversationId).then((msgs) =>
         runPostConversationTasks(conversationId, msgs, getModel(provider, modelId)),
       ).catch(() => {});
@@ -396,7 +412,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         set((state) => ({ messages: [...state.messages, { ...assistantMsg, created_at: new Date().toISOString() }] }));
       }
       useStreamStore.getState().endStream(conversationId);
-      compressInBackground(conversationId, provider, modelId, set);
+      compressInBackground(conversationId, provider, modelId, get, set);
       messageRepo.getByConversation(conversationId).then((msgs) =>
         runPostConversationTasks(conversationId, msgs, getModel(provider, modelId)),
       ).catch(() => {});
