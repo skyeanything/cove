@@ -156,7 +156,13 @@ export function AppLayout() {
         e.preventDefault();
         setSearchMessagesOpen(true);
       }
-      if (meta && e.key === ",") {
+      // macOS: ⌘,  |  Windows/Linux: Ctrl+Shift+,
+      // Use e.code ("Comma") instead of e.key (",") because Shift changes e.key to "<" on standard keyboards
+      const isMac = /Mac|iPhone|iPad/.test(navigator.userAgent);
+      if (
+        (isMac && e.metaKey && !e.shiftKey && e.code === "Comma") ||
+        (!isMac && e.ctrlKey && e.shiftKey && e.code === "Comma")
+      ) {
         e.preventDefault();
         openSettingsWindow();
       }
