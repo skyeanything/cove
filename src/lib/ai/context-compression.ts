@@ -7,8 +7,10 @@ import compressionPromptTemplate from "@/prompts/context-compression.md?raw";
  * At 60% of 128K (76800 tokens), models like DeepSeek need ~20s prefill.
  * 40% of 128K = 51200 tokens keeps first-token latency under ~10s. */
 const DEFAULT_THRESHOLD = 0.40;
-/** Ratio of context window to keep as recent messages */
-const DEFAULT_KEEP_RATIO = 0.4;
+/** Ratio of context window to keep as recent messages.
+ * Lower than the trigger threshold (0.40) so compression actually frees space.
+ * 0.20 × 128K = 25600 tokens ≈ last ~30 messages of a typical conversation. */
+const DEFAULT_KEEP_RATIO = 0.20;
 /** Minimum number of messages before compression is considered (2 complete turns) */
 const MIN_MESSAGES_FOR_COMPRESSION = 4;
 /** Max output tokens for the summary generation */
@@ -166,12 +168,14 @@ export async function generateSummary(
   };
 }
 
-/** Estimate tokens for a single message (rough: chars / 4) */
+/** Estimate tokens for a single message.
+ * Uses chars/3 (not chars/4) to account for per-message structural overhead
+ * (role tags, JSON framing) that chars/4 consistently underestimates. */
 function estimateMessageTokens(msg: Message): number {
   // parts JSON includes the assistant text already in content, so use the
   // larger of the two to avoid double-counting.
   const chars = Math.max(msg.content?.length ?? 0, msg.parts?.length ?? 0);
-  return Math.ceil(chars / 4);
+  return Math.ceil(chars / 3);
 }
 
 /** Serialize messages into a human-readable format for the summary prompt */

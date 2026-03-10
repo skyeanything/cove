@@ -146,7 +146,7 @@ describe("selectCompressionBoundary", () => {
     const msgs = Array.from({ length: 10 }, (_, i) =>
       makeMessage({ content: "x".repeat(1000), created_at: `2025-01-01T00:0${i}:00Z` }),
     );
-    // 10 msgs × 1000 chars ≈ 250 tokens each; keepBudget = 200 * 0.4 = 80 tokens
+    // 10 msgs × 1000 chars ≈ 334 tokens each (chars/3); keepBudget = 200 * 0.4 = 80 tokens
     const { toCompress, toKeep } = selectCompressionBoundary(msgs, 200, 0.4);
     expect(toCompress.length).toBeGreaterThan(0);
     expect(toKeep.length).toBeGreaterThan(0);
