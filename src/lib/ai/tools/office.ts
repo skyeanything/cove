@@ -50,13 +50,8 @@ function formatOfficellmOutput(command: string, raw: string): string {
 
 export const officeTool = tool({
   description:
-    "Operate on Office documents (DOCX/PPTX/XLSX) via officellm. " +
-    "Pass a command name and optional args object. " +
-    "Commands: detect, doctor, open, create, close, save, status, or any document command. " +
-    "IMPORTANT: Load the OfficeLLM skill first to get correct command names. " +
-    "Examples: {command: 'open', args: {path: 'doc.docx'}}, " +
-    "{command: 'replace-text', args: {find: 'old', replace: 'new'}}, " +
-    "{command: 'from-markdown', args: {i: 'in.md', o: 'out.docx'}}.",
+    "Operate on Office documents (DOCX/PPTX/XLSX). Pass command + args. " +
+    "Load OfficeLLM skill first for command reference.",
   inputSchema: z.object({
     command: z
       .string()

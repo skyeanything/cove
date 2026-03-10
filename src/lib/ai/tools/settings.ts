@@ -3,24 +3,7 @@ import { z } from "zod/v4";
 import { handleSettings } from "./settings-handlers";
 
 export const settingsTool = tool({
-  description: `Read and modify application settings. Categories and their keys:
-
-- appearance: theme (light|dark|system)
-- layout: leftSidebarOpen, leftSidebarWidth, chatWidth, filePanelOpen, fileTreeOpen, fileTreeWidth, filePreviewWidth, fileTreeShowHidden
-- general: locale (zh|en), sendShortcut (enter|modifierEnter)
-- skills: enabled (comma-separated names), dirPaths
-- provider: enabled, api_key, base_url (use provider_type or provider_id to identify)
-- assistant: name, model, temperature, top_p, max_tokens, frequency_penalty, presence_penalty, tools_enabled, web_search_enabled, system_instruction, trust_mode (use assistant_name to identify)
-
-Actions:
-- get: read a single key
-- set: change a value
-- list: show all in category
-- create: create a custom provider (provider only, requires provider_name; optional: protocol, api_key, base_url)
-- delete: delete a custom provider by provider_id (provider only)
-- validate: test provider connection and list available models with capabilities (provider only)
-- fetch_models: refresh cached model list from provider API (provider only)
-- probe: detect model capabilities (tool_calling, reasoning) via lightweight API calls (provider only, requires model_id)`,
+  description: `Read/modify app settings. Categories: appearance, layout, general, skills, provider, assistant. Actions: get, set, list, create (provider), delete (provider), validate (provider), fetch_models (provider), probe (provider, needs model_id). Use 'list' to discover available keys in a category.`,
   inputSchema: z.object({
     action: z.enum(["get", "set", "list", "create", "delete", "validate", "fetch_models", "probe"]),
     category: z.enum([

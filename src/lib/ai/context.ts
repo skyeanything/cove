@@ -23,11 +23,7 @@ export function buildSystemPrompt(options: {
   }
 
   if (options.officeAvailable) {
-    parts.push(
-      "The office tool is available for document operations (DOCX/PPTX/XLSX). " +
-      "Use office(command, args) for single operations; use cove_interpreter with the officellm bridge API for multi-step workflows. " +
-      "Load the 'OfficeLLM' skill for the command reference.",
-    );
+    parts.push("Office tool available for DOCX/PPTX/XLSX. Load 'OfficeLLM' skill for commands.");
   }
 
   if (options.assistant?.system_instruction) {
@@ -42,11 +38,8 @@ export function buildSystemPrompt(options: {
     parts.push(skill.content);
   }
 
-  // Operational rules (tool-usage, not identity — kept outside SOUL)
-  parts.push("Use dedicated tools over writing code. Call cove_interpreter only when tools are insufficient — e.g., data processing, combining results, multi-step logic.");
-  parts.push("Write/edit files only after reading them first. Dangerous bash commands require user approval. When multiple valid approaches exist, present options to the user.");
-  parts.push("Use the skill tool to load domain-specific instructions when a task matches an available skill in that tool.");
-  parts.push("Use the spawn_agent tool to delegate independent subtasks to a sub-agent when the task can be completed without real-time user interaction.");
+  // Operational rules (condensed — details in cove-core skill)
+  parts.push("Use dedicated tools first. Load skills for domain-specific tasks. Use spawn_agent for independent subtasks.");
 
   return parts.join("\n\n");
 }
