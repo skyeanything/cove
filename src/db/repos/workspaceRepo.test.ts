@@ -82,7 +82,7 @@ describe("workspaceRepo", () => {
     it("inserts workspace with 4 parameters", async () => {
       await workspaceRepo.create({ id: "ws-1", name: "My Project", path: "/tmp/project", is_default: 0 });
       expect(db.execute).toHaveBeenCalledWith(
-        "INSERT OR IGNORE INTO workspaces (id, name, path, is_default) VALUES ($1, $2, $3, $4)",
+        "INSERT INTO workspaces (id, name, path, is_default) VALUES ($1, $2, $3, $4)",
         ["ws-1", "My Project", "/tmp/project", 0],
       );
     });

@@ -28,7 +28,7 @@ export const workspaceRepo = {
   async create(ws: Omit<Workspace, "created_at">): Promise<void> {
     const db = await getDb();
     await db.execute(
-      "INSERT OR IGNORE INTO workspaces (id, name, path, is_default) VALUES ($1, $2, $3, $4)",
+      "INSERT INTO workspaces (id, name, path, is_default) VALUES ($1, $2, $3, $4)",
       [ws.id, ws.name, ws.path, ws.is_default],
     );
   },
