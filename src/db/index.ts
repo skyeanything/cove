@@ -8,6 +8,21 @@ async function runMigrations(database: Database): Promise<void> {
     "ALTER TABLE conversations ADD COLUMN provider_type TEXT",
     "CREATE VIRTUAL TABLE IF NOT EXISTS message_fts USING fts5(body, conversation_id UNINDEXED, message_id UNINDEXED)",
     "ALTER TABLE conversations ADD COLUMN summary_up_to TEXT",
+    "ALTER TABLE attachments ADD COLUMN workspace_path TEXT",
+    "ALTER TABLE attachments ADD COLUMN parsed_content TEXT",
+    "ALTER TABLE attachments ADD COLUMN parsed_summary TEXT",
+    `CREATE TABLE IF NOT EXISTS sub_agents (
+      id TEXT PRIMARY KEY,
+      name TEXT NOT NULL,
+      description TEXT DEFAULT '',
+      icon TEXT,
+      system_prompt TEXT DEFAULT '',
+      skill_names TEXT DEFAULT '[]',
+      tool_ids TEXT DEFAULT '[]',
+      enabled INTEGER DEFAULT 1,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    )`,
     // SOUL: conversation summaries for archive retrieval
     `CREATE TABLE IF NOT EXISTS conversation_summaries (
       id TEXT PRIMARY KEY,
@@ -18,6 +33,10 @@ async function runMigrations(database: Database): Promise<void> {
       FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
     )`,
     "CREATE VIRTUAL TABLE IF NOT EXISTS conversation_summaries_fts USING fts5(summary, keywords, conversation_id UNINDEXED)",
+    "ALTER TABLE sub_agents ADD COLUMN connector_ids TEXT DEFAULT '[]'",
+    "ALTER TABLE sub_agents ADD COLUMN created_by TEXT DEFAULT 'User'",
+    "ALTER TABLE sub_agents ADD COLUMN model_id TEXT",
+    "ALTER TABLE sub_agents ADD COLUMN provider_id TEXT",
   ];
   for (const sql of migrations) {
     try {
@@ -44,7 +63,9 @@ async function runMigrations(database: Database): Promise<void> {
   }
   // 首次创建 message_fts 后从 messages 回填
   try {
-    const rows = (await database.select("SELECT COUNT(*) as c FROM message_fts")) as { c: number }[];
+    const rows = (await database.select(
+      "SELECT COUNT(*) as c FROM message_fts",
+    )) as { c: number }[];
     if (rows[0]?.c === 0) {
       await database.execute(
         `INSERT INTO message_fts(conversation_id, message_id, body)

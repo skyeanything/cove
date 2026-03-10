@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
-import { Check, Cpu, Eye, ImagePlus, Image, Wrench, Brain, Database } from "lucide-react";
+import { Check, Cpu, Eye, ImagePlus, Image, Wrench, Brain, Database, ChevronDown } from "lucide-react";
 import {
   Popover,
   PopoverContent,
@@ -120,6 +120,7 @@ export function ModelSelector({ open, onOpenChange }: ModelSelectorProps) {
       <span className="min-w-0 max-w-[380px] truncate text-[11px] font-medium leading-snug -translate-y-px">
         {currentModelId ?? t("chat.selectModel")}
       </span>
+      <ChevronDown className="size-3 shrink-0 text-muted-foreground/60" strokeWidth={1.5} />
     </button>
   );
 
@@ -143,7 +144,7 @@ export function ModelSelector({ open, onOpenChange }: ModelSelectorProps) {
             placeholder={t("modelSelector.searchPlaceholder")}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="h-8 rounded-lg text-[13px]"
+            className="h-8 rounded-[4px] border-border text-[13px] focus-visible:border-accent focus-visible:ring-0"
           />
         </div>
 

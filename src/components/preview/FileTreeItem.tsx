@@ -5,13 +5,10 @@ import {
   ChevronDown,
   Folder,
   FolderOpen,
-  FilePlus,
   FolderPlus,
   Pencil,
   FileUp,
   Copy,
-  CopyPlus,
-  ExternalLink,
   Link,
   Trash2,
   Scissors,
@@ -38,7 +35,7 @@ export function FileTreeItem({
   entry,
   workspaceRoot,
   selectedPath,
-  focusedPath,
+  selectedEntries,
   expandedDirs,
   loadedChildren,
   editingPath,
@@ -47,13 +44,10 @@ export function FileTreeItem({
   onToggleExpand,
   onSelectFile,
   onLoadChildren,
-  onNewFile,
   onNewFolder,
   onCopy,
   onCut,
   onPaste,
-  onDuplicate,
-  onOpenDefaultApp,
   onRename,
   onRevealInFinder,
   onCopyRelativePath,
@@ -72,22 +66,19 @@ export function FileTreeItem({
   entry: ListDirEntry;
   workspaceRoot: string;
   selectedPath: string | null;
-  focusedPath?: string | null;
+  selectedEntries?: string[];
   expandedDirs: Set<string>;
   loadedChildren: Record<string, ListDirEntry[]>;
   editingPath: string | null;
   clipboardSourcePath?: string | null;
   clipboardMode?: "copy" | "cut" | null;
   onToggleExpand: (path: string) => void;
-  onSelectFile: (path: string) => void;
+  onSelectFile: (e: React.MouseEvent, path: string, isDir: boolean, name: string) => void;
   onLoadChildren: (path: string, entries: ListDirEntry[]) => void;
-  onNewFile: (parentPath: string) => void;
   onNewFolder: (parentPath: string) => void;
   onCopy?: (path: string) => void;
   onCut?: (path: string) => void;
   onPaste?: (targetDirPath: string) => void;
-  onDuplicate?: (path: string) => void;
-  onOpenDefaultApp?: (path: string) => void;
   onRename: (path: string) => void;
   onRevealInFinder: (path: string) => void;
   onCopyRelativePath: (path: string) => void;
@@ -106,25 +97,27 @@ export function FileTreeItem({
   const { t } = useTranslation();
   const isDir = entry.isDir;
   const path = entry.path;
-  const isSelected = selectedPath === path;
+  const isSelected = selectedEntries
+    ? selectedEntries.includes(path)
+    : selectedPath === path;
   const isExpanded = expandedDirs.has(path);
   const isDragged = draggedPath === path;
   const isDropTarget = dropTargetPath === path && isDir;
   const children = loadedChildren[path];
   const isEditing = editingPath === path;
-  const isFocused = focusedPath === path;
   const isCut = clipboardMode === "cut" && clipboardSourcePath === path;
   const inputRef = useRef<HTMLInputElement>(null);
-  const rowRef = useRef<HTMLButtonElement>(null);
 
-  const handleClick = useCallback(() => {
-    if (isEditing) return;
-    if (isDir) {
-      onToggleExpand(path);
-    } else {
-      onSelectFile(path);
-    }
-  }, [isDir, isEditing, path, onToggleExpand, onSelectFile]);
+  const parentPath = path.includes("/") ? path.replace(/\/[^/]+$/, "") : "";
+
+  const handleClick = useCallback(
+    (e: React.MouseEvent) => {
+      if (isEditing) return;
+      onSelectFile(e, path, isDir, entry.name);
+      if (isDir) onToggleExpand(path);
+    },
+    [isDir, isEditing, path, entry.name, onToggleExpand, onSelectFile],
+  );
 
   const handleExpandClick = useCallback(
     (e: React.MouseEvent) => {
@@ -142,18 +135,12 @@ export function FileTreeItem({
     }
   }, [isEditing]);
 
-  useEffect(() => {
-    if (isFocused && rowRef.current) {
-      rowRef.current.scrollIntoView({ block: "nearest" });
-    }
-  }, [isFocused]);
-
   // Suppress unused param - onLoadChildren kept for API compatibility
   void onLoadChildren;
-  // Suppress unused param - workspaceRoot kept for API compatibility
   void workspaceRoot;
 
-  const parentPath = path.includes("/") ? path.replace(/\/[^/]+$/, "") : "";
+  // Paste target: for dirs paste into dir, for files paste into parent dir
+  const pasteTargetPath = isDir ? path : parentPath;
 
   const rowContent = (
     <>
@@ -221,10 +208,7 @@ export function FileTreeItem({
       <ContextMenu>
         <ContextMenuTrigger asChild>
           <button
-            ref={rowRef}
             type="button"
-            data-tree-path={path}
-            data-tree-is-dir={String(isDir)}
             onClick={handleClick}
             draggable
             onDragStart={(e) => onDnDStart?.(e, path)}
@@ -234,11 +218,11 @@ export function FileTreeItem({
             onDrop={(e) => { if (isDir) onDnDDrop?.(e, path); }}
             className={cn(
               "relative flex w-full items-center gap-1.5 rounded-[2px] mx-1 px-2 py-1 text-left text-[13px]",
-              isSelected ? "font-medium text-foreground" : "text-foreground-secondary hover:bg-background-tertiary hover:text-foreground",
+              isSelected
+                ? "bg-background-tertiary text-foreground"
+                : "text-foreground-secondary hover:bg-background-tertiary hover:text-foreground",
               isDragged && "opacity-40",
               isDropTarget && "ring-1 ring-accent/50 bg-accent/5",
-              isFocused && !isSelected && "bg-background-tertiary text-foreground",
-              isFocused && "ring-2 ring-accent",
               isCut && "opacity-50",
             )}
           >
@@ -246,15 +230,15 @@ export function FileTreeItem({
           </button>
         </ContextMenuTrigger>
         <ContextMenuContent className="w-48 rounded-lg border border-border shadow-lg">
-          <ContextMenuItem className="gap-2 text-[13px]" onClick={() => onNewFile(isDir ? path : parentPath)}>
-            <FilePlus className="size-4" strokeWidth={1.5} />
-            {t("explorer.newFile")}
-          </ContextMenuItem>
-          <ContextMenuItem className="gap-2 text-[13px]" onClick={() => onNewFolder(isDir ? path : parentPath)}>
-            <FolderPlus className="size-4" strokeWidth={1.5} />
-            {t("explorer.newFolder")}
-          </ContextMenuItem>
-          <ContextMenuSeparator />
+          {isDir && (
+            <>
+              <ContextMenuItem className="gap-2 text-[13px]" onClick={() => onNewFolder(path)}>
+                <FolderPlus className="size-4" strokeWidth={1.5} />
+                {t("explorer.newFolder")}
+              </ContextMenuItem>
+              <ContextMenuSeparator />
+            </>
+          )}
           <ContextMenuItem className="gap-2 text-[13px]" onClick={() => onCopy?.(path)}>
             <Copy className="size-4" strokeWidth={1.5} />
             {t("explorer.copy")}
@@ -263,27 +247,17 @@ export function FileTreeItem({
             <Scissors className="size-4" strokeWidth={1.5} />
             {t("explorer.cut")}
           </ContextMenuItem>
-          {clipboardSourcePath && isDir && (
-            <ContextMenuItem className="gap-2 text-[13px]" onClick={() => onPaste?.(path)}>
+          {clipboardSourcePath && (
+            <ContextMenuItem className="gap-2 text-[13px]" onClick={() => onPaste?.(pasteTargetPath)}>
               <Clipboard className="size-4" strokeWidth={1.5} />
               {t("explorer.paste")}
             </ContextMenuItem>
           )}
-          <ContextMenuItem className="gap-2 text-[13px]" onClick={() => onDuplicate?.(path)}>
-            <CopyPlus className="size-4" strokeWidth={1.5} />
-            {t("explorer.duplicate")}
-          </ContextMenuItem>
           <ContextMenuSeparator />
           <ContextMenuItem className="gap-2 text-[13px]" onClick={() => onRename(path)}>
             <Pencil className="size-4" strokeWidth={1.5} />
             {t("explorer.rename")}
           </ContextMenuItem>
-          {!isDir && (
-            <ContextMenuItem className="gap-2 text-[13px]" onClick={() => onOpenDefaultApp?.(path)}>
-              <ExternalLink className="size-4" strokeWidth={1.5} />
-              {t("explorer.openInDefaultApp")}
-            </ContextMenuItem>
-          )}
           <ContextMenuItem className="gap-2 text-[13px]" onClick={() => onRevealInFinder(path)}>
             <FileUp className="size-4" strokeWidth={1.5} />
             {t("explorer.revealInFinder")}
@@ -316,7 +290,7 @@ export function FileTreeItem({
               entry={child}
               workspaceRoot={workspaceRoot}
               selectedPath={selectedPath}
-              focusedPath={focusedPath}
+              selectedEntries={selectedEntries}
               expandedDirs={expandedDirs}
               loadedChildren={loadedChildren}
               editingPath={editingPath}
@@ -325,13 +299,10 @@ export function FileTreeItem({
               onToggleExpand={onToggleExpand}
               onSelectFile={onSelectFile}
               onLoadChildren={onLoadChildren}
-              onNewFile={onNewFile}
               onNewFolder={onNewFolder}
               onCopy={onCopy}
               onCut={onCut}
               onPaste={onPaste}
-              onDuplicate={onDuplicate}
-              onOpenDefaultApp={onOpenDefaultApp}
               onRename={onRename}
               onRevealInFinder={onRevealInFinder}
               onCopyRelativePath={onCopyRelativePath}

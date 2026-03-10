@@ -1,8 +1,3 @@
-import {
-  CornerDownRight,
-  Box,
-  Copy,
-} from "lucide-react";
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useChatStore } from "@/stores/chatStore";
@@ -12,13 +7,10 @@ import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useSkillsStore } from "@/stores/skillsStore";
 import { getModelOption } from "@/lib/ai/model-service";
-import { estimateNextTurnTokens } from "@/lib/ai/context-compression";
-import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { listSkills } from "@/lib/ai/skills/loader";
 import { USER_VISIBLE_TOOLS } from "@/lib/ai/tools/tool-meta";
 import { useMentionDetect } from "@/hooks/useMentionDetect";
 import { useMentionFiles } from "@/hooks/useMentionFiles";
-import { WorkspacePopover } from "./WorkspacePopover";
 import { AttachmentBar } from "./AttachmentBar";
 import { MentionPopover, buildMentionItems } from "./MentionPopover";
 import { ChatToolbar } from "./ChatToolbar";
@@ -60,7 +52,6 @@ export function ChatInput({
   const providers = useDataStore((s) => s.providers);
   const modelSelectorOpen = onModelSelectorOpenChange != null ? (modelSelectorOpenProp ?? false) : modelSelectorOpenLocal;
   const setModelSelectorOpen = onModelSelectorOpenChange ?? setModelSelectorOpenLocal;
-  const messages = useChatStore((s) => s.messages);
   const error = useChatStore((s) => s.error);
   const sendMessageShortcut = useSettingsStore((s) => s.sendMessageShortcut);
   const activeWorkspace = useWorkspaceStore((s) => s.activeWorkspace);
@@ -127,16 +118,6 @@ export function ChatInput({
   );
 
   // --- context / model ---
-  const sessionTokens = estimateNextTurnTokens(messages, message.length);
-  const contextLimit = useMemo(() => {
-    if (!modelId || !providerId) return 0;
-    const prov = providers.find((p) => p.id === providerId);
-    if (!prov) return 0;
-    return getModelOption(prov, modelId)?.context_window ?? 128_000;
-  }, [modelId, providerId, providers]);
-  const contextPercent = contextLimit === 0 ? 0 : Math.min(100, Math.round((sessionTokens / contextLimit) * 100));
-  const fmtNum = (n: number) => (n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : String(n));
-  const contextTooltip = t("chat.contextUsedFormula", { used: fmtNum(sessionTokens), limit: fmtNum(contextLimit), percent: contextPercent });
 
   const provider = useMemo(() => (providerId ? providers.find((p) => p.id === providerId) : undefined), [providerId, providers]);
   const modelSupportsVision = useMemo(() => {
@@ -145,6 +126,8 @@ export function ChatInput({
     return opt?.vision === true || opt?.image_in === true;
   }, [provider, modelId]);
   const canSend = Boolean((message.trim() || draftAttachments.length > 0) && modelId && !isStreaming);
+  const [webSearchEnabled, setWebSearchEnabled] = useState(false);
+  const toggleWebSearch = useCallback(() => setWebSearchEnabled((v) => !v), []);
 
   useEffect(() => { const el = textareaRef.current; if (!el) return; el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 200) + "px"; }, [message]);
 
@@ -154,8 +137,12 @@ export function ChatInput({
     if (!canSend) return;
     if (draftAttachments.some((a) => isImageAttachment(a)) && !modelSupportsVision) { setAttachError(t("chat.visionNotSupported")); return; }
     setAttachError(null);
+    const content = message.trim();
     setMessage("");
-    sendMessage(message.trim());
+    const withHint = webSearchEnabled
+      ? `${content}\n\n[Web search enabled: use fetch_url to retrieve current information when needed, e.g. https://html.duckduckgo.com/html/?q=YOUR_QUERY]`
+      : content;
+    sendMessage(withHint);
   };
 
   const handlePaste = async (e: React.ClipboardEvent) => {
@@ -214,9 +201,6 @@ export function ChatInput({
     }
   };
 
-  const handleRevealWorkspace = async () => { if (activeWorkspace) await revealItemInDir(activeWorkspace.path); };
-  const handleCopyWorkspacePath = () => { if (activeWorkspace) navigator.clipboard.writeText(activeWorkspace.path); };
-
   return (
     <div className="shrink-0 px-4 pb-3 pt-1">
       <div className="mx-auto max-w-[896px]">
@@ -227,33 +211,14 @@ export function ChatInput({
           <div className="mb-2 rounded-lg bg-destructive/10 px-3 py-2 text-[13px] text-destructive">{error ?? attachError}</div>
         )}
 
-        <div className="rounded-lg border border-border transition-colors focus-within:border-ring" onDrop={handleDrop} onDragOver={handleDragOver}>
+        <div className="rounded-lg border border-border transition-colors hover:border-accent focus-within:border-accent" onDrop={handleDrop} onDragOver={handleDragOver}>
           <AttachmentBar attachments={draftAttachments} onRemove={removeDraftAttachment} />
-          {activeWorkspace && (
-            <div className="flex items-center gap-1.5 border-b border-border/50 px-3 py-1">
-              <WorkspacePopover trigger={
-                <button type="button" className="flex shrink-0 cursor-pointer items-center gap-1 rounded px-0.5 py-0.5 text-muted-foreground/70 hover:bg-background-tertiary hover:text-foreground" title={t("chat.workspace")}>
-                  <Box className="size-3.5" strokeWidth={2.5} />
-                  <span className="text-[10px] font-medium tracking-wide uppercase">{t("chat.workspace")}</span>
-                </button>
-              } />
-              <span className="min-w-0 truncate text-[11px] text-muted-foreground">{activeWorkspace.path}</span>
-              <div className="ml-auto flex shrink-0 items-center gap-0.5">
-                <button type="button" onClick={handleCopyWorkspacePath} className="cursor-pointer rounded p-0.5 text-muted-foreground hover:bg-background-tertiary hover:text-foreground" title={t("chat.copyPath")}>
-                  <Copy className="size-3" strokeWidth={1.5} />
-                </button>
-                <button type="button" onClick={handleRevealWorkspace} className="cursor-pointer rounded p-0.5 text-muted-foreground hover:bg-background-tertiary hover:text-foreground" title={t("chat.revealInFolder")}>
-                  <CornerDownRight className="size-3" strokeWidth={1.5} />
-                </button>
-              </div>
-            </div>
-          )}
 
           <textarea
             ref={textareaRef} value={message} onChange={handleChange}
             onCompositionEnd={() => { lastCompositionEndRef.current = Date.now(); }}
             onKeyDown={handleKeyDown} onPaste={handlePaste}
-            placeholder={modelId ? t("chat.placeholder", { shortcut: sendMessageShortcut === "enter" ? t("settings.general.shortcutEnter") : t("settings.general.shortcutModifierEnter") }) : t("chat.placeholderNoModel")}
+            placeholder={modelId ? t("chat.placeholder") : t("chat.placeholderNoModel")}
             rows={1} disabled={!modelId}
             className="block min-h-[44px] max-h-[200px] w-full resize-none bg-transparent px-4 pt-3 pb-1 text-[14px] leading-[1.5] placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
           />
@@ -283,7 +248,7 @@ export function ChatInput({
 
           <ChatToolbar
             isStreaming={isStreaming} canSend={canSend}
-            contextPercent={contextPercent} contextTooltip={contextTooltip}
+            webSearchEnabled={webSearchEnabled} onWebSearchToggle={toggleWebSearch}
             modelSelectorOpen={modelSelectorOpen} onModelSelectorOpenChange={setModelSelectorOpen}
             onAttachFiles={handleAttachFiles} onSend={handleSend} onStop={stopGeneration}
           />

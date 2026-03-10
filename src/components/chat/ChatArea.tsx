@@ -1,22 +1,24 @@
 import { ChatInput } from "./ChatInput";
 import { ChatHeader } from "./ChatHeader";
 import { MessageList } from "./MessageList";
+import type { ReactNode } from "react";
 
 interface ChatAreaProps {
-  leftSidebarOpen: boolean;
   modelSelectorOpen?: boolean;
   onModelSelectorOpenChange?: (open: boolean) => void;
+  aboveInput?: ReactNode;
 }
 
 export function ChatArea({
-  leftSidebarOpen,
   modelSelectorOpen,
   onModelSelectorOpenChange,
+  aboveInput,
 }: ChatAreaProps) {
   return (
     <div className="relative flex min-w-0 flex-1 flex-col overflow-hidden bg-background">
-      <ChatHeader leftSidebarOpen={leftSidebarOpen} />
+      <ChatHeader />
       <MessageList />
+      {aboveInput}
       <ChatInput
         modelSelectorOpen={modelSelectorOpen}
         onModelSelectorOpenChange={onModelSelectorOpenChange}

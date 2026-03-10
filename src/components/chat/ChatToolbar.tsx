@@ -5,22 +5,16 @@ import {
   Square,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { ContextRing } from "./ContextRing";
 import { ToolbarIcon } from "./ToolbarIcon";
 import { SkillsPopover } from "./SkillsPopover";
 import { ModelSelector } from "./ModelSelector";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { cn } from "@/lib/utils";
 
 interface ChatToolbarProps {
   isStreaming: boolean;
   canSend: boolean;
-  contextPercent: number;
-  contextTooltip: string;
+  webSearchEnabled: boolean;
+  onWebSearchToggle: () => void;
   modelSelectorOpen: boolean;
   onModelSelectorOpenChange: (open: boolean) => void;
   onAttachFiles: () => void;
@@ -31,8 +25,8 @@ interface ChatToolbarProps {
 export function ChatToolbar({
   isStreaming,
   canSend,
-  contextPercent,
-  contextTooltip,
+  webSearchEnabled,
+  onWebSearchToggle,
   modelSelectorOpen,
   onModelSelectorOpenChange,
   onAttachFiles,
@@ -44,22 +38,21 @@ export function ChatToolbar({
   return (
     <div className="flex items-center px-2 pb-2 pt-1">
       <ToolbarIcon icon={<Paperclip />} title={t("chat.attachFiles")} onClick={onAttachFiles} />
-      <ToolbarIcon icon={<Globe />} title={t("chat.webSearch")} />
+      <button
+        type="button"
+        onClick={onWebSearchToggle}
+        title={t("chat.webSearch")}
+        className={cn(
+          "flex size-7 shrink-0 items-center justify-center rounded-md transition-colors",
+          webSearchEnabled
+            ? "bg-accent/15 text-accent hover:bg-accent/20"
+            : "text-muted-foreground hover:bg-background-tertiary hover:text-foreground",
+        )}
+      >
+        <Globe className="size-[15px]" strokeWidth={1.5} />
+      </button>
       <SkillsPopover />
       <ModelSelector open={modelSelectorOpen} onOpenChange={onModelSelectorOpenChange} />
-
-      <TooltipProvider delayDuration={300}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <span className="flex size-7 shrink-0 cursor-default items-center justify-center rounded-md text-muted-foreground">
-              <ContextRing percent={contextPercent} />
-            </span>
-          </TooltipTrigger>
-          <TooltipContent side="top" sideOffset={4}>
-            {contextTooltip}
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
 
       <div className="flex-1" />
 
@@ -75,7 +68,7 @@ export function ChatToolbar({
         <button
           onClick={onSend}
           disabled={!canSend}
-          className="ml-1 flex size-6 items-center justify-center rounded-lg bg-foreground text-background transition-opacity disabled:opacity-30"
+          className="ml-1 flex size-6 items-center justify-center rounded-lg bg-accent text-accent-foreground transition-opacity disabled:opacity-30"
           title={t("chat.sendMessage")}
         >
           <ArrowUp className="size-4" strokeWidth={2} />

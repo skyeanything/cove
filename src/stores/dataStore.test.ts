@@ -28,9 +28,17 @@ vi.mock("@/db/repos/promptRepo", () => ({
 vi.mock("@/db/repos/summaryRepo", () => ({
   summaryRepo: { deleteByConversation: vi.fn() },
 }));
-vi.mock("@/stores/workspaceStore", () => ({
-  useWorkspaceStore: { getState: vi.fn(() => ({ init: vi.fn() })) },
-}));
+vi.mock("@/stores/workspaceStore", () => {
+  const mockStore = {
+    init: vi.fn(),
+    loadFromConversation: vi.fn(),
+  };
+  return {
+    useWorkspaceStore: {
+      getState: vi.fn(() => mockStore),
+    },
+  };
+});
 
 import { useDataStore } from "./dataStore";
 import { assistantRepo } from "@/db/repos/assistantRepo";
@@ -110,8 +118,8 @@ describe("dataStore", () => {
 
     it("calls workspaceStore.init()", async () => {
       const mockInit = vi.fn().mockResolvedValue(undefined);
-      vi.mocked(useWorkspaceStore.getState).mockReturnValue(
-        { init: mockInit } as unknown as ReturnType<typeof useWorkspaceStore.getState>,
+      vi.mocked(useWorkspaceStore.getState).mockReturnValueOnce(
+        { init: mockInit, loadFromConversation: vi.fn() } as unknown as ReturnType<typeof useWorkspaceStore.getState>,
       );
 
       vi.mocked(assistantRepo.getAll).mockResolvedValue([]);

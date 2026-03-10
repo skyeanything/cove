@@ -13,14 +13,18 @@ use crate::officellm::resolve;
 /// 使用 ~/.officellm/bin/officellm to-pdf 将 DOCX 转为 PDF。
 /// 同步阻塞，在 spawn_blocking 线程池中执行。
 pub(super) fn convert_docx_via_officellm(app: tauri::AppHandle, data_url: String) -> Result<String, String> {
+    log::info!("[office-preview] convert_docx_via_officellm called, data_url len={}", data_url.len());
+
     // ── 1. 解码文档 ─────────────────────────────────────────────────────────────
     let b64 = data_url
         .splitn(2, ',')
         .nth(1)
         .ok_or("无效的 data URL")?;
+    log::info!("[office-preview] base64 payload len={}", b64.len());
     let bytes = BASE64
         .decode(b64)
         .map_err(|e| format!("Base64 解码失败: {e}"))?;
+    log::info!("[office-preview] decoded docx bytes={}", bytes.len());
 
     // ── 2. L2 磁盘缓存命中检查 ──────────────────────────────────────────────────
     let hash = fnv1a(&bytes);
@@ -47,13 +51,18 @@ pub(super) fn convert_docx_via_officellm(app: tauri::AppHandle, data_url: String
     crate::officellm::init::wait_for_init();
 
     let (bin, is_bundled) = resolve::resolve_bin().ok_or_else(|| {
+        log::error!("[office-preview] resolve_bin() returned None, officellm not found");
         let _ = fs::remove_file(&input_path);
         "未找到 officellm".to_string()
     })?;
+    log::info!("[office-preview] resolved bin={} is_bundled={}", bin.display(), is_bundled);
+
     let home = resolve::resolve_home(is_bundled, &app).map_err(|e| {
+        log::error!("[office-preview] resolve_home failed: {e}");
         let _ = fs::remove_file(&input_path);
         e
     })?;
+    log::info!("[office-preview] resolved home={}", home.display());
 
     let input_str = input_path.to_string_lossy().into_owned();
     let output_str = output_path.to_string_lossy().into_owned();
@@ -62,16 +71,31 @@ pub(super) fn convert_docx_via_officellm(app: tauri::AppHandle, data_url: String
     let mut cmd = Command::new(&bin);
     cmd.args(["to-pdf", "-i", &input_str, "-o", &output_str]);
     crate::officellm::env::apply_env(&mut cmd, &home);
+
+    // Log environment variables set on the command
+    let env_summary: Vec<String> = cmd
+        .get_envs()
+        .filter_map(|(k, v)| Some(format!("{}={}", k.to_string_lossy(), v?.to_string_lossy())))
+        .collect();
+    log::info!("[office-preview] command env: {}", env_summary.join(", "));
+
     let result = cmd.output();
 
     // 立即清理临时输入文件
     let _ = fs::remove_file(&input_path);
 
-    let out = result.map_err(|e| format!("调用 officellm 失败 ({}): {e}", bin.display()))?;
+    let out = result.map_err(|e| {
+        log::error!("[office-preview] failed to spawn officellm: {e}");
+        format!("调用 officellm 失败 ({}): {e}", bin.display())
+    })?;
+
+    let stdout = String::from_utf8_lossy(&out.stdout);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    log::info!("[office-preview] exit={} stdout={} stderr={}", out.status, stdout.trim(), stderr.trim());
 
     if !out.status.success() {
         let _ = fs::remove_file(&output_path);
-        let stderr = String::from_utf8_lossy(&out.stderr);
+        log::error!("[office-preview] officellm to-pdf failed, exit={}, stderr:\n{stderr}", out.status);
         return Err(format!("officellm to-pdf 转换失败:\n{stderr}"));
     }
 

@@ -45,11 +45,16 @@ export async function migrateConfigIfNeeded(): Promise<void> {
   const layoutState = readLocalStorage<Record<string, unknown>>(
     "office-chat-layout",
   );
+  const oldMode = layoutState?.leftSidebarMode;
+  const leftSidebarMode =
+    oldMode === "full" || oldMode === "mini" || oldMode === "hidden"
+      ? oldMode
+      : layoutState?.leftSidebarOpen === false
+        ? "hidden"
+        : CONFIG_DEFAULTS.layout.leftSidebarMode;
   const layout: LayoutConfig = {
-    leftSidebarOpen:
-      typeof layoutState?.leftSidebarOpen === "boolean"
-        ? layoutState.leftSidebarOpen
-        : CONFIG_DEFAULTS.layout.leftSidebarOpen,
+    leftSidebarMode,
+    leftSidebarOpen: leftSidebarMode !== "hidden",
     leftSidebarWidth:
       typeof layoutState?.leftSidebarWidth === "number"
         ? layoutState.leftSidebarWidth
@@ -82,6 +87,16 @@ export async function migrateConfigIfNeeded(): Promise<void> {
       typeof layoutState?.fileTreeShowHidden === "boolean"
         ? layoutState.fileTreeShowHidden
         : CONFIG_DEFAULTS.layout.fileTreeShowHidden,
+    activePage: CONFIG_DEFAULTS.layout.activePage,
+    historyCollapsed: CONFIG_DEFAULTS.layout.historyCollapsed,
+    wsFileTreeWidth:
+      typeof layoutState?.wsFileTreeWidth === "number"
+        ? (layoutState.wsFileTreeWidth as number)
+        : CONFIG_DEFAULTS.layout.wsFileTreeWidth,
+    wsChatWidth:
+      typeof layoutState?.wsChatWidth === "number"
+        ? (layoutState.wsChatWidth as number)
+        : CONFIG_DEFAULTS.layout.wsChatWidth,
   };
   await writeConfig("layout", layout);
 

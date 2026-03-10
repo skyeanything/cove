@@ -33,10 +33,11 @@ describe("layoutStore", () => {
       expect(useLayoutStore.getState().leftSidebarOpen).toBe(false);
     });
 
-    it("toggles from false to true", () => {
-      useLayoutStore.setState({ leftSidebarOpen: false });
+    it("toggles from hidden to full", () => {
+      useLayoutStore.setState({ leftSidebarMode: "hidden", leftSidebarOpen: false });
       useLayoutStore.getState().toggleLeftSidebar();
       expect(useLayoutStore.getState().leftSidebarOpen).toBe(true);
+      expect(useLayoutStore.getState().leftSidebarMode).toBe("full");
     });
   });
 
@@ -295,6 +296,7 @@ describe("layoutStore", () => {
   describe("init", () => {
     it("loads state from config", async () => {
       vi.mocked(readConfig).mockResolvedValue({
+        leftSidebarMode: "hidden",
         leftSidebarOpen: false,
         leftSidebarWidth: 200,
         chatWidth: 500,

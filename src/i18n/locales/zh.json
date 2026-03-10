@@ -22,7 +22,7 @@
     }
   },
   "chat": {
-    "placeholder": "在此输入消息，按 {{shortcut}} 发送",
+    "placeholder": "描述任务，@ 可调用技能，/ 唤起命令行",
     "placeholderNoModel": "请先选择模型开始对话",
     "selectModel": "选择模型",
     "workspace": "工作目录",
@@ -70,16 +70,22 @@
     "pinned": "置顶",
     "today": "今天",
     "yesterday": "昨天",
-    "past7days": "过去 7 天",
     "earlier": "更早",
     "newChat": "新对话",
     "searchPlaceholder": "搜索",
+    "searchChats": "搜索聊天",
+    "workspace": "工作区",
+    "extensionMarket": "扩展市场",
+    "chatHistory": "历史对话",
+    "settings": "设置",
     "noConversations": "暂无对话",
     "untitled": "新对话",
     "pinConversation": "置顶对话",
     "unpinConversation": "取消置顶",
     "rename": "重命名",
     "delete": "删除",
+    "confirmDelete": "确认删除?",
+    "deleted": "已删除",
     "searchMessagesTitle": "搜索消息内容",
     "searchMessagesPlaceholder": "在消息内容中搜索…",
     "searching": "搜索中…",
@@ -108,7 +114,15 @@
     "folderAlreadyExists": "该名称已存在，请使用其他名称",
     "newFile": "新建文件",
     "fileAlreadyExists": "该名称已存在，请使用其他名称",
-    "invalidFileName": "文件名无效"
+    "invalidFileName": "文件名无效",
+    "setContextAnchor": "设为 AI 上下文",
+    "contextAnchorActive": "AI 上下文",
+    "search": "搜索文件"
+  },
+  "context": {
+    "label": "上下文",
+    "clear": "清除",
+    "multipleItems": "已选 {{count}} 项"
   },
   "preview": {
     "openFilePanel": "打开文件面板",
@@ -128,6 +142,7 @@
     "codeTab": "Code",
     "openDefault": "使用默认应用打开",
     "openInApp": "在 {{app}} 中打开",
+    "openLocal": "本地打开",
     "openInNativeWindow": "在新窗口用系统预览打开",
     "docxUseSystemPreview": "DOCX 请使用系统预览查看正确分页",
     "docxLoading": "加载 DOCX…",
@@ -145,7 +160,9 @@
     "closePreview": "关闭预览",
     "openInPanel": "在面板中打开",
     "pdfFallback": "PDF 预览可在侧面板中查看",
-    "officeFallback": "Office 文档预览可在侧面板中查看"
+    "officeFallback": "Office 文档预览可在侧面板中查看",
+    "dirItems": "项",
+    "dirLabel": "文件夹"
   },
   "common": {
     "settings": "设置"
@@ -286,6 +303,52 @@
     "instructionsLabel": "指令",
     "instructionsPlaceholder": "AI 代理的详细操作说明…",
     "createViaChat": "在对话中使用 skill-creator 技能来创建新技能"
+  },
+  "extensions": {
+    "title": "扩展市场",
+    "description": "Skills / MCP / Plugin / SubAgent 一站式管理",
+    "create": "创建",
+    "tabs": {
+      "skills": "技能",
+      "mcp": "MCP",
+      "plugin": "插件",
+      "subagent": "子智能体"
+    },
+    "filter": {
+      "all": "全部",
+      "builtIn": "内置",
+      "public": "公共",
+      "personal": "个人",
+      "category": "分类",
+      "status": "状态",
+      "installed": "已安装",
+      "notInstalled": "未安装"
+    },
+    "badge": {
+      "built-in": "内置",
+      "public": "公共",
+      "personal": "个人"
+    },
+    "noMcp": "暂无 MCP 服务器，点击创建添加。",
+    "noSubAgents": "暂无子智能体，点击创建添加。",
+    "wordPluginDesc": "将 AI 助手嵌入 Microsoft Word，辅助文档编辑。",
+    "newMcp": "新建 MCP 服务器",
+    "mcpName": "名称",
+    "mcpNameRequired": "名称不能为空",
+    "mcpType": "类型",
+    "mcpCommand": "命令",
+    "mcpCommandRequired": "stdio 类型必须填写命令",
+    "mcpArgs": "参数",
+    "mcpUrlRequired": "URL 不能为空",
+    "mcpEnv": "环境变量",
+    "newSubAgent": "新建子智能体",
+    "subagentName": "名称",
+    "subagentNameRequired": "名称不能为空",
+    "subagentIcon": "图标（emoji）",
+    "subagentDesc": "描述",
+    "subagentDescPlaceholder": "简要描述该智能体的用途",
+    "subagentSystemPrompt": "系统提示词",
+    "subagentSystemPromptPlaceholder": "为该子智能体编写指令…"
   },
   "workspace": {
     "title": "工作目录",

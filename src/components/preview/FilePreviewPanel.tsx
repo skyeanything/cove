@@ -16,6 +16,7 @@ import { useFilePreviewStore } from "@/stores/filePreviewStore";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { useLayoutStore } from "@/stores/layoutStore";
 import { getPreviewKind } from "@/lib/preview-types";
+import { DirPreview } from "./DirPreview";
 import { cn } from "@/lib/utils";
 import {
   PreviewFileHeader,
@@ -28,8 +29,12 @@ import { usePreviewContent } from "@/hooks/usePreviewContent";
 export function FilePreviewPanel() {
   const { t } = useTranslation();
   const selectedPath = useFilePreviewStore((s) => s.selectedPath);
+  const selectedIsDir = useFilePreviewStore((s) => s.selectedIsDir);
   const previewError = useFilePreviewStore((s) => s.previewError);
-  const workspaceRoot = useWorkspaceStore((s) => s.activeWorkspace?.path ?? null);
+  const selectedWorkspaceRoot = useFilePreviewStore((s) => s.selectedWorkspaceRoot);
+  const activeWorkspaceRoot = useWorkspaceStore((s) => s.activeWorkspace?.path ?? null);
+  // Prefer the workspace root recorded at selection time (handles multi-workspace)
+  const workspaceRoot = selectedWorkspaceRoot ?? activeWorkspaceRoot;
   const { cached, loading, error } = usePreviewContent(selectedPath, workspaceRoot);
   const setFilePreviewOpen = useLayoutStore((s) => s.setFilePreviewOpen);
   const [mdViewMode, setMdViewMode] = useState<"preview" | "code">("preview");
@@ -45,6 +50,10 @@ export function FilePreviewPanel() {
         </div>
       </div>
     );
+  }
+
+  if (selectedIsDir) {
+    return <DirPreview dirPath={selectedPath} workspaceRoot={workspaceRoot ?? ""} />;
   }
 
   const kind = getPreviewKind(selectedPath);
@@ -89,7 +98,7 @@ export function FilePreviewPanel() {
     return (
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
         <PreviewFileHeader path={selectedPath} {...headerProps} />
-        <ScrollArea className="flex-1 p-1.5">
+        <ScrollArea className="flex-1 p-4">
           <div className="file-preview-code">
             <pre className="m-0 overflow-auto pt-1 pb-1 text-[13px] leading-relaxed text-foreground">
               <code>
@@ -113,7 +122,7 @@ export function FilePreviewPanel() {
     return (
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
         <PreviewFileHeader path={selectedPath} {...headerProps} />
-        <ScrollArea className="min-h-0 flex-1 p-1.5">
+        <ScrollArea className="min-h-0 flex-1 p-4">
           <CsvViewer text={cached.text} />
         </ScrollArea>
       </div>
@@ -132,7 +141,7 @@ export function FilePreviewPanel() {
   if (kind === "md" && cached?.type === "text" && cached.text !== undefined) {
     return (
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
-        <div className="flex h-10 shrink-0 items-center justify-between gap-2 border-b border-border bg-background px-3">
+        <div className="flex h-8 shrink-0 items-center justify-between gap-2 border-b border-border bg-background px-3">
           <div className="min-w-0 truncate text-[12px] text-foreground-secondary" title={selectedPath}>
             {selectedPath}
           </div>
@@ -177,7 +186,7 @@ export function FilePreviewPanel() {
           </button>
           </div>
         </div>
-        <ScrollArea className="min-h-0 flex-1 p-1.5">
+        <ScrollArea className="min-h-0 flex-1 p-4">
           {mdViewMode === "preview" ? (
             <MarkdownContent source={cached.text} className="text-[14px]" />
           ) : (
@@ -192,7 +201,7 @@ export function FilePreviewPanel() {
     return (
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
         <PreviewFileHeader path={selectedPath} {...headerProps} />
-        <ScrollArea className="min-h-0 flex-1 p-1.5">
+        <ScrollArea className="min-h-0 flex-1 p-4">
           <CodeViewer path={selectedPath} code={cached.text} className="file-preview-code" />
         </ScrollArea>
       </div>
@@ -232,7 +241,7 @@ export function FilePreviewPanel() {
     return (
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
         <PreviewFileHeader path={selectedPath} {...headerProps} />
-        <ScrollArea className="min-h-0 flex-1 p-1.5">
+        <ScrollArea className="min-h-0 flex-1 p-4">
           {officeExt === "xlsx" && <XlsxViewer dataUrl={cached.dataUrl} />}
           {(officeExt === "pptx" || officeExt === "ppt") && <PptxViewer dataUrl={cached.dataUrl} />}
           {!["xlsx", "pptx", "ppt"].includes(officeExt) && (

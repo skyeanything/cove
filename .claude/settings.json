@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(/Users/halvee/cowork/cove/src-tauri/target/debug/officellm --version)",
+      "Bash(echo \"exit code: $?\")",
+      "Read(//Applications/LibreOffice.app/**)",
+      "Bash(git add src-tauri/src/docx_commands/officellm.rs)",
+      "Bash(git push -u origin design)",
+      "Bash(git remote set-url origin https://github.com/cove-founders/cove.git)",
+      "Bash(git add src/db/index.ts)",
+      "Bash(git push origin design)",
+      "Bash(diffstat)",
+      "Bash(git fetch origin)",
+      "Bash(git branch dev origin/main)",
+      "Bash(git push origin dev)",
+      "Bash(git checkout -- .github/workflows/ci.yml .github/workflows/codeql.yml)",
+      "Bash(git checkout -b chore/issue-286-dev-branch origin/main)",
+      "Bash(git add .github/workflows/ci.yml .github/workflows/codeql.yml .agent/workflows/submit-pr.md .agent/workflows/release-workflow.md CLAUDE.md)",
+      "Bash(git cherry-pick 952c9f2)",
+      "Bash(git stash -- src-tauri/Cargo.lock)",
+      "Bash(git cherry-pick --abort)",
+      "Bash(git reset --hard HEAD~1)"
+    ],
+    "additionalDirectories": [
+      "/tmp"
+    ]
+  }
+}

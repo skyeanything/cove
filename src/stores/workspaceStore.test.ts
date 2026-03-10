@@ -20,6 +20,12 @@ vi.mock("@/db/repos/conversationRepo", () => ({
   conversationRepo: {
     getById: vi.fn(),
     update: vi.fn(),
+    getByWorkspacePath: vi.fn().mockResolvedValue([]),
+  },
+}));
+vi.mock("@/db/repos/messageRepo", () => ({
+  messageRepo: {
+    deleteByConversation: vi.fn().mockResolvedValue(undefined),
   },
 }));
 vi.mock("@tauri-apps/api/path", () => ({

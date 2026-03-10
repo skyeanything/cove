@@ -88,4 +88,13 @@ export const conversationRepo = {
     const db = await getDb();
     await db.execute("UPDATE conversations SET pinned = $1 WHERE id = $2", [pinned, id]);
   },
+
+  /** 按 workspace_path 筛选对话（工作区模式使用） */
+  async getByWorkspacePath(path: string): Promise<Conversation[]> {
+    const db = await getDb();
+    return db.select(
+      "SELECT * FROM conversations WHERE workspace_path = $1 ORDER BY pinned DESC, updated_at DESC",
+      [path],
+    );
+  },
 };

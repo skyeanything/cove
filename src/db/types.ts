@@ -179,3 +179,20 @@ export interface McpServer {
   enabled: number;
   created_at: string;
 }
+
+export interface SubAgentDef {
+  id: string;
+  name: string;
+  description: string;
+  icon?: string;
+  system_prompt: string;
+  skill_names: string; // JSON array
+  tool_ids: string; // JSON array
+  connector_ids: string; // JSON array
+  model_id?: string;
+  provider_id?: string;
+  created_by: string;
+  enabled: number;
+  created_at: string;
+  updated_at: string;
+}

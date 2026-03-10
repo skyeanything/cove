@@ -22,7 +22,7 @@
     }
   },
   "chat": {
-    "placeholder": "Enter a message here, press {{shortcut}} to send",
+    "placeholder": "Describe a task, @ to invoke skills, / for commands",
     "placeholderNoModel": "Select a model to start chatting",
     "selectModel": "Select model",
     "workspace": "Workspace",
@@ -70,16 +70,22 @@
     "pinned": "Pinned",
     "today": "Today",
     "yesterday": "Yesterday",
-    "past7days": "Past 7 days",
     "earlier": "Earlier",
     "newChat": "New Chat",
     "searchPlaceholder": "Search",
+    "searchChats": "Search chats",
+    "workspace": "Workspace",
+    "extensionMarket": "Extension Market",
+    "chatHistory": "Chat History",
+    "settings": "Settings",
     "noConversations": "No conversations yet",
     "untitled": "New Chat",
     "pinConversation": "Pin conversation",
     "unpinConversation": "Unpin conversation",
     "rename": "Rename",
     "delete": "Delete",
+    "confirmDelete": "Delete?",
+    "deleted": "Deleted",
     "searchMessagesTitle": "Search messages",
     "searchMessagesPlaceholder": "Search in message content…",
     "searching": "Searching…",
@@ -108,7 +114,15 @@
     "folderAlreadyExists": "A folder with this name already exists.",
     "newFile": "New File",
     "fileAlreadyExists": "A file with this name already exists.",
-    "invalidFileName": "Invalid file name."
+    "invalidFileName": "Invalid file name.",
+    "setContextAnchor": "Set as AI Context",
+    "contextAnchorActive": "AI Context",
+    "search": "Search files"
+  },
+  "context": {
+    "label": "Context",
+    "clear": "Clear",
+    "multipleItems": "{{count}} items selected"
   },
   "preview": {
     "openFilePanel": "Open file panel",
@@ -128,6 +142,7 @@
     "codeTab": "Code",
     "openDefault": "Open with default app",
     "openInApp": "Open in {{app}}",
+    "openLocal": "Open Locally",
     "openInNativeWindow": "Open in system preview window",
     "docxUseSystemPreview": "Open DOCX in system preview for correct pagination",
     "docxLoading": "Loading DOCX…",
@@ -145,7 +160,9 @@
     "closePreview": "Close preview",
     "openInPanel": "Open in panel",
     "pdfFallback": "PDF preview is available in the side panel",
-    "officeFallback": "Office document preview is available in the side panel"
+    "officeFallback": "Office document preview is available in the side panel",
+    "dirItems": "items",
+    "dirLabel": "folder"
   },
   "common": {
     "settings": "Settings"
@@ -286,6 +303,52 @@
     "instructionsLabel": "Instructions",
     "instructionsPlaceholder": "Detailed instructions for the AI agent…",
     "createViaChat": "Use skill-creator in chat to create a new skill"
+  },
+  "extensions": {
+    "title": "Extension Market",
+    "description": "Skills / MCP / Plugin / SubAgent — all in one place",
+    "create": "Create",
+    "tabs": {
+      "skills": "Skills",
+      "mcp": "MCP",
+      "plugin": "Plugin",
+      "subagent": "Sub-Agent"
+    },
+    "filter": {
+      "all": "All",
+      "builtIn": "Built-in",
+      "public": "Public",
+      "personal": "Personal",
+      "category": "Category",
+      "status": "Status",
+      "installed": "Installed",
+      "notInstalled": "Not Installed"
+    },
+    "badge": {
+      "built-in": "Built-in",
+      "public": "Public",
+      "personal": "Personal"
+    },
+    "noMcp": "No MCP servers configured yet. Click Create to add one.",
+    "noSubAgents": "No sub-agents created yet. Click Create to add one.",
+    "wordPluginDesc": "Embed AI assistant into Microsoft Word for document editing assistance.",
+    "newMcp": "New MCP Server",
+    "mcpName": "Name",
+    "mcpNameRequired": "Name is required",
+    "mcpType": "Type",
+    "mcpCommand": "Command",
+    "mcpCommandRequired": "Command is required for stdio type",
+    "mcpArgs": "Arguments",
+    "mcpUrlRequired": "URL is required",
+    "mcpEnv": "Environment Variables",
+    "newSubAgent": "New Sub-Agent",
+    "subagentName": "Name",
+    "subagentNameRequired": "Name is required",
+    "subagentIcon": "Icon (emoji)",
+    "subagentDesc": "Description",
+    "subagentDescPlaceholder": "Briefly describe what this agent does",
+    "subagentSystemPrompt": "System Prompt",
+    "subagentSystemPromptPlaceholder": "Instructions for this sub-agent..."
   },
   "workspace": {
     "title": "WORKSPACE",
