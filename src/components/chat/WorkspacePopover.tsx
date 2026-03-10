@@ -38,6 +38,15 @@ export function WorkspacePopover({
   const remove = useWorkspaceStore((s) => s.remove);
   const activeConversationId = useDataStore((s) => s.activeConversationId);
 
+  // Sort: active first, then default, then reverse creation order (newest first)
+  const sortedWorkspaces = [...workspaces].sort((a, b) => {
+    const aActive = a.id === activeWorkspace?.id;
+    const bActive = b.id === activeWorkspace?.id;
+    if (aActive !== bActive) return aActive ? -1 : 1;
+    if (a.is_default !== b.is_default) return b.is_default - a.is_default;
+    return (b.created_at ?? "").localeCompare(a.created_at ?? "");
+  });
+
   const handleAddDirectory = async () => {
     const selected = await openDialog({ directory: true, multiple: false });
     if (selected) {
@@ -94,7 +103,7 @@ export function WorkspacePopover({
 
           {/* Workspace list */}
           <div className="max-h-[200px] overflow-y-auto px-2 pb-1">
-              {workspaces.map((ws) => {
+              {sortedWorkspaces.map((ws) => {
                 const isActive = activeWorkspace?.id === ws.id;
                 return (
                   <div
