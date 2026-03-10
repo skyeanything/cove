@@ -60,6 +60,19 @@ describe("estimateNextTurnTokens", () => {
     expect(result).toBe(14);
   });
 
+  it("includes parts length in fallback estimate", () => {
+    const longParts = JSON.stringify([
+      { type: "tool", toolName: "read", args: { path: "a.ts" }, result: "x".repeat(10000) },
+    ]);
+    const msgs: Message[] = [
+      makeMessage({ role: "user", content: "hi" }),
+      makeMessage({ role: "assistant", content: "ok", parts: longParts }),
+    ];
+    // Without fix: (2 + 2) / 4 = 1. With fix: (2 + 2 + partsLen) / 4 >> 1
+    const result = estimateNextTurnTokens(msgs, 0);
+    expect(result).toBeGreaterThan(2500); // parts alone ~10k chars → ~2500 tokens
+  });
+
   it("uses chars-based fallback when summary message is present", () => {
     const msgs: Message[] = [
       makeMessage({ role: "system", content: "Summary text here", parent_id: "__context_summary__" }),
@@ -67,9 +80,10 @@ describe("estimateNextTurnTokens", () => {
       makeMessage({ role: "assistant", content: "b".repeat(400), tokens_input: 50000, tokens_output: 10000 }),
     ];
     // With summary present, tokens_input is stale → use chars fallback
-    // (17 + 200 + 400 + 0) / 4 = 155 (not 50000+10000=60000)
+    // Now includes parts length; still much less than stale tokens_input (60000)
     const result = estimateNextTurnTokens(msgs, 0);
-    expect(result).toBeLessThan(1000);
+    expect(result).toBeLessThan(60000);
+    expect(result).toBeGreaterThan(0);
   });
 });
 
@@ -99,7 +113,7 @@ describe("shouldCompress", () => {
         tokens_output: i % 2 === 1 ? 20000 : undefined,
       }),
     );
-    // Last assistant has tokens_input=80000, tokens_output=20000 → 100000+0 > 128000*0.75=96000
+    // Last assistant has tokens_input=80000, tokens_output=20000 → 100000+0 > 128000*0.60=76800
     expect(shouldCompress(msgs, 128_000)).toBe(true);
   });
 

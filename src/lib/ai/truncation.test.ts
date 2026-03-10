@@ -36,7 +36,7 @@ describe("truncateOutput", () => {
   });
 
   it("uses default limits when no options provided", () => {
-    // Text well under defaults (2000 lines, 50KB)
+    // Text well under defaults (1000 lines, 30KB)
     const result = truncateOutput("short text");
     expect(result.truncated).toBe(false);
   });

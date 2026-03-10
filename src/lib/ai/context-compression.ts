@@ -3,8 +3,8 @@ import type { LanguageModel } from "ai";
 import type { Message } from "@/db/types";
 import compressionPromptTemplate from "@/prompts/context-compression.md?raw";
 
-/** Default threshold: compress when estimated tokens reach 75% of context window */
-const DEFAULT_THRESHOLD = 0.75;
+/** Default threshold: compress when estimated tokens reach 60% of context window */
+const DEFAULT_THRESHOLD = 0.60;
 /** Ratio of context window to keep as recent messages */
 const DEFAULT_KEEP_RATIO = 0.4;
 /** Minimum number of messages before compression is considered (2 complete turns) */
@@ -45,9 +45,9 @@ export function estimateNextTurnTokens(
     }
   }
 
-  // Fallback: rough estimate from all message content
+  // Fallback: rough estimate from all message content + parts (tool calls/results)
   const totalChars = messages.reduce(
-    (sum, m) => sum + (m.content?.length ?? 0),
+    (sum, m) => sum + (m.content?.length ?? 0) + (m.parts?.length ?? 0),
     0,
   );
   return Math.ceil((totalChars + newUserChars) / 4);
