@@ -16,7 +16,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { useDataStore } from "@/stores/dataStore";
@@ -94,8 +93,7 @@ export function WorkspacePopover({
           </p>
 
           {/* Workspace list */}
-          <ScrollArea type="auto" className="max-h-[200px]">
-            <div className="px-2 pb-1">
+          <div className="max-h-[200px] overflow-y-auto px-2 pb-1">
               {workspaces.map((ws) => {
                 const isActive = activeWorkspace?.id === ws.id;
                 return (
@@ -155,8 +153,7 @@ export function WorkspacePopover({
                   </div>
                 );
               })}
-            </div>
-          </ScrollArea>
+          </div>
 
           {/* Add directory button */}
           <div className="border-t border-border px-2 py-2">
