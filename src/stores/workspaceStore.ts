@@ -88,7 +88,11 @@ export const useWorkspaceStore = create<WorkspaceState>()((set, get) => ({
 
   async reload() {
     const workspaces = await workspaceRepo.getAll();
-    set({ workspaces });
+    const currentActive = get().activeWorkspace;
+    const activeWorkspace = currentActive
+      ? workspaces.find((w) => w.id === currentActive.id) ?? workspaces.find((w) => w.is_default) ?? null
+      : null;
+    set({ workspaces, activeWorkspace });
   },
 
   async select(workspaceId: string, conversationId: string | null) {

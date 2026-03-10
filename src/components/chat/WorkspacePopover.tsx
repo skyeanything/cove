@@ -80,6 +80,8 @@ export function WorkspacePopover({
         <PopoverContent
           align="start"
           side="top"
+          collisionPadding={16}
+          sideOffset={8}
           className="w-[440px] rounded-xl border border-border bg-popover p-0 shadow-lg"
         >
           {/* Header */}
@@ -92,7 +94,7 @@ export function WorkspacePopover({
           </p>
 
           {/* Workspace list */}
-          <ScrollArea className="max-h-[280px]">
+          <ScrollArea className="max-h-[200px]">
             <div className="px-2 pb-1">
               {workspaces.map((ws) => {
                 const isActive = activeWorkspace?.id === ws.id;

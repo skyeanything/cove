@@ -2,6 +2,7 @@ import { useThemeStore } from "@/stores/themeStore";
 import { useDataStore } from "@/stores/dataStore";
 import { useChatStore } from "@/stores/chatStore";
 import { useLayoutStore } from "@/stores/layoutStore";
+import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { SettingsWindow } from "@/components/settings/SettingsWindow";
 import { PreviewWindow } from "@/components/preview/PreviewWindow";
@@ -78,6 +79,17 @@ export function App() {
         }
       },
     );
+    return () => {
+      unlistenPromise.then((unlisten) => unlisten());
+    };
+  }, [isSettingsWindow]);
+
+  // Sync workspace list when Settings window mutates workspaces
+  useEffect(() => {
+    if (isSettingsWindow) return;
+    const unlistenPromise = listen("workspaces-changed", () => {
+      void useWorkspaceStore.getState().reload();
+    });
     return () => {
       unlistenPromise.then((unlisten) => unlisten());
     };

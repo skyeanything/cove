@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import { open } from "@tauri-apps/plugin-dialog";
+import { emit } from "@tauri-apps/api/event";
 import { Star, Trash2, Folder, Plus } from "lucide-react";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { cn } from "@/lib/utils";
@@ -164,6 +165,7 @@ export function WorkspacesPage() {
     if (typeof selected === "string") {
       try {
         await add(selected);
+        await emit("workspaces-changed");
       } catch (err) {
         console.error("Failed to add workspace:", err);
       }
@@ -174,7 +176,18 @@ export function WorkspacesPage() {
     if (!deleteTarget) return;
     await remove(deleteTarget.id);
     setDeleteTarget(null);
+    await emit("workspaces-changed");
   }, [deleteTarget, remove]);
+
+  const handleRename = useCallback(async (id: string, name: string) => {
+    await rename(id, name);
+    await emit("workspaces-changed");
+  }, [rename]);
+
+  const handleSetDefault = useCallback(async (id: string) => {
+    await setDefault(id);
+    await emit("workspaces-changed");
+  }, [setDefault]);
 
   return (
     <div className="flex flex-1 flex-col overflow-auto">
@@ -207,8 +220,8 @@ export function WorkspacesPage() {
                 <WorkspaceRow
                   key={ws.id}
                   workspace={ws}
-                  onRename={rename}
-                  onSetDefault={setDefault}
+                  onRename={handleRename}
+                  onSetDefault={handleSetDefault}
                   onDelete={setDeleteTarget}
                 />
               ))}
