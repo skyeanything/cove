@@ -1,25 +1,12 @@
 // @vitest-environment happy-dom
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, cleanup, act } from "@testing-library/react";
+import { render, screen, cleanup } from "@testing-library/react";
 import { FileTreePanel } from "./FileTreePanel";
 
-// ── Capture props passed to FileTreeItem ────────────────────────────────────
-
-type CapturedProps = {
-  focusedPath: string | null;
-  onSelectFile: (path: string) => void;
-  onToggleExpand: (path: string) => void;
-};
-
-let capturedProps: CapturedProps | null = null;
+// ── Mock FileTreeItem to capture props ──────────────────────────
 
 vi.mock("./FileTreeItem", () => ({
-  FileTreeItem: (props: CapturedProps & { entry: { path: string; name: string } }) => {
-    capturedProps = {
-      focusedPath: props.focusedPath,
-      onSelectFile: props.onSelectFile,
-      onToggleExpand: props.onToggleExpand,
-    };
+  FileTreeItem: (props: { entry: { path: string; name: string } }) => {
     return <div data-testid={`tree-item-${props.entry.path}`}>{props.entry.name}</div>;
   },
 }));
@@ -32,25 +19,63 @@ vi.mock("./FileTreeSearch", () => ({
   FileTreeSearch: () => null,
 }));
 
-// ── Mock stores ─────────────────────────────────────────────────────────────
-
-const mockSetSelected = vi.fn();
+// ── Mock stores ─────────────────────────────────────────────────
 
 vi.mock("@/stores/workspaceStore", () => ({
   useWorkspaceStore: (sel: (s: Record<string, unknown>) => unknown) =>
-    sel({ activeWorkspace: { path: "/workspace" } }),
+    sel({
+      workspaces: [
+        { id: "ws-1", name: "my-project", path: "/workspace", is_default: false },
+      ],
+      activeWorkspace: { id: "ws-1", path: "/workspace" },
+      add: vi.fn(),
+      remove: vi.fn(),
+      select: vi.fn(),
+    }),
 }));
 
+const mockSetSelected = vi.fn();
+const mockToggleSelected = vi.fn();
+
 vi.mock("@/stores/filePreviewStore", () => ({
-  useFilePreviewStore: (sel: (s: Record<string, unknown>) => unknown) =>
-    sel({
-      selectedPath: null,
-      lastOpenedDirPath: null,
-      setSelected: mockSetSelected,
-      pendingExpandPath: null,
-      setPendingExpandPath: vi.fn(),
-    }),
+  useFilePreviewStore: Object.assign(
+    (sel: (s: Record<string, unknown>) => unknown) =>
+      sel({
+        selectedPath: null,
+        lastOpenedDirPath: null,
+        setSelected: mockSetSelected,
+        toggleSelected: mockToggleSelected,
+        selectedEntries: [],
+        pendingExpandPath: null,
+        setPendingExpandPath: vi.fn(),
+        setSelectedWorkspaceRoot: vi.fn(),
+      }),
+    {
+      getState: () => ({
+        selectedPath: null,
+        lastOpenedDirPath: null,
+        setSelected: mockSetSelected,
+        toggleSelected: mockToggleSelected,
+        selectedEntries: [],
+        pendingExpandPath: null,
+        setPendingExpandPath: vi.fn(),
+        setSelectedWorkspaceRoot: vi.fn(),
+      }),
+    },
+  ),
   dirOfPath: (p: string) => (p.includes("/") ? p.replace(/\/[^/]+$/, "") : ""),
+}));
+
+vi.mock("@/stores/dataStore", () => ({
+  useDataStore: (sel: (s: Record<string, unknown>) => unknown) =>
+    sel({ setActiveConversation: vi.fn() }),
+}));
+
+vi.mock("@/stores/chatStore", () => ({
+  useChatStore: Object.assign(
+    (sel: (s: Record<string, unknown>) => unknown) => sel({ reset: vi.fn() }),
+    { getState: () => ({ reset: vi.fn() }) },
+  ),
 }));
 
 const { mockLayoutState } = vi.hoisted(() => {
@@ -72,14 +97,30 @@ vi.mock("@/stores/layoutStore", () => {
   return { useLayoutStore: store };
 });
 
-// ── Mock hooks ──────────────────────────────────────────────────────────────
+// ── Mock hooks ──────────────────────────────────────────────────
 
 vi.mock("@/hooks/useFileTreeDialogs", () => ({
   useFileTreeDialogs: () => ({
     onNewFile: vi.fn(),
     onNewFolder: vi.fn(),
     onDelete: vi.fn(),
-    dialogState: {},
+    deleteTarget: null,
+    setDeleteTarget: vi.fn(),
+    newFolderParentPath: null,
+    newFolderName: "",
+    setNewFolderName: vi.fn(),
+    newFolderError: null,
+    setNewFolderError: vi.fn(),
+    handleConfirmDelete: vi.fn(),
+    handleNewFolderConfirm: vi.fn(),
+    handleNewFolderCancel: vi.fn(),
+    newFileParentPath: null,
+    newFileName: "",
+    setNewFileName: vi.fn(),
+    newFileError: null,
+    setNewFileError: vi.fn(),
+    handleNewFileConfirm: vi.fn(),
+    handleNewFileCancel: vi.fn(),
   }),
 }));
 
@@ -97,21 +138,6 @@ vi.mock("@/hooks/useFileTreeDnD", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useFileTreeSearch", () => ({
-  useFileTreeSearch: () => ({
-    filteredRootEntries: [
-      { name: "src", path: "src", isDir: true, mtimeSecs: 0 },
-      { name: "README.md", path: "README.md", isDir: false, mtimeSecs: 0 },
-    ],
-    searchOpen: false,
-    searchQuery: "",
-    setSearchQuery: vi.fn(),
-    openSearch: vi.fn(),
-    closeSearch: vi.fn(),
-    matchCount: 0,
-  }),
-}));
-
 vi.mock("@/hooks/useFileClipboard", () => ({
   useFileClipboard: () => ({
     sourcePath: null,
@@ -122,22 +148,24 @@ vi.mock("@/hooks/useFileClipboard", () => ({
   }),
 }));
 
-vi.mock("@/hooks/useFileTreeKeyboard", () => ({
-  useFileTreeKeyboard: () => ({ flatList: [], handleKeyDown: vi.fn() }),
-  isEditableTarget: () => false,
-}));
-
-// ── Mock Tauri ──────────────────────────────────────────────────────────────
+// ── Mock Tauri ──────────────────────────────────────────────────
 
 vi.mock("@tauri-apps/api/core", () => ({
-  invoke: vi.fn().mockResolvedValue([]),
+  invoke: vi.fn().mockResolvedValue([
+    { name: "src", path: "src", isDir: true, mtimeSecs: 0 },
+    { name: "README.md", path: "README.md", isDir: false, mtimeSecs: 0 },
+  ]),
 }));
 
 vi.mock("@tauri-apps/api/event", () => ({
   listen: vi.fn().mockResolvedValue(() => {}),
 }));
 
-// ── Mock i18n & UI ──────────────────────────────────────────────────────────
+vi.mock("@tauri-apps/plugin-dialog", () => ({
+  open: vi.fn(),
+}));
+
+// ── Mock i18n & UI ──────────────────────────────────────────────
 
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (k: string) => k }),
@@ -151,68 +179,45 @@ vi.mock("@/components/ui/context-menu", () => ({
   ContextMenu: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   ContextMenuContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
   ContextMenuItem: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  ContextMenuSeparator: () => <hr />,
   ContextMenuTrigger: ({ children }: { children: React.ReactNode }) => <>{children}</>,
 }));
 
-vi.mock("@/lib/file-utils", () => ({
-  getAvailableDuplicateName: vi.fn(),
+vi.mock("@/components/ui/alert-dialog", () => ({
+  AlertDialog: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  AlertDialogAction: ({ children }: { children: React.ReactNode }) => <button>{children}</button>,
+  AlertDialogCancel: ({ children }: { children: React.ReactNode }) => <button>{children}</button>,
+  AlertDialogContent: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  AlertDialogDescription: ({ children }: { children: React.ReactNode }) => <p>{children}</p>,
+  AlertDialogFooter: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  AlertDialogHeader: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
+  AlertDialogTitle: ({ children }: { children: React.ReactNode }) => <h2>{children}</h2>,
 }));
 
-// ── Tests ───────────────────────────────────────────────────────────────────
+// ── Tests ───────────────────────────────────────────────────────
 
 beforeEach(() => {
   vi.clearAllMocks();
-  capturedProps = null;
 });
 afterEach(cleanup);
 
-describe("FileTreePanel focusedPath sync", () => {
-  it("passes null focusedPath initially", () => {
+describe("FileTreePanel multi-workspace", () => {
+  it("renders workspace header", () => {
     render(<FileTreePanel />);
-    expect(capturedProps).not.toBeNull();
-    expect(capturedProps!.focusedPath).toBeNull();
+    expect(screen.getByText("sidebar.workspace")).toBeTruthy();
   });
 
-  it("syncs focusedPath when onSelectFile is called", () => {
+  it("renders workspace root node with name", async () => {
     render(<FileTreePanel />);
-    expect(capturedProps!.focusedPath).toBeNull();
-
-    act(() => {
-      capturedProps!.onSelectFile("README.md");
-    });
-
-    expect(mockSetSelected).toHaveBeenCalledWith("README.md");
-    expect(capturedProps!.focusedPath).toBe("README.md");
+    expect(screen.getByText("my-project")).toBeTruthy();
   });
 
-  it("syncs focusedPath when onToggleExpand is called", () => {
+  it("renders file tree items when workspace loads", async () => {
     render(<FileTreePanel />);
-    expect(capturedProps!.focusedPath).toBeNull();
-
-    act(() => {
-      capturedProps!.onToggleExpand("src");
+    // Wait for async listDir to resolve and render items
+    await vi.waitFor(() => {
+      expect(screen.getByTestId("tree-item-src")).toBeTruthy();
+      expect(screen.getByTestId("tree-item-README.md")).toBeTruthy();
     });
-
-    expect(capturedProps!.focusedPath).toBe("src");
-  });
-
-  it("updates focusedPath across multiple interactions", () => {
-    render(<FileTreePanel />);
-
-    act(() => {
-      capturedProps!.onSelectFile("README.md");
-    });
-    expect(capturedProps!.focusedPath).toBe("README.md");
-
-    act(() => {
-      capturedProps!.onToggleExpand("src");
-    });
-    expect(capturedProps!.focusedPath).toBe("src");
-  });
-
-  it("renders file tree items when workspace is active", () => {
-    render(<FileTreePanel />);
-    expect(screen.getByTestId("tree-item-src")).toBeTruthy();
-    expect(screen.getByTestId("tree-item-README.md")).toBeTruthy();
   });
 });

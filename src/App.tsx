@@ -24,7 +24,7 @@ export function App() {
   const init = useDataStore((s) => s.init);
   const initialized = useDataStore((s) => s.initialized);
   const initError = useDataStore((s) => s.initError);
-  const [gitBashError, setGitBashError] = useState<string | null>(null);
+  const [_gitBashError, setGitBashError] = useState<string | null>(null);
   useTauriDrag();
 
   // Migrate config files + initialize stores
@@ -163,5 +163,5 @@ export function App() {
     return <PreviewWindow />;
   }
 
-  return <AppLayout gitBashError={gitBashError} />;
+  return <AppLayout />;
 }

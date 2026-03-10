@@ -48,14 +48,13 @@ function defaultProps(overrides: Partial<Parameters<typeof FileTreeItem>[0]> = {
     entry: fileEntry,
     workspaceRoot: "/workspace",
     selectedPath: null,
-    focusedPath: null,
+    selectedEntries: undefined as string[] | undefined,
     expandedDirs: new Set<string>(),
     loadedChildren: {},
     editingPath: null,
     onToggleExpand: noop,
-    onSelectFile: noop,
+    onSelectFile: noop as (e: React.MouseEvent, path: string, isDir: boolean, name: string) => void,
     onLoadChildren: noop,
-    onNewFile: noop,
     onNewFolder: noop,
     onRename: noop,
     onRevealInFinder: noop,
@@ -68,60 +67,30 @@ function defaultProps(overrides: Partial<Parameters<typeof FileTreeItem>[0]> = {
   };
 }
 
-describe("FileTreeItem focus visibility", () => {
-  it("applies focus ring class when focusedPath matches", () => {
+describe("FileTreeItem selection visibility", () => {
+  it("applies selected background when selectedPath matches", () => {
     const { container } = render(
-      <FileTreeItem {...defaultProps({ focusedPath: "src/index.ts" })} />,
+      <FileTreeItem {...defaultProps({ selectedPath: "src/index.ts" })} />,
     );
     const button = container.querySelector("button");
     expect(button).not.toBeNull();
-    expect(button!.className).toContain("ring-2");
-    expect(button!.className).toContain("ring-accent");
+    expect(button!.className).toContain("bg-background-tertiary");
   });
 
-  it("applies background highlight when focused but not selected", () => {
+  it("applies selected background via selectedEntries", () => {
     const { container } = render(
-      <FileTreeItem
-        {...defaultProps({ focusedPath: "src/index.ts", selectedPath: null })}
-      />,
+      <FileTreeItem {...defaultProps({ selectedEntries: ["src/index.ts"] })} />,
     );
     const button = container.querySelector("button");
     expect(button!.className).toContain("bg-background-tertiary");
   });
 
-  it("does not apply background highlight when focused and selected", () => {
+  it("does not apply selected background when path does not match", () => {
     const { container } = render(
-      <FileTreeItem
-        {...defaultProps({
-          focusedPath: "src/index.ts",
-          selectedPath: "src/index.ts",
-        })}
-      />,
+      <FileTreeItem {...defaultProps({ selectedPath: "other/file.ts" })} />,
     );
     const button = container.querySelector("button");
-    // ring should still appear
-    expect(button!.className).toContain("ring-accent");
-    // but bg-background-tertiary should not (since isSelected is true)
-    expect(button!.className).not.toContain("bg-background-tertiary");
-  });
-
-  it("does not apply focus ring when focusedPath does not match", () => {
-    const { container } = render(
-      <FileTreeItem {...defaultProps({ focusedPath: "other/file.ts" })} />,
-    );
-    const button = container.querySelector("button");
-    expect(button!.className).not.toContain("ring-accent/60");
-  });
-
-  it("scrolls focused row into view", () => {
-    const scrollIntoView = vi.fn();
-    Element.prototype.scrollIntoView = scrollIntoView;
-
-    render(
-      <FileTreeItem {...defaultProps({ focusedPath: "src/index.ts" })} />,
-    );
-
-    expect(scrollIntoView).toHaveBeenCalledWith({ block: "nearest" });
+    expect(button!.className).not.toContain("bg-background-tertiary text-foreground");
   });
 });
 
@@ -133,7 +102,11 @@ describe("FileTreeItem click handlers", () => {
     );
     const button = container.querySelector("button")!;
     fireEvent.click(button);
-    expect(onSelectFile).toHaveBeenCalledWith("src/index.ts");
+    expect(onSelectFile).toHaveBeenCalledTimes(1);
+    // Design version signature: (event, path, isDir, name)
+    expect(onSelectFile.mock.calls[0]![1]).toBe("src/index.ts");
+    expect(onSelectFile.mock.calls[0]![2]).toBe(false);
+    expect(onSelectFile.mock.calls[0]![3]).toBe("index.ts");
   });
 
   it("calls onToggleExpand when clicking a directory", () => {
@@ -158,5 +131,27 @@ describe("FileTreeItem click handlers", () => {
     const button = container.querySelector("button")!;
     fireEvent.click(button);
     expect(onSelectFile).not.toHaveBeenCalled();
+  });
+});
+
+describe("FileTreeItem drag-and-drop", () => {
+  it("shows drop target ring when isDropTarget", () => {
+    const { container } = render(
+      <FileTreeItem
+        {...defaultProps({ entry: dirEntry, dropTargetPath: "src" })}
+      />,
+    );
+    const button = container.querySelector("button");
+    expect(button!.className).toContain("ring-accent/50");
+  });
+
+  it("shows dragged opacity when isDragged", () => {
+    const { container } = render(
+      <FileTreeItem
+        {...defaultProps({ draggedPath: "src/index.ts" })}
+      />,
+    );
+    const button = container.querySelector("button");
+    expect(button!.className).toContain("opacity-40");
   });
 });

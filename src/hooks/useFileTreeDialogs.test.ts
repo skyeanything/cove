@@ -18,6 +18,7 @@ function renderDialogs(overrides: { workspaceRoot?: string | null } = {}) {
     selectedPath: null as string | null,
     setSelected: vi.fn(),
     setExpandedDirs: vi.fn(),
+    refreshDir: vi.fn(),
     t: (key: string) => key,
   };
   return { ...renderHook(() => useFileTreeDialogs(params)), params };

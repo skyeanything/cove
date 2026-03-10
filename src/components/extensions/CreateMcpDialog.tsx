@@ -26,9 +26,10 @@ import { useExtensionStore } from "@/stores/extensionStore";
 interface Props {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  initialServer?: McpServer | null;
 }
 
-export function CreateMcpDialog({ open, onOpenChange }: Props) {
+export function CreateMcpDialog({ open, onOpenChange, initialServer }: Props) {
   const bumpConnectors = useExtensionStore((s) => s.bumpConnectors);
   const [name, setName] = useState("");
   const [type, setType] = useState<McpServer["type"]>("stdio");
@@ -42,10 +43,21 @@ export function CreateMcpDialog({ open, onOpenChange }: Props) {
 
   useEffect(() => {
     if (open) {
-      setName(""); setType("stdio"); setCommand(""); setArgs("");
-      setUrl(""); setEnv(""); setAutoRun(false); setError("");
+      if (initialServer) {
+        setName(initialServer.name);
+        setType(initialServer.type);
+        setCommand(initialServer.command ?? "");
+        setArgs(initialServer.args ?? "");
+        setUrl(initialServer.url ?? "");
+        setEnv(initialServer.env ?? "");
+        setAutoRun(initialServer.auto_run === 1);
+      } else {
+        setName(""); setType("stdio"); setCommand(""); setArgs("");
+        setUrl(""); setEnv(""); setAutoRun(false);
+      }
+      setError("");
     }
-  }, [open]);
+  }, [open, initialServer]);
 
   const handleSave = async () => {
     if (!name.trim()) { setError("名称不能为空"); return; }

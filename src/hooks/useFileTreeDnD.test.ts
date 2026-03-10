@@ -7,19 +7,6 @@ vi.mock("@tauri-apps/api/core", () => ({
   invoke: vi.fn(),
 }));
 
-// Store the drag-drop callback so tests can trigger Tauri events
-let dragDropCallback: ((event: { payload: unknown }) => void) | null = null;
-const mockUnlisten = vi.fn();
-
-vi.mock("@tauri-apps/api/webview", () => ({
-  getCurrentWebview: () => ({
-    onDragDropEvent: (cb: (event: { payload: unknown }) => void) => {
-      dragDropCallback = cb;
-      return Promise.resolve(mockUnlisten);
-    },
-  }),
-}));
-
 import { invoke } from "@tauri-apps/api/core";
 import { useFileTreeDnD } from "./useFileTreeDnD";
 
@@ -48,30 +35,22 @@ function makeDragEvent(
   } as unknown as React.DragEvent;
 }
 
-function makeContainerRef() {
-  const div = document.createElement("div");
-  div.getBoundingClientRect = () => ({ left: 0, top: 0, right: 800, bottom: 600, width: 800, height: 600, x: 0, y: 0, toJSON: () => ({}) });
-  return { current: div } as React.RefObject<HTMLDivElement | null>;
-}
-
 describe("useFileTreeDnD", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    dragDropCallback = null;
   });
 
   it("initializes with null drag state", () => {
     const { result } = renderHook(() =>
-      useFileTreeDnD({ workspaceRoot: "/test", containerRef: makeContainerRef() }),
+      useFileTreeDnD({ workspaceRoot: "/test" }),
     );
     expect(result.current.draggedPath).toBeNull();
     expect(result.current.dropTargetPath).toBeNull();
-    expect(result.current.isExternalDragOver).toBe(false);
   });
 
   it("sets draggedPath on drag start", () => {
     const { result } = renderHook(() =>
-      useFileTreeDnD({ workspaceRoot: "/test", containerRef: makeContainerRef() }),
+      useFileTreeDnD({ workspaceRoot: "/test" }),
     );
     const e = makeDragEvent();
 
@@ -88,7 +67,7 @@ describe("useFileTreeDnD", () => {
 
   it("clears state on drag end", () => {
     const { result } = renderHook(() =>
-      useFileTreeDnD({ workspaceRoot: "/test", containerRef: makeContainerRef() }),
+      useFileTreeDnD({ workspaceRoot: "/test" }),
     );
 
     act(() => {
@@ -105,7 +84,7 @@ describe("useFileTreeDnD", () => {
   it("performs internal move on drop with text/plain data", () => {
     vi.mocked(invoke).mockResolvedValue(undefined);
     const { result } = renderHook(() =>
-      useFileTreeDnD({ workspaceRoot: "/ws", containerRef: makeContainerRef() }),
+      useFileTreeDnD({ workspaceRoot: "/ws" }),
     );
 
     act(() => {
@@ -127,7 +106,7 @@ describe("useFileTreeDnD", () => {
 
   it("does nothing when workspaceRoot is null", () => {
     const { result } = renderHook(() =>
-      useFileTreeDnD({ workspaceRoot: null, containerRef: makeContainerRef() }),
+      useFileTreeDnD({ workspaceRoot: null }),
     );
 
     const e = makeDragEvent({
@@ -141,310 +120,201 @@ describe("useFileTreeDnD", () => {
     expect(invoke).not.toHaveBeenCalled();
   });
 
-  describe("Tauri native drag-drop (external files)", () => {
-    it("sets isExternalDragOver on enter event", () => {
-      const { result } = renderHook(() =>
-        useFileTreeDnD({ workspaceRoot: "/ws", containerRef: makeContainerRef() }),
-      );
+  it("sets dropTargetPath on drag over a directory", () => {
+    const { result } = renderHook(() =>
+      useFileTreeDnD({ workspaceRoot: "/ws" }),
+    );
 
-      expect(dragDropCallback).not.toBeNull();
-      act(() => {
-        dragDropCallback!({
-          payload: { type: "enter", paths: ["/ext/file.txt"], position: { x: 0, y: 0 } },
-        });
-      });
-
-      expect(result.current.isExternalDragOver).toBe(true);
+    act(() => {
+      result.current.onDragStart(makeDragEvent(), "file.ts");
     });
 
-    it("clears state on leave event", () => {
-      const { result } = renderHook(() =>
-        useFileTreeDnD({ workspaceRoot: "/ws", containerRef: makeContainerRef() }),
-      );
-
-      act(() => {
-        dragDropCallback!({
-          payload: { type: "enter", paths: ["/ext/file.txt"], position: { x: 0, y: 0 } },
-        });
-      });
-      expect(result.current.isExternalDragOver).toBe(true);
-
-      act(() => {
-        dragDropCallback!({ payload: { type: "leave" } });
-      });
-      expect(result.current.isExternalDragOver).toBe(false);
-      expect(result.current.dropTargetPath).toBeNull();
+    const overEvent = makeDragEvent({ types: ["text/plain"] });
+    act(() => {
+      result.current.onDragOver(overEvent, "src", true);
     });
 
-    it("resolves drop target from data-tree-path on over event", () => {
-      // Set up a DOM element with data-tree-path
-      const btn = document.createElement("button");
-      btn.setAttribute("data-tree-path", "src");
-      btn.setAttribute("data-tree-is-dir", "true");
-      document.body.appendChild(btn);
-      btn.getBoundingClientRect = () => ({ x: 10, y: 10, width: 100, height: 30 } as DOMRect);
+    expect(result.current.dropTargetPath).toBe("src");
+    expect(overEvent.preventDefault).toHaveBeenCalled();
+  });
 
-      vi.spyOn(document, "elementFromPoint").mockReturnValue(btn);
+  it("does not set dropTargetPath when hovering over a file", () => {
+    const { result } = renderHook(() =>
+      useFileTreeDnD({ workspaceRoot: "/ws" }),
+    );
 
-      const { result } = renderHook(() =>
-        useFileTreeDnD({ workspaceRoot: "/ws", containerRef: makeContainerRef() }),
-      );
-
-      act(() => {
-        dragDropCallback!({
-          payload: { type: "over", position: { x: 50, y: 20 } },
-        });
-      });
-
-      expect(result.current.dropTargetPath).toBe("src");
-
-      document.body.removeChild(btn);
-      vi.restoreAllMocks();
+    act(() => {
+      result.current.onDragStart(makeDragEvent(), "file.ts");
     });
 
-    it("uses parent dir when hovering over a file on over event", () => {
-      const btn = document.createElement("button");
-      btn.setAttribute("data-tree-path", "src/index.ts");
-      btn.setAttribute("data-tree-is-dir", "false");
-      document.body.appendChild(btn);
-
-      vi.spyOn(document, "elementFromPoint").mockReturnValue(btn);
-
-      const { result } = renderHook(() =>
-        useFileTreeDnD({ workspaceRoot: "/ws", containerRef: makeContainerRef() }),
-      );
-
-      act(() => {
-        dragDropCallback!({
-          payload: { type: "over", position: { x: 50, y: 20 } },
-        });
-      });
-
-      expect(result.current.dropTargetPath).toBe("src");
-
-      document.body.removeChild(btn);
-      vi.restoreAllMocks();
+    const overEvent = makeDragEvent({ types: ["text/plain"] });
+    act(() => {
+      result.current.onDragOver(overEvent, "src/index.ts", false);
     });
 
-    it("invokes copy_external_file on drop event", async () => {
-      vi.mocked(invoke).mockResolvedValue(undefined);
+    expect(result.current.dropTargetPath).toBeNull();
+    expect(overEvent.preventDefault).not.toHaveBeenCalled();
+  });
 
-      const btn = document.createElement("button");
-      btn.setAttribute("data-tree-path", "assets");
-      btn.setAttribute("data-tree-is-dir", "true");
-      document.body.appendChild(btn);
-      vi.spyOn(document, "elementFromPoint").mockReturnValue(btn);
+  it("prevents dropping a folder into itself or its descendant", () => {
+    const { result } = renderHook(() =>
+      useFileTreeDnD({ workspaceRoot: "/ws" }),
+    );
 
-      renderHook(() =>
-        useFileTreeDnD({ workspaceRoot: "/ws", containerRef: makeContainerRef() }),
-      );
-
-      act(() => {
-        dragDropCallback!({
-          payload: {
-            type: "drop",
-            paths: ["/Users/me/Desktop/photo.png"],
-            position: { x: 50, y: 20 },
-          },
-        });
-      });
-
-      await vi.waitFor(() => {
-        expect(invoke).toHaveBeenCalledWith("copy_external_file", {
-          args: {
-            workspaceRoot: "/ws",
-            externalPath: "/Users/me/Desktop/photo.png",
-            destPath: "assets/photo.png",
-          },
-        });
-      });
-
-      document.body.removeChild(btn);
-      vi.restoreAllMocks();
+    act(() => {
+      result.current.onDragStart(makeDragEvent(), "src");
     });
 
-    it("drops to root when no tree target found", async () => {
-      vi.mocked(invoke).mockResolvedValue(undefined);
-
-      const rootDiv = document.createElement("div");
-      rootDiv.setAttribute("data-tree-root", "true");
-      document.body.appendChild(rootDiv);
-      vi.spyOn(document, "elementFromPoint").mockReturnValue(rootDiv);
-
-      renderHook(() =>
-        useFileTreeDnD({ workspaceRoot: "/ws", containerRef: makeContainerRef() }),
-      );
-
-      act(() => {
-        dragDropCallback!({
-          payload: {
-            type: "drop",
-            paths: ["/ext/readme.txt"],
-            position: { x: 50, y: 20 },
-          },
-        });
-      });
-
-      await vi.waitFor(() => {
-        expect(invoke).toHaveBeenCalledWith("copy_external_file", {
-          args: {
-            workspaceRoot: "/ws",
-            externalPath: "/ext/readme.txt",
-            destPath: "readme.txt",
-          },
-        });
-      });
-
-      document.body.removeChild(rootDiv);
-      vi.restoreAllMocks();
+    const overEvent = makeDragEvent({ types: ["text/plain"] });
+    act(() => {
+      result.current.onDragOver(overEvent, "src/nested", true);
     });
 
-    it("tries fallback name when first copy fails", async () => {
-      vi.mocked(invoke)
-        .mockRejectedValueOnce(new Error("destination already exists"))
-        .mockResolvedValueOnce(undefined);
+    expect(result.current.dropTargetPath).toBeNull();
+    expect(overEvent.preventDefault).not.toHaveBeenCalled();
+  });
 
-      const rootDiv = document.createElement("div");
-      rootDiv.setAttribute("data-tree-root", "true");
-      document.body.appendChild(rootDiv);
-      vi.spyOn(document, "elementFromPoint").mockReturnValue(rootDiv);
+  it("clears dropTargetPath on drag leave", () => {
+    const { result } = renderHook(() =>
+      useFileTreeDnD({ workspaceRoot: "/ws" }),
+    );
 
-      renderHook(() =>
-        useFileTreeDnD({ workspaceRoot: "/ws", containerRef: makeContainerRef() }),
-      );
-
-      act(() => {
-        dragDropCallback!({
-          payload: {
-            type: "drop",
-            paths: ["/ext/doc.pdf"],
-            position: { x: 50, y: 20 },
-          },
-        });
-      });
-
-      await vi.waitFor(() => {
-        expect(invoke).toHaveBeenCalledTimes(2);
-      });
-
-      expect(invoke).toHaveBeenNthCalledWith(1, "copy_external_file", {
-        args: { workspaceRoot: "/ws", externalPath: "/ext/doc.pdf", destPath: "doc.pdf" },
-      });
-      expect(invoke).toHaveBeenNthCalledWith(2, "copy_external_file", {
-        args: {
-          workspaceRoot: "/ws",
-          externalPath: "/ext/doc.pdf",
-          destPath: "doc (copy).pdf",
-        },
-      });
-
-      document.body.removeChild(rootDiv);
-      vi.restoreAllMocks();
+    act(() => {
+      result.current.onDragStart(makeDragEvent(), "file.ts");
     });
 
-    it("does nothing on drop when workspaceRoot is null", () => {
-      renderHook(() =>
-        useFileTreeDnD({ workspaceRoot: null, containerRef: makeContainerRef() }),
-      );
+    const overEvent = makeDragEvent({ types: ["text/plain"] });
+    act(() => {
+      result.current.onDragOver(overEvent, "src", true);
+    });
+    expect(result.current.dropTargetPath).toBe("src");
 
-      act(() => {
-        dragDropCallback!({
-          payload: {
-            type: "drop",
-            paths: ["/ext/file.txt"],
-            position: { x: 0, y: 0 },
-          },
-        });
-      });
+    const leaveEvent = makeDragEvent();
+    act(() => {
+      result.current.onDragLeave(leaveEvent, "src");
+    });
+    expect(result.current.dropTargetPath).toBeNull();
+  });
 
-      expect(invoke).not.toHaveBeenCalled();
+  it("calls refreshDir on source and target after move", async () => {
+    vi.mocked(invoke).mockResolvedValue(undefined);
+    const refreshDir = vi.fn();
+    const { result } = renderHook(() =>
+      useFileTreeDnD({ workspaceRoot: "/ws", refreshDir }),
+    );
+
+    act(() => {
+      result.current.onDragStart(makeDragEvent(), "src/file.ts");
     });
 
-    it("cleans up listener on unmount", async () => {
-      const { unmount } = renderHook(() =>
-        useFileTreeDnD({ workspaceRoot: "/ws", containerRef: makeContainerRef() }),
-      );
-
-      unmount();
-
-      // The cleanup calls unlisten.then(fn => fn()), so we need to wait for the microtask
-      await vi.waitFor(() => {
-        expect(mockUnlisten).toHaveBeenCalled();
-      });
+    const dropEvent = makeDragEvent({
+      types: ["text/plain"],
+      data: { "text/plain": "src/file.ts" },
+    });
+    act(() => {
+      result.current.onDrop(dropEvent, "dest");
     });
 
-    it("handles Windows-style backslash paths", async () => {
-      vi.mocked(invoke).mockResolvedValue(undefined);
+    await vi.waitFor(() => {
+      expect(refreshDir).toHaveBeenCalledWith("src");
+      expect(refreshDir).toHaveBeenCalledWith("dest");
+    });
+  });
 
-      const btn = document.createElement("button");
-      btn.setAttribute("data-tree-path", "docs");
-      btn.setAttribute("data-tree-is-dir", "true");
-      document.body.appendChild(btn);
-      vi.spyOn(document, "elementFromPoint").mockReturnValue(btn);
+  it("moves to root via onRootDrop", () => {
+    vi.mocked(invoke).mockResolvedValue(undefined);
+    const { result } = renderHook(() =>
+      useFileTreeDnD({ workspaceRoot: "/ws" }),
+    );
 
-      renderHook(() =>
-        useFileTreeDnD({ workspaceRoot: "/ws", containerRef: makeContainerRef() }),
-      );
-
-      act(() => {
-        dragDropCallback!({
-          payload: {
-            type: "drop",
-            paths: ["C:\\Users\\me\\Documents\\report.docx"],
-            position: { x: 50, y: 20 },
-          },
-        });
-      });
-
-      await vi.waitFor(() => {
-        expect(invoke).toHaveBeenCalledWith("copy_external_file", {
-          args: {
-            workspaceRoot: "/ws",
-            externalPath: "C:\\Users\\me\\Documents\\report.docx",
-            destPath: "docs/report.docx",
-          },
-        });
-      });
-
-      document.body.removeChild(btn);
-      vi.restoreAllMocks();
+    act(() => {
+      result.current.onDragStart(makeDragEvent(), "sub/file.ts");
     });
 
-    it("copies multiple files on single drop", async () => {
-      vi.mocked(invoke).mockResolvedValue(undefined);
-
-      const rootDiv = document.createElement("div");
-      rootDiv.setAttribute("data-tree-root", "true");
-      document.body.appendChild(rootDiv);
-      vi.spyOn(document, "elementFromPoint").mockReturnValue(rootDiv);
-
-      renderHook(() =>
-        useFileTreeDnD({ workspaceRoot: "/ws", containerRef: makeContainerRef() }),
-      );
-
-      act(() => {
-        dragDropCallback!({
-          payload: {
-            type: "drop",
-            paths: ["/ext/a.txt", "/ext/b.txt"],
-            position: { x: 50, y: 20 },
-          },
-        });
-      });
-
-      await vi.waitFor(() => {
-        expect(invoke).toHaveBeenCalledTimes(2);
-      });
-
-      expect(invoke).toHaveBeenCalledWith("copy_external_file", {
-        args: { workspaceRoot: "/ws", externalPath: "/ext/a.txt", destPath: "a.txt" },
-      });
-      expect(invoke).toHaveBeenCalledWith("copy_external_file", {
-        args: { workspaceRoot: "/ws", externalPath: "/ext/b.txt", destPath: "b.txt" },
-      });
-
-      document.body.removeChild(rootDiv);
-      vi.restoreAllMocks();
+    const dropEvent = makeDragEvent({
+      types: ["text/plain"],
+      data: { "text/plain": "sub/file.ts" },
     });
+    act(() => {
+      result.current.onRootDrop(dropEvent);
+    });
+
+    expect(invoke).toHaveBeenCalledWith("move_file", {
+      args: { workspaceRoot: "/ws", fromPath: "sub/file.ts", toPath: "file.ts" },
+    });
+  });
+
+  it("does not move root-level item via onRootDrop", () => {
+    const { result } = renderHook(() =>
+      useFileTreeDnD({ workspaceRoot: "/ws" }),
+    );
+
+    act(() => {
+      result.current.onDragStart(makeDragEvent(), "file.ts");
+    });
+
+    const dropEvent = makeDragEvent({
+      types: ["text/plain"],
+      data: { "text/plain": "file.ts" },
+    });
+    act(() => {
+      result.current.onRootDrop(dropEvent);
+    });
+
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it("allows onRootDragOver only for nested items", () => {
+    const { result } = renderHook(() =>
+      useFileTreeDnD({ workspaceRoot: "/ws" }),
+    );
+
+    // Nested item - should allow
+    act(() => {
+      result.current.onDragStart(makeDragEvent(), "sub/file.ts");
+    });
+
+    const overEvent = makeDragEvent();
+    act(() => {
+      result.current.onRootDragOver(overEvent);
+    });
+    expect(overEvent.preventDefault).toHaveBeenCalled();
+    expect(result.current.dropTargetPath).toBe("");
+  });
+
+  it("blocks onRootDragOver for root-level items", () => {
+    const { result } = renderHook(() =>
+      useFileTreeDnD({ workspaceRoot: "/ws" }),
+    );
+
+    act(() => {
+      result.current.onDragStart(makeDragEvent(), "file.ts");
+    });
+
+    const overEvent = makeDragEvent();
+    act(() => {
+      result.current.onRootDragOver(overEvent);
+    });
+    expect(overEvent.preventDefault).not.toHaveBeenCalled();
+  });
+
+  it("skips move when source equals destination", () => {
+    const { result } = renderHook(() =>
+      useFileTreeDnD({ workspaceRoot: "/ws" }),
+    );
+
+    act(() => {
+      result.current.onDragStart(makeDragEvent(), "dir/file.ts");
+    });
+
+    const dropEvent = makeDragEvent({
+      types: ["text/plain"],
+      data: { "text/plain": "dir/file.ts" },
+    });
+    act(() => {
+      result.current.onDrop(dropEvent, "dir");
+    });
+
+    expect(invoke).not.toHaveBeenCalled();
   });
 });
