@@ -94,7 +94,7 @@ export function WorkspacePopover({
           </p>
 
           {/* Workspace list */}
-          <ScrollArea className="max-h-[200px]">
+          <ScrollArea type="auto" className="max-h-[200px]">
             <div className="px-2 pb-1">
               {workspaces.map((ws) => {
                 const isActive = activeWorkspace?.id === ws.id;
