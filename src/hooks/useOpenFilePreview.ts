@@ -27,6 +27,10 @@ export function useOpenFilePreview() {
       const state = useLayoutStore.getState();
       if (!state.filePreviewOpen) setFilePreviewOpen(true);
       if (!state.filePanelOpen) setFilePanelOpen(true);
+      // Navigate to workspace page where the file preview panel lives
+      if (state.activePage !== "workspace") {
+        useLayoutStore.getState().setActivePage("workspace");
+      }
     },
     [setSelected, setFilePanelOpen, setFilePreviewOpen],
   );
