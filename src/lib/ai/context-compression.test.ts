@@ -60,17 +60,30 @@ describe("estimateNextTurnTokens", () => {
     expect(result).toBe(14);
   });
 
-  it("includes parts length in fallback estimate", () => {
+  it("uses parts length when larger than content (avoids double-counting)", () => {
     const longParts = JSON.stringify([
+      { type: "text", text: "ok" },
       { type: "tool", toolName: "read", args: { path: "a.ts" }, result: "x".repeat(10000) },
     ]);
     const msgs: Message[] = [
       makeMessage({ role: "user", content: "hi" }),
       makeMessage({ role: "assistant", content: "ok", parts: longParts }),
     ];
-    // Without fix: (2 + 2) / 4 = 1. With fix: (2 + 2 + partsLen) / 4 >> 1
+    // Uses max(content.length, parts.length) per message to avoid double-counting.
+    // "hi" user msg: max(2, 0) = 2. assistant: max(2, partsLen) = partsLen (~10k).
     const result = estimateNextTurnTokens(msgs, 0);
-    expect(result).toBeGreaterThan(2500); // parts alone ~10k chars → ~2500 tokens
+    expect(result).toBeGreaterThan(2500); // parts ~10k chars → ~2500 tokens
+  });
+
+  it("does not double-count content and parts for text-only assistant", () => {
+    // assistant with content="hello" and parts containing the same text
+    const parts = JSON.stringify([{ type: "text", text: "hello" }]);
+    const msgs: Message[] = [
+      makeMessage({ role: "assistant", content: "hello", parts }),
+    ];
+    // max(5, ~30) = ~30 chars → ~8 tokens, NOT (5+30)/4=9
+    const result = estimateNextTurnTokens(msgs, 0);
+    expect(result).toBe(Math.ceil(parts.length / 4));
   });
 
   it("uses chars-based fallback when summary message is present", () => {
