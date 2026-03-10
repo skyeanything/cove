@@ -2,6 +2,14 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 import type { StreamLike, StreamUpdate } from "./stream-types";
 import { handleAgentStream } from "./stream-handler";
 
+// Mock throttle to pass-through immediately (throttle logic tested separately)
+vi.mock("./stream-throttle", () => ({
+  createStreamThrottle: (getState: () => StreamUpdate, onUpdate: (s: StreamUpdate) => void) => ({
+    markDirty: () => onUpdate(getState()),
+    flushSync: () => {},
+  }),
+}));
+
 vi.mock("./stream-debug", () => ({
   createStreamDebugLogger: () => ({
     start: vi.fn(),

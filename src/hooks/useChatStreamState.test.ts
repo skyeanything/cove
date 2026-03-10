@@ -12,7 +12,7 @@ vi.mock("@/stores/streamStore", () => ({
 
 import { useDataStore } from "@/stores/dataStore";
 import { useStreamStore } from "@/stores/streamStore";
-import { useChatStreamState } from "./useChatStreamState";
+import { useChatStreamState, useIsStreaming } from "./useChatStreamState";
 
 function mockStores(activeId: string | null, streams: Record<string, unknown>) {
   vi.mocked(useDataStore).mockImplementation((sel: (s: Record<string, unknown>) => unknown) =>
@@ -74,5 +74,37 @@ describe("useChatStreamState", () => {
     const { result } = renderHook(() => useChatStreamState());
     expect(result.current.isStreaming).toBe(false);
     expect(result.current.streamingContent).toBe("");
+  });
+});
+
+describe("useIsStreaming", () => {
+  it("returns false when no active conversation", () => {
+    mockStores(null, {});
+    const { result } = renderHook(() => useIsStreaming());
+    expect(result.current).toBe(false);
+  });
+
+  it("returns true when active conversation is streaming", () => {
+    mockStores("conv-1", {
+      "conv-1": { isStreaming: true },
+    });
+    const { result } = renderHook(() => useIsStreaming());
+    expect(result.current).toBe(true);
+  });
+
+  it("returns false when active conversation is not streaming", () => {
+    mockStores("conv-1", {
+      "conv-1": { isStreaming: false },
+    });
+    const { result } = renderHook(() => useIsStreaming());
+    expect(result.current).toBe(false);
+  });
+
+  it("ignores streams from other conversations", () => {
+    mockStores("conv-1", {
+      "conv-2": { isStreaming: true },
+    });
+    const { result } = renderHook(() => useIsStreaming());
+    expect(result.current).toBe(false);
   });
 });

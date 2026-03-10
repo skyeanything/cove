@@ -1,6 +1,7 @@
 import type { ToolCallInfo, MessagePart } from "@/stores/chat-types";
 import type { StreamLike, StreamResult, StreamUpdate, StreamDebugOptions } from "./stream-types";
 import { createStreamDebugLogger, parseErrorLike } from "./stream-debug";
+import { createStreamThrottle } from "./stream-throttle";
 
 export type { StreamResult, StreamUpdate };
 
@@ -18,6 +19,16 @@ export async function handleAgentStream(
   const debug = createStreamDebugLogger(debugOptions);
   debug.start();
 
+  const throttle = createStreamThrottle(
+    () => ({
+      streamingContent: fullContent,
+      streamingReasoning: fullReasoning,
+      streamingToolCalls: [...toolCalls],
+      streamingParts: [...parts],
+    }),
+    onUpdate,
+  );
+
   try {
   for await (const part of stream.fullStream) {
     debug.event(part);
@@ -31,7 +42,7 @@ export async function handleAgentStream(
       } else {
         parts.push({ type: "text", text });
       }
-      onUpdate({ streamingContent: fullContent, streamingParts: [...parts], streamingToolCalls: [...toolCalls] });
+      throttle.markDirty();
       continue;
     }
 
@@ -41,7 +52,7 @@ export async function handleAgentStream(
       fullReasoning += text;
       const last = parts[parts.length - 1];
       if (last?.type === "reasoning") { last.text += text; } else { parts.push({ type: "reasoning", text }); }
-      onUpdate({ streamingContent: fullContent, streamingReasoning: fullReasoning, streamingToolCalls: [...toolCalls], streamingParts: [...parts] });
+      throttle.markDirty();
       continue;
     }
 
@@ -52,7 +63,7 @@ export async function handleAgentStream(
       fullReasoning += text;
       const last = parts[parts.length - 1];
       if (last?.type === "reasoning") { last.text += text; } else { parts.push({ type: "reasoning", text }); }
-      onUpdate({ streamingContent: fullContent, streamingReasoning: fullReasoning, streamingToolCalls: [...toolCalls], streamingParts: [...parts] });
+      throttle.markDirty();
       continue;
     }
 
@@ -64,7 +75,7 @@ export async function handleAgentStream(
       const tc: ToolCallInfo = { id, toolName, args: {}, isLoading: true, startTime: Date.now(), argsJsonStream: "" };
       toolCalls.push(tc);
       parts.push({ type: "tool", ...tc });
-      onUpdate({ streamingToolCalls: [...toolCalls], streamingParts: [...parts] });
+      throttle.markDirty();
       continue;
     }
 
@@ -77,7 +88,7 @@ export async function handleAgentStream(
           tc.argsJsonStream = (tc.argsJsonStream ?? "") + delta;
           const partInParts = parts.find((p) => p.type === "tool" && p.id === id);
           if (partInParts && partInParts.type === "tool") partInParts.argsJsonStream = tc.argsJsonStream;
-          onUpdate({ streamingToolCalls: [...toolCalls], streamingParts: [...parts] });
+          throttle.markDirty();
         }
       }
       continue;
@@ -95,7 +106,7 @@ export async function handleAgentStream(
             partInParts.args = tc.args;
             delete (partInParts as ToolCallInfo).argsJsonStream;
           }
-          onUpdate({ streamingToolCalls: [...toolCalls], streamingParts: [...parts] });
+          throttle.markDirty();
         }
       }
       continue;
@@ -122,7 +133,7 @@ export async function handleAgentStream(
         toolCalls.push(tc);
         parts.push({ type: "tool", ...tc });
       }
-      onUpdate({ streamingToolCalls: [...toolCalls], streamingParts: [...parts] });
+      throttle.markDirty();
       continue;
     }
 
@@ -141,7 +152,7 @@ export async function handleAgentStream(
         partInParts.isLoading = false;
         if (tc?.durationMs != null) partInParts.durationMs = tc.durationMs;
       }
-      onUpdate({ streamingToolCalls: [...toolCalls], streamingParts: [...parts] });
+      throttle.markDirty();
       continue;
     }
 
@@ -152,6 +163,8 @@ export async function handleAgentStream(
   } catch (err) {
     // Catch stream-level errors thrown by the SDK (e.g. AI_MissingToolResultsError)
     if (!streamError) streamError = parseErrorLike(err) ?? "Unknown stream error";
+  } finally {
+    throttle.flushSync();
   }
 
   if (streamError) {

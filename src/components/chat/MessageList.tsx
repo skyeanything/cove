@@ -6,7 +6,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, memo } from "react";
 import { useTranslation } from "react-i18next";
 import { useChatStore } from "@/stores/chatStore";
 import type { MessagePart } from "@/stores/chatStore";
@@ -21,7 +21,7 @@ import {
 import { useAutoScroll } from "@/hooks/useAutoScroll";
 import { ScrollToBottomButton } from "./ScrollToBottomButton";
 import { renderContentWithMentions } from "@/lib/render-mentions";
-import { useChatStreamState } from "@/hooks/useChatStreamState";
+import { useChatStreamState, useIsStreaming } from "@/hooks/useChatStreamState";
 
 const EMPTY_ATTACHMENTS: Attachment[] = [];
 
@@ -66,7 +66,7 @@ export function MessageList() {
   );
 }
 
-function MessageBubble({ message }: { message: Message }) {
+const MessageBubble = memo(function MessageBubble({ message }: { message: Message }) {
   // Summary card for context compression
   if (message.parent_id === "__context_summary__") {
     return <SummaryCard content={message.content ?? ""} />;
@@ -102,7 +102,7 @@ function MessageBubble({ message }: { message: Message }) {
     );
   }
   return null;
-}
+});
 
 function UserMessage({ messageId, content }: { messageId: string; content: string }) {
   const { t } = useTranslation();
@@ -112,7 +112,7 @@ function UserMessage({ messageId, content }: { messageId: string; content: strin
   const [hovered, setHovered] = useState(false);
   const editAndResend = useChatStore((s) => s.editAndResend);
   const attachments = useChatStore((s) => s.attachmentsByMessage[messageId] ?? EMPTY_ATTACHMENTS);
-  const { isStreaming: isStreamingForEdit } = useChatStreamState();
+  const isStreamingForEdit = useIsStreaming();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleCopy = useCallback(() => {

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, memo } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Copy,
@@ -12,7 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useChatStore } from "@/stores/chatStore";
 import type { ToolCallInfo, MessagePart } from "@/stores/chatStore";
-import { useChatStreamState } from "@/hooks/useChatStreamState";
+import { useIsStreaming } from "@/hooks/useChatStreamState";
 import { usePermissionStore } from "@/stores/permissionStore";
 import { cn, stripMarkdown } from "@/lib/utils";
 import { splitThinkBlocks } from "@/lib/splitThinkBlocks";
@@ -131,7 +131,7 @@ export function renderMessageContent(
   );
 }
 
-export function AssistantMessage({
+export const AssistantMessage = memo(function AssistantMessage({
   messageId,
   content,
   reasoning,
@@ -156,7 +156,7 @@ export function AssistantMessage({
   const [messageHovered, setMessageHovered] = useState(false);
   const [copiedWhich, setCopiedWhich] = useState<"plain" | "markdown" | null>(null);
   const regenerateMessage = useChatStore((s) => s.regenerateMessage);
-  const { isStreaming } = useChatStreamState();
+  const isStreaming = useIsStreaming();
   const showTokens = (tokensInput != null && tokensInput > 0) || (tokensOutput != null && tokensOutput > 0);
 
   const handleRegenerate = useCallback(() => {
@@ -324,4 +324,4 @@ export function AssistantMessage({
       </div>
     </div>
   );
-}
+});

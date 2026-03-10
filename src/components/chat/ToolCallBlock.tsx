@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, memo } from "react";
 import { useTranslation } from "react-i18next";
 import {
   CircleCheck,
@@ -53,7 +53,7 @@ function isToolCallPending(toolCall: ToolCallInfo, pendingAsk: PendingPermission
   return pathOrCmd !== undefined && pendingAsk.pathOrCommand === pathOrCmd;
 }
 
-export function ToolCallBlock({ toolCall, pendingAsk }: { toolCall: ToolCallInfo; pendingAsk: PendingPermission | null }) {
+export const ToolCallBlock = memo(function ToolCallBlock({ toolCall, pendingAsk }: { toolCall: ToolCallInfo; pendingAsk: PendingPermission | null }) {
   const [open, setOpen] = useState(false);
   const { t } = useTranslation();
   const respond = usePermissionStore((s) => s.respond);
@@ -205,4 +205,4 @@ export function ToolCallBlock({ toolCall, pendingAsk }: { toolCall: ToolCallInfo
       )}
     </div>
   );
-}
+});
