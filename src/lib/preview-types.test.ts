@@ -138,6 +138,10 @@ describe("getPreviewKind", () => {
     it("maps .vue to 'code'", () => {
       expect(getPreviewKind("App.vue")).toBe("code");
     });
+
+    it("maps .lua to 'code'", () => {
+      expect(getPreviewKind("script.lua")).toBe("code");
+    });
   });
 
   // ── Plain text ─────────────────────────────────────────────────────
@@ -279,6 +283,10 @@ describe("getPrismLanguage", () => {
 
   it("returns 'markdown' for .md", () => {
     expect(getPrismLanguage("README.md")).toBe("markdown");
+  });
+
+  it("returns 'lua' for .lua", () => {
+    expect(getPrismLanguage("script.lua")).toBe("lua");
   });
 
   it("returns 'plaintext' for unknown extension", () => {

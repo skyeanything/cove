@@ -13,6 +13,7 @@ import "prismjs/components/prism-tsx";
 import "prismjs/components/prism-css";
 import "prismjs/components/prism-python";
 import "prismjs/components/prism-yaml";
+import "prismjs/components/prism-lua";
 import "prismjs/components/prism-markdown";
 import "prismjs/components/prism-markup";
 

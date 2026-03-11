@@ -2,8 +2,10 @@
 //! Embedded Lua 5.4 interpreter for sandboxed code execution.
 //!
 //! AI agent executes Lua code in a safe sandbox with workspace file APIs.
-//! No os/io/package/debug modules; only controlled workspace functions.
+//! Sandbox-safe subsets of io/os are provided (workspace-scoped).
 
+mod io_shim;
+mod os_shim;
 mod print_capture;
 mod workspace;
 
@@ -186,6 +188,12 @@ pub(crate) fn run_lua_inner(
     }
     // Remove require
     let _ = globals.set("require", LuaValue::Nil);
+
+    // Register sandbox-safe io/os shims (after clearing originals)
+    io_shim::register_io(&lua, workspace_root)
+        .map_err(|e| format!("io shim setup: {e}"))?;
+    os_shim::register_os(&lua, workspace_root)
+        .map_err(|e| format!("os shim setup: {e}"))?;
 
     let print_buf = PrintCapture::new();
     let print_buf_clone = print_buf.clone();

@@ -3,7 +3,7 @@ export type PreviewKind = "txt" | "md" | "code" | "csv" | "html" | "image" | "pd
 
 const CODE_EXTS = new Set([
   "js", "jsx", "ts", "tsx", "mjs", "cjs",
-  "py", "rs", "go", "css", "scss", "less",
+  "py", "rs", "go", "lua", "css", "scss", "less",
   "json", "yaml", "yml", "xml", "md", "sh", "bash", "zsh",
   "sql", "graphql", "vue", "svelte",
 ]);
@@ -45,6 +45,7 @@ export const EXT_TO_PRISM_LANG: Record<string, string> = {
   yml: "yaml",
   md: "markdown",
   qmd: "markdown",
+  lua: "lua",
   sh: "bash",
   bash: "bash",
   zsh: "bash",

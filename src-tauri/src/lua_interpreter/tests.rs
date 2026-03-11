@@ -275,23 +275,36 @@ fn test_glob_parent_traversal_rejected() {
     assert!(r.error.unwrap().contains("parent traversal"));
 }
 
-// --- sandboxing ---
+// --- sandboxing (os.execute / io.popen blocked, but safe subsets available) ---
 
 #[test]
-fn test_os_not_available() {
+fn test_os_execute_blocked() {
     let dir = TempDir::new().unwrap();
     let r = run(dir.path().to_str().unwrap(), "return os.execute('echo hi')");
     assert!(r.error.is_some());
+    assert!(r.error.unwrap().contains("blocked"));
 }
 
 #[test]
-fn test_io_not_available() {
+fn test_io_open_outside_workspace() {
     let dir = TempDir::new().unwrap();
     let r = run(
         dir.path().to_str().unwrap(),
-        "return io.open('/etc/passwd', 'r')",
+        r#"
+        local f, err = io.open('/etc/passwd', 'r')
+        return tostring(f) .. '|' .. type(err)
+        "#,
     );
+    assert!(r.error.is_none(), "error: {:?}", r.error);
+    assert_eq!(r.result, "nil|string");
+}
+
+#[test]
+fn test_io_popen_blocked() {
+    let dir = TempDir::new().unwrap();
+    let r = run(dir.path().to_str().unwrap(), "io.popen('ls')");
     assert!(r.error.is_some());
+    assert!(r.error.unwrap().contains("blocked"));
 }
 
 #[test]
@@ -523,6 +536,265 @@ fn test_bridge_not_loaded_without_officellm_home() {
     // officellm global should NOT exist when officellm_home is None
     let dir = TempDir::new().unwrap();
     let r = run(dir.path().to_str().unwrap(), "return type(officellm)");
+    assert!(r.error.is_none());
+    assert_eq!(r.result, "nil");
+}
+
+// --- io shim ---
+
+#[test]
+fn test_io_open_read() {
+    let dir = TempDir::new().unwrap();
+    fs::write(dir.path().join("data.txt"), "line1\nline2\nline3").unwrap();
+    let r = run(
+        dir.path().to_str().unwrap(),
+        r#"
+        local f = io.open('data.txt', 'r')
+        local all = f:read('*a')
+        f:close()
+        return all
+        "#,
+    );
+    assert!(r.error.is_none(), "error: {:?}", r.error);
+    assert_eq!(r.result, "line1\nline2\nline3");
+}
+
+#[test]
+fn test_io_open_read_line() {
+    let dir = TempDir::new().unwrap();
+    fs::write(dir.path().join("lines.txt"), "aaa\nbbb\nccc").unwrap();
+    let r = run(
+        dir.path().to_str().unwrap(),
+        r#"
+        local f = io.open('lines.txt')
+        local a = f:read('*l')
+        local b = f:read('*l')
+        f:close()
+        return a .. '|' .. b
+        "#,
+    );
+    assert!(r.error.is_none(), "error: {:?}", r.error);
+    assert_eq!(r.result, "aaa|bbb");
+}
+
+#[test]
+fn test_io_open_write() {
+    let dir = TempDir::new().unwrap();
+    let r = run(
+        dir.path().to_str().unwrap(),
+        r#"
+        local f = io.open('out.txt', 'w')
+        f:write('hello ')
+        f:write('world')
+        f:close()
+        return workspace.readFile('out.txt')
+        "#,
+    );
+    assert!(r.error.is_none(), "error: {:?}", r.error);
+    assert_eq!(r.result, "hello world");
+}
+
+#[test]
+fn test_io_open_append() {
+    let dir = TempDir::new().unwrap();
+    fs::write(dir.path().join("log.txt"), "first\n").unwrap();
+    let r = run(
+        dir.path().to_str().unwrap(),
+        r#"
+        local f = io.open('log.txt', 'a')
+        f:write('second\n')
+        f:close()
+        return workspace.readFile('log.txt')
+        "#,
+    );
+    assert!(r.error.is_none(), "error: {:?}", r.error);
+    assert_eq!(r.result, "first\nsecond\n");
+}
+
+#[test]
+fn test_io_lines() {
+    let dir = TempDir::new().unwrap();
+    fs::write(dir.path().join("iter.txt"), "x\ny\nz").unwrap();
+    let r = run(
+        dir.path().to_str().unwrap(),
+        r#"
+        local result = {}
+        for line in io.lines('iter.txt') do
+            result[#result+1] = line
+        end
+        return table.concat(result, ',')
+        "#,
+    );
+    assert!(r.error.is_none(), "error: {:?}", r.error);
+    assert_eq!(r.result, "x,y,z");
+}
+
+#[test]
+fn test_io_type() {
+    let dir = TempDir::new().unwrap();
+    fs::write(dir.path().join("t.txt"), "").unwrap();
+    let r = run(
+        dir.path().to_str().unwrap(),
+        r#"
+        local f = io.open('t.txt', 'r')
+        local t1 = io.type(f)
+        f:close()
+        local t2 = io.type({})
+        return t1 .. '|' .. tostring(t2)
+        "#,
+    );
+    assert!(r.error.is_none(), "error: {:?}", r.error);
+    assert_eq!(r.result, "file|nil");
+}
+
+#[test]
+fn test_io_open_missing_returns_nil() {
+    let dir = TempDir::new().unwrap();
+    let r = run(
+        dir.path().to_str().unwrap(),
+        r#"
+        local f, err = io.open('nonexistent.txt', 'r')
+        return tostring(f) .. '|' .. type(err)
+        "#,
+    );
+    assert!(r.error.is_none(), "error: {:?}", r.error);
+    assert_eq!(r.result, "nil|string");
+}
+
+#[test]
+fn test_io_lines_respects_position() {
+    let dir = TempDir::new().unwrap();
+    fs::write(dir.path().join("pos.txt"), "aaa\nbbb\nccc\nddd").unwrap();
+    let r = run(
+        dir.path().to_str().unwrap(),
+        r#"
+        local f = io.open('pos.txt', 'r')
+        f:read('*l')  -- consume "aaa"
+        local result = {}
+        for line in f:lines() do
+            result[#result+1] = line
+        end
+        f:close()
+        return table.concat(result, ',')
+        "#,
+    );
+    assert!(r.error.is_none(), "error: {:?}", r.error);
+    assert_eq!(r.result, "bbb,ccc,ddd");
+}
+
+#[test]
+fn test_io_type_closed_file() {
+    let dir = TempDir::new().unwrap();
+    fs::write(dir.path().join("ct.txt"), "").unwrap();
+    let r = run(
+        dir.path().to_str().unwrap(),
+        r#"
+        local f = io.open('ct.txt', 'r')
+        local t1 = io.type(f)
+        f:close()
+        local t2 = io.type(f)
+        return t1 .. '|' .. t2
+        "#,
+    );
+    assert!(r.error.is_none(), "error: {:?}", r.error);
+    assert_eq!(r.result, "file|closed file");
+}
+
+// --- os shim ---
+
+#[test]
+fn test_os_time_clock() {
+    let dir = TempDir::new().unwrap();
+    let r = run(
+        dir.path().to_str().unwrap(),
+        r#"
+        local t = os.time()
+        local c = os.clock()
+        return (type(t) == 'number' and t > 0 and type(c) == 'number') and 'ok' or 'fail'
+        "#,
+    );
+    assert!(r.error.is_none(), "error: {:?}", r.error);
+    assert_eq!(r.result, "ok");
+}
+
+#[test]
+fn test_os_date() {
+    let dir = TempDir::new().unwrap();
+    let r = run(
+        dir.path().to_str().unwrap(),
+        "return os.date('!%Y', 0)",
+    );
+    assert!(r.error.is_none(), "error: {:?}", r.error);
+    assert_eq!(r.result, "1970");
+}
+
+#[test]
+fn test_os_difftime() {
+    let dir = TempDir::new().unwrap();
+    let r = run(
+        dir.path().to_str().unwrap(),
+        "return os.difftime(100, 30)",
+    );
+    assert!(r.error.is_none(), "error: {:?}", r.error);
+    assert_eq!(r.result, "70");
+}
+
+#[test]
+fn test_os_tmpname() {
+    let dir = TempDir::new().unwrap();
+    let r = run(
+        dir.path().to_str().unwrap(),
+        r#"
+        local name = os.tmpname()
+        return (name:sub(1, 10) == '.cove-tmp-' and workspace.exists(name)) and 'ok' or 'fail'
+        "#,
+    );
+    assert!(r.error.is_none(), "error: {:?}", r.error);
+    assert_eq!(r.result, "ok");
+}
+
+#[test]
+fn test_os_remove() {
+    let dir = TempDir::new().unwrap();
+    fs::write(dir.path().join("del.txt"), "bye").unwrap();
+    let r = run(
+        dir.path().to_str().unwrap(),
+        r#"
+        os.remove('del.txt')
+        return workspace.exists('del.txt')
+        "#,
+    );
+    assert!(r.error.is_none(), "error: {:?}", r.error);
+    assert_eq!(r.result, "false");
+}
+
+#[test]
+fn test_os_rename() {
+    let dir = TempDir::new().unwrap();
+    fs::write(dir.path().join("old.txt"), "data").unwrap();
+    let r = run(
+        dir.path().to_str().unwrap(),
+        r#"
+        os.rename('old.txt', 'new.txt')
+        return workspace.readFile('new.txt')
+        "#,
+    );
+    assert!(r.error.is_none(), "error: {:?}", r.error);
+    assert_eq!(r.result, "data");
+}
+
+#[test]
+fn test_os_exit_blocked() {
+    let dir = TempDir::new().unwrap();
+    let r = run(dir.path().to_str().unwrap(), "os.exit(0)");
+    assert!(r.error.is_some());
+    assert!(r.error.unwrap().contains("blocked"));
+}
+
+#[test]
+fn test_os_getenv_returns_nil() {
+    let dir = TempDir::new().unwrap();
+    let r = run(dir.path().to_str().unwrap(), "return os.getenv('HOME')");
     assert!(r.error.is_none());
     assert_eq!(r.result, "nil");
 }

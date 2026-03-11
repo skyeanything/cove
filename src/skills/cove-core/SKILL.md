@@ -29,10 +29,14 @@ Use `print()` for output (not console.log). Multiple args are tab-separated.
 Pass `file: "path/to/script.lua"` instead of `code` to execute a .lua file from the workspace.
 
 ### Sandboxed
-`os`, `io`, `require`, `debug`, `dofile`, `loadfile` are not available. No network access. Memory 64MB, timeout 30s (max 60s). Workspace scope only.
+Safe subsets of `io` and `os` are available (workspace-scoped).
+`io.open`, `io.lines`, `io.read`, `io.write` operate within workspace only.
+`os.time()`, `os.clock()`, `os.date()`, `os.tmpname()`, `os.remove()`, `os.rename()` available.
+`os.execute`, `io.popen`, `require`, `debug`, `dofile`, `loadfile` are blocked.
+No network access. Memory 64MB, timeout 30s (max 60s). Workspace scope only.
 
 ### Available globals
-`print`, `json`, `workspace`, `string`, `table`, `math`, `tonumber`, `tostring`, `type`, `pairs`, `ipairs`, `select`, `pcall`, `xpcall`, `error`, `assert`.
+`print`, `json`, `workspace`, `io`, `os`, `string`, `table`, `math`, `tonumber`, `tostring`, `type`, `pairs`, `ipairs`, `select`, `pcall`, `xpcall`, `error`, `assert`.
 
 ## Before acting
 
