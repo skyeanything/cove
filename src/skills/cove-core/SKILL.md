@@ -1,6 +1,6 @@
 ---
 name: cove-core
-description: "Cove core capabilities: built-in JavaScript interpreter, file operations, and core tool usage guide."
+description: "Cove core capabilities: built-in Lua interpreter, file operations, and core tool usage guide."
 emoji: "🏠"
 always: true
 ---
@@ -14,11 +14,25 @@ always: true
 Do NOT wrap a single operation in cove_interpreter when a dedicated tool can do it.
 Do NOT use bash for JSON parsing or math — use cove_interpreter.
 
-## cove_interpreter APIs
+## cove_interpreter (Lua 5.4)
 
-`workspace.readFile(path)`, `writeFile`, `appendFile`, `listDir`, `exists`, `stat`, `copyFile`, `moveFile`, `remove`, `createDir`, `glob(pattern)`, `officellm(cmd, args)`. Also: `console.*`, `Math.*`, `JSON.*`, `Date`, `RegExp`.
+### Output
+Use `print()` for output (not console.log). Multiple args are tab-separated.
 
-No network, no `fetch/require/import/process/fs`. Memory 64MB, timeout 30s (max 60s). Workspace scope only.
+### JSON
+`json.encode(table)` and `json.decode(string)` are available (Rust-backed, not a Lua library).
+
+### Workspace APIs
+`workspace.readFile(path)`, `writeFile(path, content)`, `appendFile(path, content)`, `listDir(path)`, `exists(path)`, `stat(path)`, `copyFile(src, dst)`, `moveFile(src, dst)`, `remove(path)`, `createDir(path)`, `glob(pattern)`, `officellm(cmd, args)`.
+
+### File execution
+Pass `file: "path/to/script.lua"` instead of `code` to execute a .lua file from the workspace.
+
+### Sandboxed
+`os`, `io`, `require`, `debug`, `dofile`, `loadfile` are not available. No network access. Memory 64MB, timeout 30s (max 60s). Workspace scope only.
+
+### Available globals
+`print`, `json`, `workspace`, `string`, `table`, `math`, `tonumber`, `tostring`, `type`, `pairs`, `ipairs`, `select`, `pcall`, `xpcall`, `error`, `assert`.
 
 ## Before acting
 

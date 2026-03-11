@@ -8,7 +8,7 @@ import { fetchUrlTool } from "./fetch-url";
 import { createSkillTool, createSkillResourceTool } from "./skill";
 import { writeSkillTool } from "./write-skill";
 import { officeTool } from "./office";
-import { jsInterpreterTool } from "./jsInterpreter";
+import { interpreterTool } from "./interpreter";
 import { diagramTool } from "./diagram";
 import { createSpawnAgentTool } from "./spawn-agent";
 import { recallTool, recallDetailTool } from "./recall";
@@ -28,7 +28,7 @@ const TOOL_IMPLS: Record<string, AnyTool> = {
   edit: editTool,
   // bash is created per-conversation via createBashTool — not a static singleton
   fetch_url: fetchUrlTool,
-  cove_interpreter: jsInterpreterTool,
+  cove_interpreter: interpreterTool,
   write_skill: writeSkillTool,
   office: officeTool,
   diagram: diagramTool,

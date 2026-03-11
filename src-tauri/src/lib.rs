@@ -7,7 +7,8 @@ mod docx_commands;
 mod document_parsers;
 mod fetch_commands;
 mod fs_commands;
-mod js_interpreter;
+mod lua_interpreter;
+mod workspace_ops;
 mod officellm;
 mod render_commands;
 mod sandbox;
@@ -170,7 +171,7 @@ pub fn run() {
       sandbox::check_sandbox_supported,
       sandbox::get_sandbox_policy,
       sandbox::set_sandbox_policy,
-      js_interpreter::run_js,
+      lua_interpreter::run_lua,
       skill_discovery::discover_external_skills,
       skill_commands::write_skill,
       skill_commands::delete_skill,
