@@ -4,6 +4,11 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+patchedDependencies:
+  docx-preview-sync@0.4.20:
+    hash: d8a9d7cfdc1f073a5ebb65cee713d30881b88c2b5a47a148e4c2e744fbe0add0
+    path: patches/docx-preview-sync@0.4.20.patch
+
 importers:
 
   .:
@@ -64,7 +69,7 @@ importers:
         version: 8.0.3
       docx-preview-sync:
         specifier: ^0.4.20
-        version: 0.4.20
+        version: 0.4.20(patch_hash=d8a9d7cfdc1f073a5ebb65cee713d30881b88c2b5a47a148e4c2e744fbe0add0)
       dompurify:
         specifier: ^3.3.1
         version: 3.3.1
@@ -8964,7 +8969,7 @@ snapshots:
 
   diff@8.0.3: {}
 
-  docx-preview-sync@0.4.20:
+  docx-preview-sync@0.4.20(patch_hash=d8a9d7cfdc1f073a5ebb65cee713d30881b88c2b5a47a148e4c2e744fbe0add0):
     dependencies:
       jszip: 3.10.1
       konva: 9.3.22

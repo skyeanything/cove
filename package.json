@@ -94,6 +94,9 @@
   "pnpm": {
     "onlyBuiltDependencies": [
       "esbuild"
-    ]
+    ],
+    "patchedDependencies": {
+      "docx-preview-sync@0.4.20": "patches/docx-preview-sync@0.4.20.patch"
+    }
   }
 }
