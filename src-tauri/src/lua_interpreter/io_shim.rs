@@ -19,7 +19,13 @@ pub(super) fn register_io(lua: &Lua, workspace_root: &str) -> LuaResult<()> {
         "open",
         lua.create_function(move |lua, (path, mode): (String, Option<String>)| {
             let mode = mode.unwrap_or_else(|| "r".to_string());
-            create_file_handle(lua, &wr_c, &path, &mode)
+            match create_file_handle(lua, &wr_c, &path, &mode) {
+                Ok(handle) => Ok((handle, LuaValue::Nil)),
+                Err(e) => Ok((
+                    LuaValue::Nil,
+                    LuaValue::String(lua.create_string(&e.to_string())?),
+                )),
+            }
         })?,
     )?;
 
@@ -72,8 +78,14 @@ pub(super) fn register_io(lua: &Lua, workspace_root: &str) -> LuaResult<()> {
         "type",
         lua.create_function(|lua, val: LuaValue| {
             if let LuaValue::Table(t) = &val {
-                if let Ok(marker) = t.get::<String>("_io_type") {
-                    return Ok(LuaValue::String(lua.create_string(&marker)?));
+                if t.get::<String>("_io_type").is_ok() {
+                    let closed = t
+                        .get::<LuaTable>("_state")
+                        .ok()
+                        .and_then(|s| s.get::<bool>("closed").ok())
+                        .unwrap_or(false);
+                    let marker = if closed { "closed file" } else { "file" };
+                    return Ok(LuaValue::String(lua.create_string(marker)?));
                 }
             }
             Ok(LuaValue::Nil)
@@ -163,7 +175,14 @@ fn create_read_handle(
         "lines",
         lua.create_function(move |lua, _self_arg: LuaValue| {
             let content: String = st.get("content")?;
-            let lines: Vec<String> = content.lines().map(|l| l.to_string()).collect();
+            let pos: usize = st.get::<i64>("pos")? as usize;
+            let remaining = if pos < content.len() {
+                &content[pos..]
+            } else {
+                ""
+            };
+            let lines: Vec<String> = remaining.lines().map(|l| l.to_string()).collect();
+            st.set("pos", content.len() as i64)?;
             let idx = lua.create_userdata(LineIterState { lines, pos: 0 })?;
             let iter = lua.create_function(move |lua, ud: LuaAnyUserData| {
                 let mut state = ud.borrow_mut::<LineIterState>()?;

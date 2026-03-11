@@ -290,9 +290,13 @@ fn test_io_open_outside_workspace() {
     let dir = TempDir::new().unwrap();
     let r = run(
         dir.path().to_str().unwrap(),
-        "return io.open('/etc/passwd', 'r')",
+        r#"
+        local f, err = io.open('/etc/passwd', 'r')
+        return tostring(f) .. '|' .. type(err)
+        "#,
     );
-    assert!(r.error.is_some());
+    assert!(r.error.is_none(), "error: {:?}", r.error);
+    assert_eq!(r.result, "nil|string");
 }
 
 #[test]
@@ -641,6 +645,59 @@ fn test_io_type() {
     );
     assert!(r.error.is_none(), "error: {:?}", r.error);
     assert_eq!(r.result, "file|nil");
+}
+
+#[test]
+fn test_io_open_missing_returns_nil() {
+    let dir = TempDir::new().unwrap();
+    let r = run(
+        dir.path().to_str().unwrap(),
+        r#"
+        local f, err = io.open('nonexistent.txt', 'r')
+        return tostring(f) .. '|' .. type(err)
+        "#,
+    );
+    assert!(r.error.is_none(), "error: {:?}", r.error);
+    assert_eq!(r.result, "nil|string");
+}
+
+#[test]
+fn test_io_lines_respects_position() {
+    let dir = TempDir::new().unwrap();
+    fs::write(dir.path().join("pos.txt"), "aaa\nbbb\nccc\nddd").unwrap();
+    let r = run(
+        dir.path().to_str().unwrap(),
+        r#"
+        local f = io.open('pos.txt', 'r')
+        f:read('*l')  -- consume "aaa"
+        local result = {}
+        for line in f:lines() do
+            result[#result+1] = line
+        end
+        f:close()
+        return table.concat(result, ',')
+        "#,
+    );
+    assert!(r.error.is_none(), "error: {:?}", r.error);
+    assert_eq!(r.result, "bbb,ccc,ddd");
+}
+
+#[test]
+fn test_io_type_closed_file() {
+    let dir = TempDir::new().unwrap();
+    fs::write(dir.path().join("ct.txt"), "").unwrap();
+    let r = run(
+        dir.path().to_str().unwrap(),
+        r#"
+        local f = io.open('ct.txt', 'r')
+        local t1 = io.type(f)
+        f:close()
+        local t2 = io.type(f)
+        return t1 .. '|' .. t2
+        "#,
+    );
+    assert!(r.error.is_none(), "error: {:?}", r.error);
+    assert_eq!(r.result, "file|closed file");
 }
 
 // --- os shim ---
