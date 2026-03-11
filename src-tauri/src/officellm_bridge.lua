@@ -36,11 +36,11 @@ end
 
 local function create_session()
     return {
-        call = function(_, command, params)
+        call = function(command, params)
             return invoke(command, convert_params(params or {}))
         end,
 
-        execute = function(_, ops, options)
+        execute = function(ops, options)
             local batch = { version = "1.0", ops = ops }
             if options then
                 for k, v in pairs(options) do
@@ -50,7 +50,7 @@ local function create_session()
             return invoke("execute", { ["instructions-json"] = json.encode(batch) })
         end,
 
-        save = function(_, path)
+        save = function(path)
             if path then
                 return invoke("save", { path = path })
             else

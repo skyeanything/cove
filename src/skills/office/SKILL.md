@@ -21,47 +21,47 @@ office(command: "from-markdown", args: {i: "in.md", o: "out.docx"})
 ```
 
 **Multi-step workflows** -- use `cove_interpreter` with the officellm bridge:
-```javascript
-// Edit existing document
-var doc = officellm.open("report.docx");
-doc.call("replace-text", { find: "old", replace: "new" });
-doc.call("apply-format", { find: "Important", bold: true });
-doc.save("report-updated.docx");
-doc.close();
+```lua
+-- Edit existing document
+local doc = officellm.open("report.docx")
+doc.call("replace-text", { find = "old", replace = "new" })
+doc.call("apply-format", { find = "Important", bold = true })
+doc.save("report-updated.docx")
+doc.close()
 
-// Create new document from scratch
-var doc = officellm.create({ markdown: "# Report\n\nContent here" });
-doc.call("apply-format", { find: "Report", bold: true });
-doc.save("report.docx");  // create documents require a path on save
-doc.close();
+-- Create new document from scratch
+local doc = officellm.create({ markdown = "# Report\n\nContent here" })
+doc.call("apply-format", { find = "Report", bold = true })
+doc.save("report.docx")  -- create documents require a path on save
+doc.close()
 ```
 
 Batch operations via `doc.execute()`:
-```javascript
-doc.execute([
-  { op: "ReplaceText", target: "Draft", payload: "Final" },
-  { op: "ApplyFormat", target: "Title", format: { bold: true, fontSize: "16pt" } }
-], { atomic: true, dryRun: true });
+```lua
+doc.execute({
+  { op = "ReplaceText", target = "Draft", payload = "Final" },
+  { op = "ApplyFormat", target = "Title", format = { bold = true, fontSize = "16pt" } }
+}, { atomic = true, dryRun = true })
 ```
 
-Stateless (no open needed): `officellm.call("from-markdown", { i: "in.md", o: "out.docx" })`.
+Stateless (no open needed): `officellm.call("from-markdown", { i = "in.md", o = "out.docx" })`.
 
 ## officellm bridge API (cove_interpreter)
 
-When officellm is available, a bridge API is auto-injected into the QuickJS runtime.
+When officellm is available, a bridge API is auto-injected into the Lua runtime.
 Use it for multi-step workflows combining multiple operations on the same document.
 For single operations, use the `office` tool directly.
 
 **Low-level workspace.officellm()** is also available for direct calls:
-```javascript
-var raw = JSON.parse(workspace.officellm("extract-text", { i: "report.docx" }));
-if (raw.status === "success") console.log(raw.data.text);
+```lua
+local raw = json.decode(workspace.officellm("extract-text", { i = "report.docx" }))
+if raw.status == "success" then print(raw.data.text) end
 ```
 
 Rules:
 - Always check `status` before `open`. Always `close` when done.
-- Wrap calls in try/catch; log the command name in error messages.
-- `workspace.officellm()` returns a JSON string; always `JSON.parse()` it.
+- Wrap calls in `pcall`; log the command name in error messages.
+- `workspace.officellm()` returns a JSON string; always `json.decode()` it.
 
 ## Session coordination
 

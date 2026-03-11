@@ -38,7 +38,7 @@ All tools are available by default. Category determines gating.
 | Shell Command | Execute a shell command |
 | Fetch URL | Fetch content from a URL as text |
 | Parse Document | Parse document files into structured text |
-| Cove Interpreter | Run JS in a sandboxed QuickJS interpreter |
+| Cove Interpreter | Run Lua code in a sandboxed interpreter |
 | Diagram | Render Mermaid diagrams to PNG images |
 | Settings | Read and modify application settings via chat |
 | Recall | Search conversation archive by topic (internal, not user-visible) |
@@ -69,7 +69,7 @@ Modular capability packs. Each skill is a `SKILL.md` file with YAML frontmatter.
 
 - Enable/disable in Settings > Skills
 - Three sources: built-in (bundled in app), user (`~/.cove/skills/`), discovered (from other tools)
-- `cove-core` core skill is always active (provides JS interpreter rules)
+- `cove-core` core skill is always active (provides Lua interpreter rules)
 - Create custom skills by enabling `skill-creator` and asking the AI
 
 ## Settings
