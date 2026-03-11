@@ -165,7 +165,7 @@ pub(crate) fn run_lua_inner(
     let timed_out = Arc::new(AtomicBool::new(false));
     let timed_out_clone = timed_out.clone();
 
-    let lua = unsafe { Lua::unsafe_new() };
+    let lua = Lua::new();
     let _ = lua.set_memory_limit(DEFAULT_MEMORY_LIMIT);
     lua.set_hook(
         mlua::HookTriggers::new().every_nth_instruction(4096),
