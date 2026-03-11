@@ -46,30 +46,47 @@ export function DocxHtmlViewer({ dataUrl, className }: DocxHtmlViewerProps) {
     setStatus("rendering");
     setError("");
 
-    const key = cacheKey(dataUrl);
-    let buf = memCache.get(key);
-    if (!buf) {
-      buf = dataUrlToArrayBuffer(dataUrl);
-      memCache.set(key, buf);
-    }
-
     const container = containerRef.current;
     if (!container) return;
 
-    renderAsync(buf, container, styleRef.current ?? undefined, {
-      inWrapper: false,
-      ignoreHeight: true,
-      ignoreWidth: true,
-    })
-      .then(() => {
-        if (pendingRef.current !== dataUrl) return;
-        setStatus("done");
+    const handleError = (err: unknown) => {
+      if (pendingRef.current !== dataUrl) return;
+      setError(String(err));
+      setStatus("error");
+    };
+
+    // dataUrlToArrayBuffer (atob) can throw synchronously on malformed input
+    let buf: ArrayBuffer;
+    try {
+      const key = cacheKey(dataUrl);
+      const cached = memCache.get(key);
+      if (cached) {
+        buf = cached;
+      } else {
+        buf = dataUrlToArrayBuffer(dataUrl);
+        memCache.set(key, buf);
+      }
+    } catch (err) {
+      handleError(err);
+      return;
+    }
+
+    // renderAsync may throw synchronously on certain malformed DOCX files
+    // (WebKit reports it as "Right side of assignment cannot be destructured")
+    try {
+      void renderAsync(buf, container, styleRef.current ?? undefined, {
+        inWrapper: false,
+        ignoreHeight: true,
+        ignoreWidth: true,
       })
-      .catch((err: unknown) => {
-        if (pendingRef.current !== dataUrl) return;
-        setError(String(err));
-        setStatus("error");
-      });
+        .then(() => {
+          if (pendingRef.current !== dataUrl) return;
+          setStatus("done");
+        })
+        .catch(handleError);
+    } catch (err) {
+      handleError(err);
+    }
   }, [dataUrl]);
 
   return (
