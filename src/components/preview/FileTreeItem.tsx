@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/context-menu";
 import { cn } from "@/lib/utils";
 import { getFileIcon } from "@/lib/file-tree-icons";
+import type { InsertTarget } from "@/hooks/useFileTreeDnD";
 
 export interface ListDirEntry {
   name: string;
@@ -59,6 +60,7 @@ export function FileTreeItem({
   onRenameCancel,
   draggedPath,
   dropTargetPath,
+  insertTarget,
   onDnDStart,
   onDnDEnd,
   onDnDOver,
@@ -91,11 +93,12 @@ export function FileTreeItem({
   onRenameCancel: () => void;
   draggedPath?: string | null;
   dropTargetPath?: string | null;
+  insertTarget?: InsertTarget | null;
   onDnDStart?: (e: React.DragEvent, path: string) => void;
   onDnDEnd?: () => void;
   onDnDOver?: (e: React.DragEvent, path: string, isDir: boolean) => void;
   onDnDLeave?: (e: React.DragEvent, path: string) => void;
-  onDnDDrop?: (e: React.DragEvent, path: string) => void;
+  onDnDDrop?: (e: React.DragEvent, path: string, isDir: boolean) => void;
 }) {
   const { t } = useTranslation();
   const isDir = entry.isDir;
@@ -105,13 +108,17 @@ export function FileTreeItem({
     : selectedPath === path;
   const isExpanded = expandedDirs.has(path);
   const isDragged = draggedPath === path;
-  const isDropTarget = dropTargetPath === path && isDir;
+  // Highlight when this item is the explicit drop target, or when this is a file
+  // and the effective drop target is its parent directory.
+  const parentPath = path.includes("/") ? path.replace(/\/[^/]+$/, "") : "";
+  const isDropTarget =
+    dropTargetPath === path || (!isDir && dropTargetPath === parentPath);
+  const insertBefore = insertTarget?.path === path && insertTarget.position === "before";
+  const insertAfter = insertTarget?.path === path && insertTarget.position === "after";
   const children = loadedChildren[path];
   const isEditing = editingPath === path;
   const isCut = clipboardMode === "cut" && clipboardSourcePath === path;
   const inputRef = useRef<HTMLInputElement>(null);
-
-  const parentPath = path.includes("/") ? path.replace(/\/[^/]+$/, "") : "";
 
   const handleClick = useCallback(
     (e: React.MouseEvent) => {
@@ -202,6 +209,9 @@ export function FileTreeItem({
 
   return (
     <div className="select-none relative">
+      {insertBefore && (
+        <div className="absolute top-0 left-2 right-2 h-0.5 bg-accent rounded-full z-10 pointer-events-none" />
+      )}
       {isSelected && (
         <div
           className="absolute left-1 right-1 top-0 bottom-0 rounded-[2px] bg-background-tertiary pointer-events-none -z-[1]"
@@ -218,7 +228,7 @@ export function FileTreeItem({
             onDragEnd={onDnDEnd}
             onDragOver={(e) => onDnDOver?.(e, path, isDir)}
             onDragLeave={(e) => onDnDLeave?.(e, path)}
-            onDrop={(e) => { if (isDir) onDnDDrop?.(e, path); }}
+            onDrop={(e) => onDnDDrop?.(e, path, isDir)}
             className={cn(
               "relative flex w-full items-center gap-1.5 rounded-[2px] mx-1 px-2 py-1 text-left text-[13px]",
               isSelected
@@ -289,6 +299,9 @@ export function FileTreeItem({
           </ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>
+      {insertAfter && (
+        <div className="absolute bottom-0 left-2 right-2 h-0.5 bg-accent rounded-full z-10 pointer-events-none" />
+      )}
       {isDir && isExpanded && children !== undefined && (
         <div className="ml-4 pl-1">
           {children.map((child) => (
@@ -320,6 +333,7 @@ export function FileTreeItem({
               onRenameCancel={onRenameCancel}
               draggedPath={draggedPath}
               dropTargetPath={dropTargetPath}
+              insertTarget={insertTarget}
               onDnDStart={onDnDStart}
               onDnDEnd={onDnDEnd}
               onDnDOver={onDnDOver}

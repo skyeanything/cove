@@ -83,12 +83,15 @@ export function PreviewFileHeader({
   workspaceRoot,
   officeApps,
   children,
+  leftActions,
 }: {
   path: string;
   workspaceRoot: string | null;
   officeApps: OfficeAppInfo[];
   /** Extra controls rendered before the open-externally button (e.g. HistoryPopover) */
   children?: ReactNode;
+  /** Controls rendered to the left of the breadcrumb nav (e.g. file tree toggle) */
+  leftActions?: ReactNode;
 }) {
   const { t } = useTranslation();
   const openExternally = useOpenExternally(workspaceRoot, path);
@@ -110,8 +113,11 @@ export function PreviewFileHeader({
 
   return (
     <div className="flex h-8 shrink-0 items-center justify-between gap-2 border-b border-border bg-background px-3">
-      <div className="file-preview-header-path min-w-0 text-[13px]">
-        <BreadcrumbNav path={path} />
+      <div className="flex min-w-0 items-center gap-1">
+        {leftActions}
+        <div className="file-preview-header-path min-w-0 text-[13px]">
+          <BreadcrumbNav path={path} />
+        </div>
       </div>
       <div className="relative flex shrink-0 items-center gap-1" ref={dropdownRef}>
         {children}

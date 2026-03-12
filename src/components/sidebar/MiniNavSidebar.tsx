@@ -17,6 +17,7 @@ import {
   Blocks,
   MessageSquare,
   Settings,
+  PanelRight,
 } from "lucide-react";
 
 interface NavIconProps {
@@ -55,6 +56,16 @@ export function MiniNavSidebar() {
 
   return (
     <div className="no-select flex h-full w-full flex-col overflow-hidden border-r border-sidebar-border bg-sidebar">
+      {/* 展开按钮 */}
+      <div className="flex h-10 shrink-0 items-center justify-center border-b border-sidebar-border">
+        <button
+          onClick={setLeftSidebarFull}
+          title="展开侧边栏 (⌘B)"
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-sidebar-foreground/60 transition-colors hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+        >
+          <PanelRight className="size-[18px]" strokeWidth={1.5} />
+        </button>
+      </div>
       {/* 导航图标 */}
       <div className="space-y-0.5 px-1.5 pt-2">
         <NavIcon

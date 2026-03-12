@@ -37,6 +37,12 @@ interface LayoutState {
   setWsFileTreeWidth: (width: number) => void;
   setWsChatWidth: (width: number) => void;
 
+  /** --- Workspace mode panel visibility --- */
+  wsFileTreeVisible: boolean;
+  wsChatVisible: boolean;
+  toggleWsFileTree: () => void;
+  toggleWsChat: () => void;
+
   /** --- File panel --- */
   filePanelOpen: boolean;
   filePanelClosing: boolean;
@@ -108,6 +114,8 @@ function persistLayout(state: LayoutState): void {
     historyCollapsed: state.historyCollapsed,
     wsFileTreeWidth: state.wsFileTreeWidth,
     wsChatWidth: state.wsChatWidth,
+    wsFileTreeVisible: state.wsFileTreeVisible,
+    wsChatVisible: state.wsChatVisible,
   };
   void writeConfig("layout", config);
 }
@@ -126,8 +134,8 @@ export const useLayoutStore = create<LayoutState>()((set, get) => ({
   leftSidebarWidth: 260,
   toggleLeftSidebar: () => {
     set((s) => {
-      const next: SidebarMode = s.leftSidebarMode === "hidden" ? "full" : "hidden";
-      return { leftSidebarMode: next, leftSidebarOpen: next !== "hidden" };
+      const next: SidebarMode = s.leftSidebarMode === "mini" ? "full" : "mini";
+      return { leftSidebarMode: next, leftSidebarOpen: true };
     });
     persistLayout(get());
   },
@@ -167,6 +175,18 @@ export const useLayoutStore = create<LayoutState>()((set, get) => ({
   },
   setWsChatWidth: (width) => {
     set({ wsChatWidth: Math.min(WS_CHAT_MAX, Math.max(WS_CHAT_MIN, width)) });
+    persistLayout(get());
+  },
+
+  /* Workspace mode panel visibility */
+  wsFileTreeVisible: true,
+  wsChatVisible: true,
+  toggleWsFileTree: () => {
+    set((s) => ({ wsFileTreeVisible: !s.wsFileTreeVisible }));
+    persistLayout(get());
+  },
+  toggleWsChat: () => {
+    set((s) => ({ wsChatVisible: !s.wsChatVisible }));
     persistLayout(get());
   },
 
@@ -263,6 +283,8 @@ export const useLayoutStore = create<LayoutState>()((set, get) => ({
       historyCollapsed: config.historyCollapsed ?? false,
       wsFileTreeWidth: config.wsFileTreeWidth ?? 280,
       wsChatWidth: config.wsChatWidth ?? 360,
+      wsFileTreeVisible: config.wsFileTreeVisible ?? true,
+      wsChatVisible: config.wsChatVisible ?? true,
     });
   },
 }));

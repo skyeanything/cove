@@ -1,5 +1,6 @@
 export interface AppearanceConfig {
   theme: "light" | "dark" | "system";
+  fontSize: "sm" | "md" | "lg";
 }
 
 export type SidebarMode = "full" | "mini" | "hidden";
@@ -20,6 +21,8 @@ export interface LayoutConfig {
   historyCollapsed: boolean;
   wsFileTreeWidth: number;
   wsChatWidth: number;
+  wsFileTreeVisible: boolean;
+  wsChatVisible: boolean;
 }
 
 export interface GeneralConfig {
@@ -33,7 +36,7 @@ export interface SkillsConfig {
 }
 
 export const CONFIG_DEFAULTS = {
-  appearance: { theme: "system" } satisfies AppearanceConfig,
+  appearance: { theme: "system", fontSize: "md" } satisfies AppearanceConfig,
   layout: {
     leftSidebarMode: "full",
     leftSidebarOpen: true,
@@ -49,6 +52,8 @@ export const CONFIG_DEFAULTS = {
     historyCollapsed: false,
     wsFileTreeWidth: 280,
     wsChatWidth: 360,
+    wsFileTreeVisible: true,
+    wsChatVisible: true,
   } satisfies LayoutConfig,
   general: {
     locale: "zh",

@@ -1,6 +1,6 @@
 // FILE_SIZE_EXCEPTION: 4 type-specific detail panels (Skill/Tool/Connector/SubAgent) + shared utilities in one dispatcher
 import { useState, useEffect, useMemo } from "react";
-import { MoreHorizontal, Wand2, Wrench, Blocks, Bot, MessageSquare, Pencil, Trash2 } from "lucide-react";
+import { MoreHorizontal, Wand2, Wrench, Blocks, Bot, MessageSquare, Pencil, Trash2, FolderOpen } from "lucide-react";
 import type { ComponentType } from "react";
 import { cn } from "@/lib/utils";
 import {
@@ -10,6 +10,7 @@ import {
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { invoke } from "@tauri-apps/api/core";
 import { useExtensionStore } from "@/stores/extensionStore";
 import { useSkillsStore } from "@/stores/skillsStore";
 import { useLayoutStore } from "@/stores/layoutStore";
@@ -65,6 +66,7 @@ function DetailHeader({
   emoji,
   name,
   onUse,
+  onOpenFolder,
   onEdit,
   onDelete,
 }: {
@@ -72,6 +74,7 @@ function DetailHeader({
   emoji?: string;
   name: string;
   onUse?: () => void;
+  onOpenFolder?: () => void;
   onEdit?: () => void;
   onDelete?: () => void;
 }) {
@@ -93,6 +96,15 @@ function DetailHeader({
             title="使用"
           >
             <MessageSquare className="size-4" strokeWidth={1.5} />
+          </button>
+        )}
+        {onOpenFolder && (
+          <button
+            onClick={onOpenFolder}
+            className="rounded-md p-1 text-foreground-secondary transition-colors hover:bg-background-tertiary hover:text-foreground"
+            title="在 Finder 中显示"
+          >
+            <FolderOpen className="size-4" strokeWidth={1.5} />
           </button>
         )}
         {onEdit && (
@@ -135,6 +147,7 @@ function SkillDetailContent({
   content,
   addedBy,
   folderName,
+  skillFolderPath,
   onUse,
   onDelete,
 }: {
@@ -144,6 +157,8 @@ function SkillDetailContent({
   addedBy: string;
   /** Present only for user (ext) skills — enables edit button */
   folderName?: string;
+  /** Absolute path to the skill's folder — enables open-in-finder button */
+  skillFolderPath?: string;
   onUse: () => void;
   onDelete?: () => void;
 }) {
@@ -163,6 +178,7 @@ function SkillDetailContent({
         icon={Wand2}
         name={name}
         onUse={onUse}
+        onOpenFolder={skillFolderPath ? () => { invoke("open_skill_folder", { path: skillFolderPath }).catch(console.error); } : undefined}
         onEdit={folderName ? () => setEditOpen(true) : undefined}
         onDelete={onDelete ? () => setConfirmOpen(true) : undefined}
       />
@@ -548,6 +564,7 @@ export function ExtDetailPanel() {
       const entry = externalSkills.find((s) => s.folderName === folderName);
       if (!entry) return null;
       const { meta, content: skillContent } = entry.skill;
+      const skillFolderPath = entry.skillDir || entry.path.slice(0, entry.path.lastIndexOf("/"));
       return (
         <SkillDetailContent
           name={meta.name}
@@ -555,6 +572,7 @@ export function ExtDetailPanel() {
           content={skillContent}
           addedBy="用户"
           folderName={folderName}
+          skillFolderPath={skillFolderPath}
           onUse={() => setActivePage("chat")}
           onDelete={() => void deleteSkill(folderName, workspacePath).then(() => setSelectedKey(null))}
         />

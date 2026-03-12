@@ -11,9 +11,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Sun, Moon, ShieldCheck } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { useThemeStore } from "@/stores/themeStore";
 import { useDataStore } from "@/stores/dataStore";
 import { usePermissionStore } from "@/stores/permissionStore";
 
@@ -88,19 +87,12 @@ function TrustModeToggle({ conversationId }: { conversationId: string }) {
 
 export function ChatHeader() {
   const { t } = useTranslation();
-  const theme = useThemeStore((s) => s.theme);
-  const setTheme = useThemeStore((s) => s.setTheme);
   const activeConversationId = useDataStore((s) => s.activeConversationId);
   const conversations = useDataStore((s) => s.conversations);
   const activeConversation = activeConversationId
     ? conversations.find((c) => c.id === activeConversationId)
     : null;
   const title = activeConversation?.title ?? t("sidebar.untitled");
-
-  const isDark =
-    theme === "dark" ||
-    (theme === "system" &&
-      window.matchMedia("(prefers-color-scheme: dark)").matches);
 
   return (
     <div className="shrink-0">
@@ -117,25 +109,11 @@ export function ChatHeader() {
 
         <div className="min-w-0 flex-1" />
 
-        {/* Theme toggle */}
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          onClick={() => setTheme(isDark ? "light" : "dark")}
-          className="size-6 text-muted-foreground hover:text-foreground"
-          title={isDark ? "Switch to light mode" : "Switch to dark mode"}
-        >
-          {isDark ? (
-            <Sun className="size-[16px]" strokeWidth={1.5} />
-          ) : (
-            <Moon className="size-[16px]" strokeWidth={1.5} />
-          )}
-        </Button>
-
         {/* Trust mode toggle */}
         {activeConversationId && (
           <TrustModeToggle conversationId={activeConversationId} />
         )}
+
       </div>
       <Separator />
     </div>

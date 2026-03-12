@@ -21,7 +21,6 @@ import Prism from "prismjs";
 import { Highlight } from "prism-react-renderer";
 import { cn } from "@/lib/utils";
 import type { ToolCallInfo } from "@/stores/chatStore";
-import { usePermissionStore } from "@/stores/permissionStore";
 import type { PendingPermission } from "@/stores/permissionStore";
 
 import "prismjs/components/prism-bash";
@@ -58,12 +57,6 @@ export const BASH_HIGHLIGHT_THEME = {
 /** 耗时超过此值（毫秒）才在 UI 展示 */
 export const DURATION_THRESHOLD_MS = 1000;
 
-/** 工具 → 权限描述 i18n key，未定义时降级到 permission.title */
-const PERMISSION_DESC_KEYS: Record<string, string> = {
-  bash: "permission.bash",
-  write: "permission.write",
-  edit: "permission.edit",
-};
 
 /** 工具返回结果是否表示用户拒绝（未执行）——仅匹配工具实际返回的拒绝前缀 */
 export const REJECTED_PREFIXES = [
@@ -408,7 +401,6 @@ function isToolCallPending(toolCall: ToolCallInfo, pendingAsk: PendingPermission
 export function ToolCallBlock({ toolCall, pendingAsk }: { toolCall: ToolCallInfo; pendingAsk: PendingPermission | null }) {
   const [open, setOpen] = useState(() => toolCall.isLoading);
   const { t } = useTranslation();
-  const respond = usePermissionStore((s) => s.respond);
   const toolDisplayName = (typeof toolCall.toolName === "string" ? toolCall.toolName : "tool").replace(/_/g, " ");
   const toolSummary = getToolHeaderSummary(toolCall.toolName, toolCall.args);
   const showPermissionBar = toolCall.isLoading && isToolCallPending(toolCall, pendingAsk);
@@ -520,39 +512,6 @@ export function ToolCallBlock({ toolCall, pendingAsk }: { toolCall: ToolCallInfo
           </div>
         </div>
       </div>
-      {showPermissionBar && (
-        <div className="border-t border-amber-200/60 dark:border-amber-800/40 bg-amber-50/50 dark:bg-amber-950/20 px-3 py-2.5">
-          <div className="flex items-center gap-1.5 mb-2.5">
-            <TriangleAlert className="size-3.5 shrink-0 text-amber-500 dark:text-amber-400" strokeWidth={1.5} />
-            <span className="text-[12px] text-amber-700 dark:text-amber-300">
-              {t(PERMISSION_DESC_KEYS[toolCall.toolName] ?? "permission.title")}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => respond("deny")}
-              className="h-7 rounded-md px-3 text-[12px] text-destructive bg-destructive/10 hover:bg-destructive/20 transition-colors cursor-pointer"
-            >
-              {t("permission.deny")}
-            </button>
-            <button
-              type="button"
-              onClick={() => respond("allow")}
-              className="h-7 rounded-md px-3 text-[12px] font-medium bg-accent text-accent-foreground hover:bg-accent-hover transition-colors cursor-pointer"
-            >
-              {t("permission.allow")}
-            </button>
-            <button
-              type="button"
-              onClick={() => respond("always_allow")}
-              className="h-7 rounded-md px-3 text-[12px] text-foreground-secondary border border-border hover:bg-background-tertiary transition-colors cursor-pointer"
-            >
-              {t("permission.alwaysAllow")}
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

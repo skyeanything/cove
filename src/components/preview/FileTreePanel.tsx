@@ -43,6 +43,9 @@ import {
 import type { Workspace } from "@/db/types";
 import { useFileTreeDialogs } from "@/hooks/useFileTreeDialogs";
 import { useFileTreeDnD } from "@/hooks/useFileTreeDnD";
+import type { InsertTarget } from "@/hooks/useFileTreeDnD";
+import { useFileOrder } from "@/hooks/useFileOrder";
+import type { OrderedEntry } from "@/hooks/useFileOrder";
 import { useFileClipboard } from "@/hooks/useFileClipboard";
 import { FileTreeItem } from "./FileTreeItem";
 import { FileTreeDialogs } from "./FileTreeDialogs";
@@ -128,6 +131,15 @@ function WorkspaceRootNode({
       .catch(() => {});
   }, [workspaceRoot]);
 
+  const { order, loadOrder, applyOrder, reorder, initFolderOrder } = useFileOrder(workspaceRoot);
+
+  const handleReorder = useCallback(
+    (draggedPath: string, target: InsertTarget) => {
+      reorder(target, draggedPath);
+    },
+    [reorder],
+  );
+
   const dialogs = useFileTreeDialogs({
     workspaceRoot,
     selectedPath,
@@ -136,22 +148,26 @@ function WorkspaceRootNode({
     refreshDir,
     t,
   });
-  const dnd = useFileTreeDnD({ workspaceRoot, refreshDir });
+  const dnd = useFileTreeDnD({ workspaceRoot, refreshDir, onReorder: handleReorder });
   const clipboard = useFileClipboard(workspaceRoot, refreshDir);
 
   const loadRoot = useCallback(() => {
     setRootLoaded(true);
     listDir(workspaceRoot, "", fileTreeShowHidden)
-      .then(setRootEntries)
+      .then((entries) => {
+        setRootEntries(entries);
+        initFolderOrder("", entries as OrderedEntry[]);
+      })
       .catch(() => setRootEntries([]));
-  }, [workspaceRoot, fileTreeShowHidden]);
+  }, [workspaceRoot, fileTreeShowHidden, initFolderOrder]);
 
   useEffect(() => {
     setRootEntries(null);
     setRootLoaded(false);
     setExpandedDirs(new Set());
     setLoadedChildren({});
-  }, [workspaceRoot, fileTreeShowHidden]);
+    void loadOrder();
+  }, [workspaceRoot, fileTreeShowHidden, loadOrder]);
 
   useEffect(() => {
     if (workspaceRoot && !rootLoaded) loadRoot();
@@ -161,10 +177,13 @@ function WorkspaceRootNode({
     const toLoad = [...expandedDirs].filter((p) => loadedChildren[p] === undefined);
     toLoad.forEach((dirPath) => {
       listDir(workspaceRoot, dirPath, fileTreeShowHidden)
-        .then((entries) => setLoadedChildren((prev) => ({ ...prev, [dirPath]: entries })))
+        .then((entries) => {
+          setLoadedChildren((prev) => ({ ...prev, [dirPath]: entries }));
+          initFolderOrder(dirPath, entries as OrderedEntry[]);
+        })
         .catch(() => setLoadedChildren((prev) => ({ ...prev, [dirPath]: [] })));
     });
-  }, [workspaceRoot, expandedDirs, fileTreeShowHidden]);
+  }, [workspaceRoot, expandedDirs, fileTreeShowHidden, initFolderOrder]);
 
   useEffect(() => {
     if (activeWorkspaceId !== workspace.id) return;
@@ -283,6 +302,21 @@ function WorkspaceRootNode({
     return result;
   }, [loadedChildren, searchQuery]);
 
+  // Apply custom sort order on top of filtered results.
+  // `order` is included as a dep so memos re-run when reorder() updates state.
+  const orderedRootEntries = useMemo(() => {
+    if (!filteredRootEntries) return null;
+    return applyOrder(filteredRootEntries as OrderedEntry[], "") as ListDirEntry[];
+  }, [filteredRootEntries, applyOrder, order]);
+
+  const orderedLoadedChildren = useMemo(() => {
+    const result: Record<string, ListDirEntry[]> = {};
+    for (const [key, entries] of Object.entries(filteredLoadedChildren)) {
+      result[key] = applyOrder(entries as OrderedEntry[], key) as ListDirEntry[];
+    }
+    return result;
+  }, [filteredLoadedChildren, applyOrder, order]);
+
   const matchCount = useMemo(() => {
     if (!searchQuery || !rootEntries) return 0;
     const q = searchQuery.toLowerCase();
@@ -309,7 +343,7 @@ function WorkspaceRootNode({
     selectedPath,
     selectedEntries,
     expandedDirs,
-    loadedChildren: filteredLoadedChildren,
+    loadedChildren: orderedLoadedChildren,
     editingPath,
     clipboardSourcePath: clipboard.sourcePath,
     clipboardMode: clipboard.mode,
@@ -330,6 +364,7 @@ function WorkspaceRootNode({
     onRenameCancel,
     draggedPath: dnd.draggedPath,
     dropTargetPath: dnd.dropTargetPath,
+    insertTarget: dnd.insertTarget,
     onDnDStart: dnd.onDragStart,
     onDnDEnd: dnd.onDragEnd,
     onDnDOver: dnd.onDragOver,
@@ -421,12 +456,12 @@ function WorkspaceRootNode({
           onDragOver={dnd.onRootDragOver}
           onDrop={dnd.onRootDrop}
         >
-          {filteredRootEntries === null ? (
+          {orderedRootEntries === null ? (
             <div className="py-2 text-center text-[13px] text-muted-foreground">{t("preview.loading")}</div>
-          ) : filteredRootEntries.length === 0 ? (
+          ) : orderedRootEntries.length === 0 ? (
             <div className="py-2 pl-14 text-[13px] text-muted-foreground">{t("preview.emptyDir")}</div>
           ) : (
-            filteredRootEntries.map((entry) => (
+            orderedRootEntries.map((entry) => (
               <FileTreeItem key={entry.path} entry={entry} {...sharedItemProps} />
             ))
           )}

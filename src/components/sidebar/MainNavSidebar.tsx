@@ -5,6 +5,7 @@ import {
   SquarePen,
   FolderOpen,
   Blocks,
+  PanelLeft,
 } from "lucide-react";
 import { useState, useRef, useEffect, useCallback } from "react";
 import { useDataStore } from "@/stores/dataStore";
@@ -23,6 +24,7 @@ export function MainNavSidebar() {
 
   const activePage = useLayoutStore((s) => s.activePage);
   const setActivePage = useLayoutStore((s) => s.setActivePage);
+  const toggleLeftSidebar = useLayoutStore((s) => s.toggleLeftSidebar);
   const setActiveConversation = useDataStore((s) => s.setActiveConversation);
 
   const activeWorkspace = useWorkspaceStore((s) => s.activeWorkspace);
@@ -66,8 +68,24 @@ export function MainNavSidebar() {
 
   return (
     <div className="no-select flex h-full w-full flex-col overflow-hidden">
+      {/* Logo + 产品名 + 收起按钮 */}
+      <div className="flex h-10 shrink-0 items-center justify-between px-3">
+        <div className="flex items-center gap-2">
+          <img src="/logo.png" alt="Cove" className="size-7 rounded" />
+          <span className="text-[15px] font-semibold text-foreground">Cove</span>
+        </div>
+        <button
+          type="button"
+          onClick={toggleLeftSidebar}
+          className="rounded p-1 text-muted-foreground transition-colors hover:bg-sidebar-accent/50 hover:text-foreground"
+          title="收起侧边栏 (⌘B)"
+        >
+          <PanelLeft className="size-[16px]" strokeWidth={1.5} />
+        </button>
+      </div>
+
       {/* Nav items */}
-      <div className="space-y-0.5 px-1.5 pt-2">
+      <div className="space-y-0.5 px-1.5 pt-1">
         {/* 新对话 — 与工作区/扩展市场同级样式 */}
         <button
           onClick={handleNewChat}

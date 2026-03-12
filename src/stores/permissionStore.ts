@@ -34,6 +34,8 @@ interface PermissionState {
   pendingQueue: PendingPermission[];
   /** bash 会话级已允许的命令首词 */
   allowedBashPatterns: Record<string, Set<string>>;
+  /** 会话级已始终允许的 write/edit 操作 */
+  alwaysAllowedOperations: Record<string, Set<PermissionOperation>>;
   /** 开启信任模式的会话 ID 集合 */
   trustModeConversations: Set<string>;
   /** AI 请求开启信任模式时的待确认项（需用户确认） */
@@ -60,6 +62,7 @@ export const usePermissionStore = create<PermissionState>()((setState, get) => (
   pendingAsk: null,
   pendingQueue: [],
   allowedBashPatterns: {},
+  alwaysAllowedOperations: {},
   trustModeConversations: new Set<string>(),
   pendingTrustModeRequest: null,
 
@@ -67,6 +70,13 @@ export const usePermissionStore = create<PermissionState>()((setState, get) => (
     if (operation === "bash" && options?.bashPattern) {
       const patterns = get().allowedBashPatterns[conversationId];
       if (patterns?.has(options.bashPattern)) {
+        return Promise.resolve(true);
+      }
+    }
+    // 非 bash 操作：检查会话级始终允许列表
+    if (operation !== "bash") {
+      const alwaysAllowed = get().alwaysAllowedOperations[conversationId];
+      if (alwaysAllowed?.has(operation)) {
         return Promise.resolve(true);
       }
     }
@@ -82,11 +92,20 @@ export const usePermissionStore = create<PermissionState>()((setState, get) => (
         pathOrCommand,
         bashPattern,
         resolve: (choice: PermissionChoice) => {
-          if (choice === "always_allow" && operation === "bash" && bashPattern) {
-            const prev = get().allowedBashPatterns;
-            const set = prev[conversationId] ?? new Set<string>();
-            set.add(bashPattern);
-            setState({ allowedBashPatterns: { ...prev, [conversationId]: set } });
+          if (choice === "always_allow") {
+            if (operation === "bash" && bashPattern) {
+              // bash：记住命令首词
+              const prev = get().allowedBashPatterns;
+              const set = prev[conversationId] ?? new Set<string>();
+              set.add(bashPattern);
+              setState({ allowedBashPatterns: { ...prev, [conversationId]: set } });
+            } else if (operation !== "bash") {
+              // write/edit：记住操作类型
+              const prev = get().alwaysAllowedOperations;
+              const set = new Set(prev[conversationId] ?? []);
+              set.add(operation);
+              setState({ alwaysAllowedOperations: { ...prev, [conversationId]: set } });
+            }
           }
           resolve(choice !== "deny");
         },

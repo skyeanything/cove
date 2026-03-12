@@ -92,7 +92,18 @@
     "searchMessagesTitle": "搜索消息内容",
     "searchMessagesPlaceholder": "在消息内容中搜索…",
     "searching": "搜索中…",
-    "noSearchResults": "无匹配结果"
+    "noSearchResults": "无匹配结果",
+    "quickSettings": "快速设置",
+    "language": "语言",
+    "theme": "主题",
+    "themeLight": "亮色",
+    "themeDark": "深色",
+    "themeSystem": "跟随系统",
+    "fontSize": "字体大小",
+    "fontSizeSm": "小",
+    "fontSizeMd": "默认",
+    "fontSizeLg": "大",
+    "openSettings": "设置"
   },
   "modelSelector": {
     "noProviders": "未配置提供商。请打开设置 (⌘,) 添加。",
@@ -121,7 +132,8 @@
     "duplicate": "创建副本",
     "openInDefaultApp": "使用默认应用打开",
     "newFile": "新建文件",
-    "invalidFileName": "文件名无效"
+    "invalidFileName": "文件名无效",
+    "collapsePanel": "收起面板"
   },
   "context": {
     "label": "上下文",
@@ -172,7 +184,12 @@
     "closePreview": "关闭预览",
     "openInPanel": "在面板中打开",
     "pdfFallback": "PDF 预览可在侧面板中查看",
-    "officeFallback": "Office 文档预览可在侧面板中查看"
+    "officeFallback": "Office 文档预览可在侧面板中查看",
+    "translate": "译文",
+    "translateOn": "翻译为中文（仅预览）",
+    "translateOff": "返回原文",
+    "showOriginal": "原文",
+    "translating": "翻译中…"
   },
   "common": {
     "settings": "设置"

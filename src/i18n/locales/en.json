@@ -92,7 +92,18 @@
     "searchMessagesTitle": "Search messages",
     "searchMessagesPlaceholder": "Search in message content…",
     "searching": "Searching…",
-    "noSearchResults": "No matches"
+    "noSearchResults": "No matches",
+    "quickSettings": "Quick Settings",
+    "language": "Language",
+    "theme": "Theme",
+    "themeLight": "Light",
+    "themeDark": "Dark",
+    "themeSystem": "System",
+    "fontSize": "Font Size",
+    "fontSizeSm": "Small",
+    "fontSizeMd": "Default",
+    "fontSizeLg": "Large",
+    "openSettings": "Settings"
   },
   "modelSelector": {
     "noProviders": "No providers configured. Open Settings (⌘,) to add a provider.",
@@ -121,7 +132,8 @@
     "duplicate": "Duplicate",
     "openInDefaultApp": "Open in Default App",
     "newFile": "New File",
-    "invalidFileName": "Invalid file name."
+    "invalidFileName": "Invalid file name.",
+    "collapsePanel": "Collapse panel"
   },
   "context": {
     "label": "Context",
@@ -172,7 +184,12 @@
     "closePreview": "Close preview",
     "openInPanel": "Open in panel",
     "pdfFallback": "PDF preview is available in the side panel",
-    "officeFallback": "Office document preview is available in the side panel"
+    "officeFallback": "Office document preview is available in the side panel",
+    "translate": "Translate",
+    "translateOn": "Translate to Chinese (preview only)",
+    "translateOff": "Back to original",
+    "showOriginal": "Original",
+    "translating": "Translating…"
   },
   "common": {
     "settings": "Settings"
