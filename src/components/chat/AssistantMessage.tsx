@@ -292,7 +292,7 @@ export const AssistantMessage = memo(function AssistantMessage({
                 ? "mt-1" : "-mt-4",
           )}>
             {messageHovered && (
-              <div className="flex items-center gap-1 pointer-events-auto">
+              <div className="flex items-center gap-1 pointer-events-none">
                 {copyContent && (
                   <>
                     <ActionButton
