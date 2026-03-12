@@ -799,6 +799,48 @@ fn test_os_getenv_returns_nil() {
     assert_eq!(r.result, "nil");
 }
 
+// --- shebang stripping ---
+
+#[test]
+fn test_shebang_stripped_inline() {
+    let dir = TempDir::new().unwrap();
+    let r = run(dir.path().to_str().unwrap(), "#!/usr/bin/env lua\nreturn 1 + 2");
+    assert!(r.error.is_none(), "error: {:?}", r.error);
+    assert_eq!(r.result, "3");
+}
+
+#[test]
+fn test_shebang_stripped_file() {
+    let dir = TempDir::new().unwrap();
+    fs::write(
+        dir.path().join("shebang.lua"),
+        "#!/usr/bin/env lua\nreturn 'ok'",
+    )
+    .unwrap();
+    let r = run_lua_inner(
+        dir.path().to_str().unwrap(),
+        None,
+        Some("shebang.lua"),
+        5_000,
+        None,
+    )
+    .expect("should not fail");
+    assert!(r.error.is_none(), "error: {:?}", r.error);
+    assert_eq!(r.result, "ok");
+}
+
+#[test]
+fn test_strip_shebang_unit() {
+    use super::strip_shebang;
+
+    assert_eq!(strip_shebang("return 1"), "return 1");
+    assert_eq!(strip_shebang("#!/usr/bin/env lua\nreturn 1"), "return 1");
+    assert_eq!(strip_shebang("#!/usr/bin/lua\nprint('hi')"), "print('hi')");
+    assert_eq!(strip_shebang("#!lua"), "");
+    assert_eq!(strip_shebang(""), "");
+    assert_eq!(strip_shebang("#not a shebang"), "#not a shebang");
+}
+
 // --- code/file exclusivity ---
 
 #[test]

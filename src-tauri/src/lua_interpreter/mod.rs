@@ -152,6 +152,14 @@ fn lua_value_to_string(val: &LuaValue) -> String {
     }
 }
 
+/// Strip a `#!` shebang line from Lua source so mlua can parse it.
+fn strip_shebang(source: &str) -> &str {
+    match source.strip_prefix("#!") {
+        Some(rest) => rest.split_once('\n').map_or("", |(_, after)| after),
+        None => source,
+    }
+}
+
 /// Run Lua code without AppHandle dependency (for tests).
 pub(crate) fn run_lua_inner(
     workspace_root: &str,
@@ -226,7 +234,7 @@ pub(crate) fn run_lua_inner(
         return Err("either code or file must be provided".to_string());
     };
 
-    let eval_result: LuaResult<LuaValue> = lua.load(&source).eval();
+    let eval_result: LuaResult<LuaValue> = lua.load(strip_shebang(&source)).eval();
     let execution_ms = start.elapsed().as_millis() as u64;
 
     if timed_out.load(Ordering::Relaxed) {
