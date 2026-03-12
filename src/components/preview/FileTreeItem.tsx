@@ -46,6 +46,7 @@ export function FileTreeItem({
   clipboardMode,
   onToggleExpand,
   onSelectFile,
+  onDoubleClickFile,
   onLoadChildren,
   onNewFile,
   onNewFolder,
@@ -80,6 +81,7 @@ export function FileTreeItem({
   clipboardMode?: "copy" | "cut" | null;
   onToggleExpand: (path: string) => void;
   onSelectFile: (path: string) => void;
+  onDoubleClickFile?: (path: string) => void;
   onLoadChildren: (path: string, entries: ListDirEntry[]) => void;
   onNewFile: (parentPath: string) => void;
   onNewFolder: (parentPath: string) => void;
@@ -134,6 +136,11 @@ export function FileTreeItem({
     },
     [isDir, path, onToggleExpand],
   );
+
+  const handleDoubleClick = useCallback(() => {
+    if (isEditing || isDir) return;
+    onDoubleClickFile?.(path);
+  }, [isDir, isEditing, path, onDoubleClickFile]);
 
   useEffect(() => {
     if (isEditing && inputRef.current) {
@@ -226,6 +233,7 @@ export function FileTreeItem({
             data-tree-path={path}
             data-tree-is-dir={String(isDir)}
             onClick={handleClick}
+            onDoubleClick={handleDoubleClick}
             draggable
             onDragStart={(e) => onDnDStart?.(e, path)}
             onDragEnd={onDnDEnd}
@@ -324,6 +332,7 @@ export function FileTreeItem({
               clipboardMode={clipboardMode}
               onToggleExpand={onToggleExpand}
               onSelectFile={onSelectFile}
+              onDoubleClickFile={onDoubleClickFile}
               onLoadChildren={onLoadChildren}
               onNewFile={onNewFile}
               onNewFolder={onNewFolder}
