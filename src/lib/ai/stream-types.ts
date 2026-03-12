@@ -10,9 +10,12 @@ export interface StreamLike {
     input?: unknown;
     output?: unknown;
     error?: unknown;
+    reason?: string;
     /** tool-input-start / tool-input-delta 使用（SDK fullStream 用 id） */
     id?: string;
     delta?: string;
+    finishReason?: string;
+    rawFinishReason?: string;
   }>;
   usage: PromiseLike<{
     inputTokens?: number;

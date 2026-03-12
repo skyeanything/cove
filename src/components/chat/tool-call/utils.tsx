@@ -46,6 +46,8 @@ export const DURATION_THRESHOLD_MS = 1000;
 export const REJECTED_PREFIXES = [
   "用户拒绝了",
   "该命令被拒绝执行",
+  "该工具执行被拒绝",
+  "tool execution denied",
   "this skill is not enabled",
 ];
 

@@ -256,18 +256,6 @@ export const useChatStore = create<ChatState>()((set, get) => ({
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") {
         reportAgentRunMetrics(runMetrics, { aborted: true });
-        const stream = useStreamStore.getState().getStream(conversationId);
-        const partialContent = stream?.streamingContent ?? "";
-        if (partialContent) {
-          const assistantMsg: Omit<Message, "created_at"> = {
-            id: crypto.randomUUID(), conversation_id: conversationId, role: "assistant",
-            content: partialContent, reasoning: stream?.streamingReasoning || undefined, model: modelId,
-          };
-          await messageRepo.create(assistantMsg);
-          if (useDataStore.getState().activeConversationId === conversationId) {
-            set((state) => ({ messages: [...state.messages, { ...assistantMsg, created_at: new Date().toISOString() }] }));
-          }
-        }
         useStreamStore.getState().endStream(conversationId);
         return;
       }

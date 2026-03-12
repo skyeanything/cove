@@ -324,18 +324,15 @@ describe("chatStore — sendMessage", () => {
       expect(mockStreamStore.endStream).toHaveBeenCalledWith("conv-1");
     });
 
-    it("saves partial content on AbortError", async () => {
+    it("does not save partial content on AbortError", async () => {
       setupDefaultMocks();
-      mockStreamStore.getStream.mockReturnValue({ streamingContent: "partial response", streamingReasoning: "" });
       vi.mocked(runStreamLoop).mockImplementation(async (_opts, callbacks) => {
         callbacks.onUpdate({ streamingContent: "partial response" });
         throw Object.assign(new Error("Aborted"), { name: "AbortError" });
       });
       await useChatStore.getState().sendMessage("hello");
-      // user msg + partial assistant
-      expect(messageRepo.create).toHaveBeenCalledTimes(2);
-      const lastCall = vi.mocked(messageRepo.create).mock.calls[1]![0];
-      expect(lastCall).toEqual(expect.objectContaining({ role: "assistant", content: "partial response" }));
+      // Only the user message is persisted.
+      expect(messageRepo.create).toHaveBeenCalledTimes(1);
     });
 
     it("does NOT save on AbortError when streamingContent empty", async () => {

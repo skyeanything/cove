@@ -206,6 +206,76 @@ describe("handleAgentStream", () => {
     expect(result.parts[2]!.type).toBe("text");
   });
 
+  it("hides step text from tool-using steps when step boundaries are present", async () => {
+    const contentSnapshots: string[] = [];
+    const stream = makeStream([
+      { type: "start-step" },
+      { type: "text-delta", text: "Issue created successfully." },
+      { type: "tool-call", toolCallId: "tc-step", toolName: "bash", input: { command: "gh issue create" } },
+      { type: "tool-result", toolCallId: "tc-step", output: "created issue #123" },
+      { type: "finish-step" },
+      { type: "start-step" },
+      { type: "text-delta", text: "Issue creation is confirmed." },
+      { type: "finish-step" },
+    ]);
+
+    const result = await handleAgentStream(stream, (u) => contentSnapshots.push(u.streamingContent ?? ""));
+
+    expect(result.content).toBe("Issue creation is confirmed.");
+    expect(result.parts).toEqual([
+      expect.objectContaining({
+        type: "tool",
+        id: "tc-step",
+        toolName: "bash",
+        result: "created issue #123",
+        isLoading: false,
+      }),
+      { type: "text", text: "Issue creation is confirmed." },
+    ]);
+    expect(contentSnapshots).not.toContain("Issue created successfully.");
+  });
+
+  it("commits tool-free step text only on finish-step", async () => {
+    const updates: StreamUpdate[] = [];
+    const stream = makeStream([
+      { type: "start-step" },
+      { type: "text-delta", text: "Buffered" },
+      { type: "text-delta", text: " answer" },
+      { type: "finish-step" },
+    ]);
+
+    const result = await handleAgentStream(stream, (u) => updates.push({ ...u }));
+
+    expect(result.content).toBe("Buffered answer");
+    expect(result.parts).toEqual([{ type: "text", text: "Buffered answer" }]);
+    expect(updates).toHaveLength(1);
+    expect(updates[0]!.streamingContent).toBe("Buffered answer");
+  });
+
+  it("marks tool-error and tool-output-denied as completed tool states", async () => {
+    const stream = makeStream([
+      { type: "tool-call", toolCallId: "tc-error", toolName: "bash", input: { command: "boom" } },
+      { type: "tool-error", toolCallId: "tc-error", toolName: "bash", error: new Error("boom") },
+      { type: "tool-call", toolCallId: "tc-denied", toolName: "write", input: { filePath: "x.ts" } },
+      { type: "tool-output-denied", toolCallId: "tc-denied", toolName: "write" },
+    ]);
+
+    const result = await handleAgentStream(stream, () => {});
+
+    expect(result.toolCalls).toEqual([
+      expect.objectContaining({
+        id: "tc-error",
+        result: "执行失败：boom",
+        isLoading: false,
+      }),
+      expect.objectContaining({
+        id: "tc-denied",
+        result: "该工具执行被拒绝。",
+        isLoading: false,
+      }),
+    ]);
+  });
+
   // --- onPartType callback ---
 
   it("calls onPartType for each event type", async () => {
