@@ -39,7 +39,6 @@ fn walks_recursively_and_returns_files() {
         include_dirs: None,
         max_depth: None,
         max_entries: None,
-        force_include_exts: None,
     };
     let result = walk_files(args).unwrap();
 
@@ -59,7 +58,6 @@ fn skips_hidden_files_and_dirs() {
         include_dirs: Some(true),
         max_depth: None,
         max_entries: None,
-        force_include_exts: None,
     };
     let result = walk_files(args).unwrap();
 
@@ -77,7 +75,6 @@ fn includes_dirs_when_requested() {
         include_dirs: Some(true),
         max_depth: None,
         max_entries: None,
-        force_include_exts: None,
     };
     let result = walk_files(args).unwrap();
 
@@ -96,7 +93,6 @@ fn excludes_dirs_by_default() {
         include_dirs: None,
         max_depth: None,
         max_entries: None,
-        force_include_exts: None,
     };
     let result = walk_files(args).unwrap();
     assert!(result.iter().all(|e| !e.is_dir));
@@ -110,7 +106,6 @@ fn respects_max_depth() {
         include_dirs: None,
         max_depth: Some(1),
         max_entries: None,
-        force_include_exts: None,
     };
     let result = walk_files(args).unwrap();
     let p = paths(&result);
@@ -130,7 +125,6 @@ fn respects_max_entries() {
         include_dirs: Some(true),
         max_depth: None,
         max_entries: Some(3),
-        force_include_exts: None,
     };
     let result = walk_files(args).unwrap();
     assert!(result.len() <= 3);
@@ -144,7 +138,6 @@ fn paths_use_forward_slashes() {
         include_dirs: None,
         max_depth: None,
         max_entries: None,
-        force_include_exts: None,
     };
     let result = walk_files(args).unwrap();
     for entry in &result {
@@ -160,7 +153,6 @@ fn sorts_dirs_first_then_alphabetical() {
         include_dirs: Some(true),
         max_depth: None,
         max_entries: None,
-        force_include_exts: None,
     };
     let result = walk_files(args).unwrap();
 
@@ -179,7 +171,6 @@ fn returns_error_for_nonexistent_workspace() {
         include_dirs: None,
         max_depth: None,
         max_entries: None,
-        force_include_exts: None,
     };
     assert!(walk_files(args).is_err());
 }
@@ -201,7 +192,6 @@ fn respects_gitignore() {
         include_dirs: Some(true),
         max_depth: None,
         max_entries: None,
-        force_include_exts: None,
     };
     let result = walk_files(args).unwrap();
     let p = paths(&result);
@@ -209,44 +199,4 @@ fn respects_gitignore() {
     assert!(!p.contains(&"debug.log"));
     assert!(!p.contains(&"build/output.js"));
     assert!(!p.iter().any(|path| path.starts_with("build")));
-}
-
-#[test]
-fn force_include_exts_bypasses_gitignore() {
-    let dir = setup_workspace();
-    let root = dir.path();
-
-    fs::create_dir_all(root.join(".git")).unwrap();
-    fs::write(root.join(".gitignore"), "*.docx\n*.pdf\n").unwrap();
-    fs::write(root.join("report.docx"), "fake docx").unwrap();
-    fs::write(root.join("manual.pdf"), "fake pdf").unwrap();
-    fs::write(root.join("notes.txt"), "text").unwrap();
-
-    // Without force_include_exts: gitignored files hidden
-    let args = WalkFilesArgs {
-        workspace_root: root.to_string_lossy().into_owned(),
-        include_dirs: None,
-        max_depth: None,
-        max_entries: None,
-        force_include_exts: None,
-    };
-    let result = walk_files(args).unwrap();
-    let p = paths(&result);
-    assert!(!p.contains(&"report.docx"));
-    assert!(!p.contains(&"manual.pdf"));
-    assert!(p.contains(&"notes.txt"));
-
-    // With force_include_exts: gitignored files appear
-    let args = WalkFilesArgs {
-        workspace_root: root.to_string_lossy().into_owned(),
-        include_dirs: None,
-        max_depth: None,
-        max_entries: None,
-        force_include_exts: Some(vec!["docx".to_string(), "pdf".to_string()]),
-    };
-    let result = walk_files(args).unwrap();
-    let p = paths(&result);
-    assert!(p.contains(&"report.docx"));
-    assert!(p.contains(&"manual.pdf"));
-    assert!(p.contains(&"notes.txt"));
 }

@@ -18,21 +18,54 @@ interface WalkFileEntry {
 
 const MAX_RESULTS = 10;
 
-/** Extensions commonly gitignored but cove can read (no leading dot, lowercase). */
-const FORCE_INCLUDE_EXTS = [
-  "docx", "xlsx", "pptx", "pdf",
-  "doc", "xls", "ppt",
-  "odt", "ods", "odp",
-];
+/** File extensions cove can read — used to filter @mention file results. */
+const ALLOWED_EXTS = new Set([
+  // Office documents
+  "docx", "xlsx", "pptx", "pdf", "doc", "xls", "ppt", "odt", "ods", "odp",
+  // Text / markup
+  "md", "txt", "csv", "tsv", "json", "yaml", "yml", "toml", "xml", "ini",
+  "env", "log",
+  // Web
+  "html", "htm", "css", "scss", "sass", "less", "js", "jsx", "mjs", "cjs",
+  "ts", "tsx", "vue", "svelte", "astro",
+  // Systems
+  "c", "cpp", "cc", "cxx", "h", "hpp", "hxx", "rs", "go", "zig",
+  // JVM
+  "java", "kt", "kts", "scala", "groovy", "gradle",
+  // .NET
+  "cs", "fs", "vb",
+  // Scripting
+  "py", "rb", "pl", "pm", "php", "lua", "r",
+  // Shell
+  "sh", "bash", "zsh", "fish", "ps1", "bat", "cmd",
+  // Mobile
+  "swift", "m", "mm", "dart",
+  // Functional
+  "ex", "exs", "erl", "hs", "ml", "mli", "clj", "cljs", "elm", "lisp",
+  // Data / config
+  "sql", "graphql", "proto", "tf", "hcl",
+  // Other
+  "dockerfile", "makefile", "cmake",
+  // Images
+  "png", "jpg", "jpeg", "gif", "svg", "webp", "bmp", "ico",
+]);
 
-/** Filename patterns to exclude from @mention results (temp/lock files). */
+/** Filename patterns to exclude (temp/lock files). */
 const EXCLUDED_PATTERNS = [
   /^~\$/, // Word/Excel lock files
   /\.tmp$/i,
 ];
 
-function isExcluded(name: string): boolean {
-  return EXCLUDED_PATTERNS.some((p) => p.test(name));
+function isMentionable(name: string, isDir: boolean): boolean {
+  if (isDir) return true;
+  if (EXCLUDED_PATTERNS.some((p) => p.test(name))) return false;
+  const dot = name.lastIndexOf(".");
+  if (dot === -1) {
+    // No extension — allow common extensionless files
+    const lower = name.toLowerCase();
+    return ALLOWED_EXTS.has(lower); // dockerfile, makefile, etc.
+  }
+  return ALLOWED_EXTS.has(name.slice(dot + 1).toLowerCase());
 }
 
 /** Extract parent directory from a relative path. */
@@ -44,8 +77,7 @@ function extractParentDir(path: string): string {
 
 /**
  * Lists workspace files (recursively) for @mention autocomplete.
- * Uses walk_files for subdirectory traversal and pinyin matching
- * for Chinese filename search.
+ * Filters to cove-readable file types and excludes temp/lock files.
  */
 export function useMentionFiles(
   workspacePath: string | null,
@@ -80,16 +112,12 @@ export function useMentionFiles(
 
       try {
         const raw = await invoke<WalkFileEntry[]>("walk_files", {
-          args: {
-            workspaceRoot: workspacePath,
-            includeDirs: true,
-            forceIncludeExts: FORCE_INCLUDE_EXTS,
-          },
+          args: { workspaceRoot: workspacePath, includeDirs: true },
         });
         if (cancelled) return;
 
         const items: MentionFileEntry[] = raw
-          .filter((e) => e.isDir || !isExcluded(e.name))
+          .filter((e) => isMentionable(e.name, e.isDir))
           .map((e) => ({
             name: e.name,
             path: e.path,
