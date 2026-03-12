@@ -66,8 +66,8 @@ fn expand_path(p: &str) -> PathBuf {
     PathBuf::from(s)
 }
 
-const RESOURCE_DIRS: &[&str] = &["resources", "quickjs-examples"];
-const RESOURCE_EXTENSIONS: &[&str] = &["md", "json", "js", "txt", "yaml", "yml"];
+const RESOURCE_DIRS: &[&str] = &["resources", "lua-examples"];
+const RESOURCE_EXTENSIONS: &[&str] = &["md", "json", "lua", "js", "txt", "yaml", "yml"];
 const MAX_RESOURCE_ENTRIES: usize = 100;
 const MAX_RESOURCE_DEPTH: usize = 3;
 

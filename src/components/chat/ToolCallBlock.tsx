@@ -1,5 +1,5 @@
 // FILE_SIZE_EXCEPTION: ToolCallBlock is a complex component with many tightly coupled sub-components
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Wrench,
@@ -398,7 +398,7 @@ function isToolCallPending(toolCall: ToolCallInfo, pendingAsk: PendingPermission
   return pathOrCmd !== undefined && pendingAsk.pathOrCommand === pathOrCmd;
 }
 
-export function ToolCallBlock({ toolCall, pendingAsk }: { toolCall: ToolCallInfo; pendingAsk: PendingPermission | null }) {
+export const ToolCallBlock = memo(function ToolCallBlock({ toolCall, pendingAsk }: { toolCall: ToolCallInfo; pendingAsk: PendingPermission | null }) {
   const [open, setOpen] = useState(() => toolCall.isLoading);
   const { t } = useTranslation();
   const toolDisplayName = (typeof toolCall.toolName === "string" ? toolCall.toolName : "tool").replace(/_/g, " ");
@@ -514,4 +514,4 @@ export function ToolCallBlock({ toolCall, pendingAsk }: { toolCall: ToolCallInfo
       </div>
     </div>
   );
-}
+});

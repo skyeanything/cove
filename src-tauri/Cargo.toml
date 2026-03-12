@@ -41,7 +41,7 @@ rookie = "0.5"
 html2md = "0.2"
 regex = "1.10"
 notify = "6.1"
-rquickjs = { version = "0.11", features = ["bindgen", "parallel"] }
+mlua = { version = "0.10", features = ["lua54", "vendored", "serialize"] }
 ignore = "0.4"
 chromiumoxide = "0.9"
 futures = "0.3"

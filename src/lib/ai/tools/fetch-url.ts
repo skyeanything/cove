@@ -40,13 +40,8 @@ function extractDomain(url: string): string {
 
 export const fetchUrlTool = tool({
   description:
-    "Fetch a URL's content as Markdown, or save/export the page as PDF, PNG screenshot, or Markdown file. " +
-    "When user asks to convert/save a webpage as PDF, set saveAsPdf=true. " +
-    "When user asks to convert/save/screenshot a webpage as PNG/image, set saveAsPng=true. " +
-    "When user asks to save/export a webpage as Markdown (.md file), set saveAsMarkdown=true. " +
-    "These save the file directly — do NOT manually recreate page content. " +
-    "If the site blocks access or returns low-quality content, the result may suggest retrying with browser cookies — " +
-    "ask the user for permission before doing so. Does not support YouTube transcripts.",
+    "Fetch URL content as Markdown. Set saveAsPdf/saveAsPng/saveAsMarkdown to export as file instead. " +
+    "If blocked, result may suggest cookie retry — ask user permission first.",
   inputSchema: z.object({
     url: z.string().describe("Full URL (must start with http:// or https://)"),
     timeoutMs: z.number().optional().describe("Timeout in ms, default 30000"),
@@ -58,15 +53,15 @@ export const fetchUrlTool = tool({
     saveAsPdf: z
       .boolean()
       .optional()
-      .describe("Save the webpage as a PDF file via Chrome headless rendering. Use when user asks to convert/export/save a page as PDF. Requires workspace."),
+      .describe("Export page as PDF file"),
     saveAsPng: z
       .boolean()
       .optional()
-      .describe("Save a PNG screenshot of the webpage via Chrome headless rendering. Use when user asks to convert/screenshot/save a page as PNG/image. Requires workspace."),
+      .describe("Export page as PNG screenshot"),
     saveAsMarkdown: z
       .boolean()
       .optional()
-      .describe("Save the webpage content as a Markdown (.md) file. Use when user asks to save/export a page as Markdown. Requires workspace."),
+      .describe("Export page as Markdown file"),
   }),
   execute: async ({ url, timeoutMs = 30000, maxChars = 120000, useCookies, saveAsPdf, saveAsPng, saveAsMarkdown }) => {
     if (saveAsMarkdown) {

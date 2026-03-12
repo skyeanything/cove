@@ -74,11 +74,18 @@ export function ToolCallArgsDisplay({
     return <div className="mb-2">{renderBashCommand(command)}</div>;
   }
   if (toolName === "cove_interpreter") {
-    const code = (args.code as string) ?? "—";
+    const code = args.code as string | undefined;
+    const file = args.file as string | undefined;
+    const label = file ? "Script" : "Lua";
+    const content = file ?? code ?? "—";
     return (
       <div className="mb-2 space-y-1">
-        <div className="text-[11px] font-medium text-foreground-secondary">{t("tool.jsCode")}</div>
-        {renderPre(code)}
+        <div className="text-[11px] font-medium text-foreground-secondary">{label}</div>
+        {file ? (
+          <div className="py-0.5"><FilePathChip path={content} /></div>
+        ) : (
+          renderPre(content)
+        )}
       </div>
     );
   }

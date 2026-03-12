@@ -3,14 +3,24 @@ import type { LanguageModel } from "ai";
 import type { Message } from "@/db/types";
 import compressionPromptTemplate from "@/prompts/context-compression.md?raw";
 
-/** Default threshold: compress when estimated tokens reach 60% of context window */
-const DEFAULT_THRESHOLD = 0.60;
-/** Ratio of context window to keep as recent messages */
-const DEFAULT_KEEP_RATIO = 0.4;
+/** Default threshold: compress when estimated tokens reach 40% of context window.
+ * At 60% of 128K (76800 tokens), models like DeepSeek need ~20s prefill.
+ * 40% of 128K = 51200 tokens keeps first-token latency under ~10s. */
+const DEFAULT_THRESHOLD = 0.40;
+/** Ratio of context window to keep as recent messages.
+ * Lower than the trigger threshold (0.40) so compression actually frees space.
+ * 0.20 × 128K = 25600 tokens ≈ last ~30 messages of a typical conversation. */
+const DEFAULT_KEEP_RATIO = 0.20;
 /** Minimum number of messages before compression is considered (2 complete turns) */
 const MIN_MESSAGES_FOR_COMPRESSION = 4;
 /** Max output tokens for the summary generation */
 const SUMMARY_MAX_TOKENS = 2048;
+/**
+ * Approximate token overhead for system prompt (~25K chars) + tool definitions (~20K chars).
+ * Applied only in the chars-based fallback path; the precise path (tokens_input from API)
+ * already includes this overhead.
+ */
+const FIXED_OVERHEAD_TOKENS = 10_000;
 
 /**
  * Estimate the input tokens for the next turn.
@@ -49,11 +59,13 @@ export function estimateNextTurnTokens(
   // parts is a JSON string containing text + tool calls/results and already
   // includes the assistant text stored in content, so use whichever is larger
   // to avoid double-counting.
+  // FIXED_OVERHEAD_TOKENS accounts for system prompt + tool definitions that
+  // are not reflected in message content but consume context window.
   const totalChars = messages.reduce(
     (sum, m) => sum + Math.max(m.content?.length ?? 0, m.parts?.length ?? 0),
     0,
   );
-  return Math.ceil((totalChars + newUserChars) / 4);
+  return Math.ceil((totalChars + newUserChars) / 4) + FIXED_OVERHEAD_TOKENS;
 }
 
 /**
@@ -156,12 +168,14 @@ export async function generateSummary(
   };
 }
 
-/** Estimate tokens for a single message (rough: chars / 4) */
+/** Estimate tokens for a single message.
+ * Uses chars/3 (not chars/4) to account for per-message structural overhead
+ * (role tags, JSON framing) that chars/4 consistently underestimates. */
 function estimateMessageTokens(msg: Message): number {
   // parts JSON includes the assistant text already in content, so use the
   // larger of the two to avoid double-counting.
   const chars = Math.max(msg.content?.length ?? 0, msg.parts?.length ?? 0);
-  return Math.ceil(chars / 4);
+  return Math.ceil(chars / 3);
 }
 
 /** Serialize messages into a human-readable format for the summary prompt */

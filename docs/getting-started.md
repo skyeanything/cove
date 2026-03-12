@@ -17,7 +17,7 @@
 
 ### Xcode Command Line Tools
 
-Rust 编译和部分 npm 原生模块（如 rquickjs 的 bindgen）依赖 clang，必须先装。
+Rust 编译和部分原生依赖（如 mlua 的 vendored Lua 编译）依赖 clang，必须先装。
 
 ```bash
 xcode-select --install
@@ -182,10 +182,10 @@ pnpm test
 
 ## 常见问题
 
-### rquickjs / bindgen / clang 编译失败
+### mlua / lua-src / clang 编译失败
 
 ```
-error: failed to run custom build command for `rquickjs-sys`
+error: failed to run custom build command for `lua-src`
 ```
 
 原因：缺少 Xcode Command Line Tools。安装后重试：

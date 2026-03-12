@@ -36,28 +36,28 @@ describe("estimateNextTurnTokens", () => {
     expect(result).toBe(603);
   });
 
-  it("falls back to chars/4 when no token data", () => {
+  it("falls back to chars/4 + overhead when no token data", () => {
     const msgs: Message[] = [
       makeMessage({ role: "user", content: "a".repeat(400) }),
       makeMessage({ role: "assistant", content: "b".repeat(600) }),
     ];
-    // (400 + 600 + 20) / 4 = 255
+    // (400 + 600 + 20) / 4 + 10000 (overhead) = 10255
     const result = estimateNextTurnTokens(msgs, 20);
-    expect(result).toBe(255);
+    expect(result).toBe(10255);
   });
 
   it("handles empty messages array", () => {
     const result = estimateNextTurnTokens([], 100);
-    expect(result).toBe(25); // ceil(100/4)
+    expect(result).toBe(10025); // ceil(100/4) + 10000 overhead
   });
 
   it("handles assistant with zero tokens_input", () => {
     const msgs: Message[] = [
       makeMessage({ role: "assistant", content: "test", tokens_input: 0 }),
     ];
-    // Fallback: (4 + 50) / 4 = 14
+    // Fallback: (4 + 50) / 4 + 10000 = 10014
     const result = estimateNextTurnTokens(msgs, 50);
-    expect(result).toBe(14);
+    expect(result).toBe(10014);
   });
 
   it("uses parts length when larger than content (avoids double-counting)", () => {
@@ -81,9 +81,9 @@ describe("estimateNextTurnTokens", () => {
     const msgs: Message[] = [
       makeMessage({ role: "assistant", content: "hello", parts }),
     ];
-    // max(5, ~30) = ~30 chars → ~8 tokens, NOT (5+30)/4=9
+    // max(5, ~30) = ~30 chars → ~8 tokens + 10000 overhead
     const result = estimateNextTurnTokens(msgs, 0);
-    expect(result).toBe(Math.ceil(parts.length / 4));
+    expect(result).toBe(Math.ceil(parts.length / 4) + 10000);
   });
 
   it("uses chars-based fallback when summary message is present", () => {
@@ -126,7 +126,7 @@ describe("shouldCompress", () => {
         tokens_output: i % 2 === 1 ? 20000 : undefined,
       }),
     );
-    // Last assistant has tokens_input=80000, tokens_output=20000 → 100000+0 > 128000*0.60=76800
+    // Last assistant has tokens_input=80000, tokens_output=20000 → 100000+0 > 128000*0.40=51200
     expect(shouldCompress(msgs, 128_000)).toBe(true);
   });
 
@@ -146,7 +146,7 @@ describe("selectCompressionBoundary", () => {
     const msgs = Array.from({ length: 10 }, (_, i) =>
       makeMessage({ content: "x".repeat(1000), created_at: `2025-01-01T00:0${i}:00Z` }),
     );
-    // 10 msgs × 1000 chars ≈ 250 tokens each; keepBudget = 200 * 0.4 = 80 tokens
+    // 10 msgs × 1000 chars ≈ 334 tokens each (chars/3); keepBudget = 200 * 0.4 = 80 tokens
     const { toCompress, toKeep } = selectCompressionBoundary(msgs, 200, 0.4);
     expect(toCompress.length).toBeGreaterThan(0);
     expect(toKeep.length).toBeGreaterThan(0);

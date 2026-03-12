@@ -145,9 +145,9 @@ describe("officeTool – doctor", () => {
   });
 });
 
-// ── QuickJS-routed commands ──────────────────────────────────────────────────
+// ── Lua-routed commands ──────────────────────────────────────────────────────
 
-describe("officeTool – QuickJS commands", () => {
+describe("officeTool – Lua commands", () => {
   it("requires workspace for non-detect/doctor commands", async () => {
     withNoWorkspace();
     const result = await exec({ command: "open", args: { path: "doc.docx" } });
@@ -155,10 +155,10 @@ describe("officeTool – QuickJS commands", () => {
     expect(result).toContain("workspace");
   });
 
-  it("generates JS code and invokes run_js for open", async () => {
+  it("generates Lua code and invokes run_lua for open", async () => {
     let capturedArgs: Record<string, unknown> = {};
     setupTauriMocks({
-      run_js: (payload) => {
+      run_lua: (payload) => {
         capturedArgs = (payload as { args: Record<string, unknown> }).args;
         return jsResult('{"status":"success"}');
       },
@@ -166,13 +166,14 @@ describe("officeTool – QuickJS commands", () => {
     const result = await exec({ command: "open", args: { path: "doc.docx" } });
     expect(capturedArgs.workspaceRoot).toBe("/workspace");
     expect(capturedArgs.code).toContain('workspace.officellm("open"');
-    expect(capturedArgs.code).toContain('"path":"doc.docx"');
+    expect(capturedArgs.code).toContain('"path"');
+    expect(capturedArgs.code).toContain('"doc.docx"');
     expect(result).toBe("open: success");
   });
 
   it("returns no-session message for status with null data", async () => {
     setupTauriMocks({
-      run_js: () => jsResult('{"status":"success","data":null}'),
+      run_lua: () => jsResult('{"status":"success","data":null}'),
     });
     const result = await exec({ command: "status" });
     expect(result).toBe("No active document session.");
@@ -180,7 +181,7 @@ describe("officeTool – QuickJS commands", () => {
 
   it("returns session info for status with data", async () => {
     setupTauriMocks({
-      run_js: () => jsResult('{"status":"success","data":{"path":"doc.docx","modified":false}}'),
+      run_lua: () => jsResult('{"status":"success","data":{"path":"doc.docx","modified":false}}'),
     });
     const result = await exec({ command: "status" });
     expect(result).toBe('{"path":"doc.docx","modified":false}');
@@ -188,7 +189,7 @@ describe("officeTool – QuickJS commands", () => {
 
   it("formats save result with file path for UI extraction", async () => {
     setupTauriMocks({
-      run_js: () => jsResult('{"status":"success","data":"/workspace/report.docx"}'),
+      run_lua: () => jsResult('{"status":"success","data":"/workspace/report.docx"}'),
     });
     const result = await exec({ command: "save" });
     expect(result).toBe("Document saved to: /workspace/report.docx");
@@ -197,7 +198,7 @@ describe("officeTool – QuickJS commands", () => {
   it("passes args correctly for command calls", async () => {
     let capturedCode = "";
     setupTauriMocks({
-      run_js: (payload) => {
+      run_lua: (payload) => {
         capturedCode = ((payload as { args: { code: string } }).args).code;
         return jsResult('{"status":"success","data":{"modified":true}}');
       },
@@ -206,14 +207,16 @@ describe("officeTool – QuickJS commands", () => {
       command: "replace-text", args: { find: "old", replace: "new" },
     });
     expect(capturedCode).toContain('"replace-text"');
-    expect(capturedCode).toContain('"find":"old"');
-    expect(capturedCode).toContain('"replace":"new"');
+    expect(capturedCode).toContain('"find"');
+    expect(capturedCode).toContain('"old"');
+    expect(capturedCode).toContain('"replace"');
+    expect(capturedCode).toContain('"new"');
     expect(result).toBe('{"modified":true}');
   });
 
   it("returns formatted data from successful command", async () => {
     setupTauriMocks({
-      run_js: () => jsResult('{"status":"success","data":{"slides":5}}'),
+      run_lua: () => jsResult('{"status":"success","data":{"slides":5}}'),
     });
     const result = await exec({ command: "get-info" });
     expect(result).toBe('{"slides":5}');
@@ -221,7 +224,7 @@ describe("officeTool – QuickJS commands", () => {
 
   it("returns string data directly", async () => {
     setupTauriMocks({
-      run_js: () => jsResult('{"status":"success","data":"extracted text content"}'),
+      run_lua: () => jsResult('{"status":"success","data":"extracted text content"}'),
     });
     const result = await exec({ command: "extract-text", args: { i: "doc.docx" } });
     expect(result).toBe("extracted text content");
@@ -229,7 +232,7 @@ describe("officeTool – QuickJS commands", () => {
 
   it("returns error from officellm", async () => {
     setupTauriMocks({
-      run_js: () => jsResult('{"status":"error","error":"no active session"}'),
+      run_lua: () => jsResult('{"status":"error","error":"no active session"}'),
     });
     const result = await exec({ command: "save" });
     expect(result).toContain("Error");
@@ -238,7 +241,7 @@ describe("officeTool – QuickJS commands", () => {
 
   it("returns JS execution error", async () => {
     setupTauriMocks({
-      run_js: () => ({
+      run_lua: () => ({
         output: "", result: "", error: "officellm not installed", executionMs: 5,
       }),
     });
@@ -247,9 +250,9 @@ describe("officeTool – QuickJS commands", () => {
     expect(result).toContain("officellm not installed");
   });
 
-  it("handles run_js invoke error", async () => {
+  it("handles Lua invoke error", async () => {
     setupTauriMocks({
-      run_js: () => { throw new Error("backend unreachable"); },
+      run_lua: () => { throw new Error("backend unreachable"); },
     });
     const result = await exec({ command: "open", args: { path: "doc.docx" } });
     expect(result).toContain("office error");
@@ -259,7 +262,7 @@ describe("officeTool – QuickJS commands", () => {
   it("uses empty args when none provided", async () => {
     let capturedCode = "";
     setupTauriMocks({
-      run_js: (payload) => {
+      run_lua: (payload) => {
         capturedCode = ((payload as { args: { code: string } }).args).code;
         return jsResult('{"status":"success"}');
       },
@@ -268,10 +271,10 @@ describe("officeTool – QuickJS commands", () => {
     expect(capturedCode).toContain("{}");
   });
 
-  it("sets 30s timeout for run_js", async () => {
+  it("sets 30s timeout for run_lua invocation", async () => {
     let capturedTimeout: unknown;
     setupTauriMocks({
-      run_js: (payload) => {
+      run_lua: (payload) => {
         capturedTimeout = ((payload as { args: { timeoutMs: number } }).args).timeoutMs;
         return jsResult('{"status":"success"}');
       },
@@ -282,7 +285,7 @@ describe("officeTool – QuickJS commands", () => {
 
   it("handles non-JSON output gracefully", async () => {
     setupTauriMocks({
-      run_js: () => jsResult("plain text output"),
+      run_lua: () => jsResult("plain text output"),
     });
     const result = await exec({ command: "some-cmd" });
     expect(result).toBe("plain text output");
@@ -290,7 +293,7 @@ describe("officeTool – QuickJS commands", () => {
 
   it("returns fallback when output is empty", async () => {
     setupTauriMocks({
-      run_js: () => jsResult(""),
+      run_lua: () => jsResult(""),
     });
     const result = await exec({ command: "some-cmd" });
     expect(result).toBe("some-cmd: done");

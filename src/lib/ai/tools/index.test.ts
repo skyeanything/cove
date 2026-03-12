@@ -8,7 +8,7 @@ vi.mock("./edit", () => ({ editTool: { _id: "edit" } }));
 vi.mock("./bash", () => ({ createBashTool: vi.fn(() => ({ _id: "bash" })) }));
 vi.mock("./fetch-url", () => ({ fetchUrlTool: { _id: "fetch_url" } }));
 vi.mock("./office", () => ({ officeTool: { _id: "office" } }));
-vi.mock("./jsInterpreter", () => ({ jsInterpreterTool: { _id: "cove_interpreter" } }));
+vi.mock("./interpreter", () => ({ interpreterTool: { _id: "cove_interpreter" } }));
 vi.mock("./diagram", () => ({ diagramTool: { _id: "diagram" } }));
 vi.mock("./write-skill", () => ({ writeSkillTool: { _id: "write_skill" } }));
 vi.mock("./skill", () => ({

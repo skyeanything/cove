@@ -1,10 +1,10 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, memo } from "react";
 import { Brain, ChevronDown, ChevronRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MarkdownContent } from "@/components/chat/MarkdownContent";
 
 /** 单段推理（与 tool call 交错时使用），可折叠；后面出现 tool/text 或流结束即视为完成，变为 "Thought" 并同时折叠 */
-export function ReasoningSegment({
+export const ReasoningSegment = memo(function ReasoningSegment({
   text,
   isStreaming,
   isComplete,
@@ -76,4 +76,4 @@ export function ReasoningSegment({
       </div>
     </div>
   );
-}
+});

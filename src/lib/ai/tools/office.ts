@@ -17,11 +17,22 @@ interface CommandResult {
   metrics: unknown;
 }
 
-interface JsExecutionResult {
+interface LuaExecutionResult {
   output: string;
   result: string;
   error: string | null;
   executionMs: number;
+}
+
+/** Escape a string for Lua string literal. */
+function luaStr(s: string): string {
+  return '"' + s.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/\n/g, "\\n") + '"';
+}
+
+/** Build a Lua table literal from a Record<string, string>. */
+function buildLuaTable(obj: Record<string, string>): string {
+  const entries = Object.entries(obj).map(([k, v]) => `[${luaStr(k)}] = ${luaStr(v)}`);
+  return "{" + entries.join(", ") + "}";
 }
 
 /** Parse the JSON output from workspace.officellm() and format for agent. */
@@ -50,13 +61,8 @@ function formatOfficellmOutput(command: string, raw: string): string {
 
 export const officeTool = tool({
   description:
-    "Operate on Office documents (DOCX/PPTX/XLSX) via officellm. " +
-    "Pass a command name and optional args object. " +
-    "Commands: detect, doctor, open, create, close, save, status, or any document command. " +
-    "IMPORTANT: Load the OfficeLLM skill first to get correct command names. " +
-    "Examples: {command: 'open', args: {path: 'doc.docx'}}, " +
-    "{command: 'replace-text', args: {find: 'old', replace: 'new'}}, " +
-    "{command: 'from-markdown', args: {i: 'in.md', o: 'out.docx'}}.",
+    "Operate on Office documents (DOCX/PPTX/XLSX). Pass command + args. " +
+    "Load OfficeLLM skill first for command reference.",
   inputSchema: z.object({
     command: z
       .string()
@@ -93,17 +99,17 @@ export const officeTool = tool({
       }
     }
 
-    // All other commands: execute via QuickJS sandbox
+    // All other commands: execute via Lua sandbox
     const activeWorkspace = useWorkspaceStore.getState().activeWorkspace;
     if (!activeWorkspace) {
       return "Error: select a workspace directory first.";
     }
 
-    const jsArgs = JSON.stringify(args ?? {});
-    const code = `console.log(workspace.officellm(${JSON.stringify(command)}, ${jsArgs}))`;
+    const luaArgs = buildLuaTable(args ?? {});
+    const code = `print(workspace.officellm(${luaStr(command)}, ${luaArgs}))`;
 
     try {
-      const result = await invoke<JsExecutionResult>("run_js", {
+      const result = await invoke<LuaExecutionResult>("run_lua", {
         args: { workspaceRoot: activeWorkspace.path, code, timeoutMs: 30_000 },
       });
       if (result.error) return `Error: ${result.error}`;

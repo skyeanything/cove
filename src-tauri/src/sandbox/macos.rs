@@ -36,7 +36,7 @@ fn generate_profile(workspace_root: &str, policy: &SandboxPolicy) -> String {
     // 基本进程操作
     lines.push("(allow process-exec)".to_string());
     lines.push("(allow process-fork)".to_string());
-    lines.push("(allow signal (target self))".to_string());
+    lines.push("(allow signal (target children))".to_string());
     lines.push("(allow sysctl-read)".to_string());
 
     // 允许读取大部分文件

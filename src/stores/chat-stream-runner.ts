@@ -49,9 +49,11 @@ export async function runStreamLoop(
   callbacks: StreamRunCallbacks,
 ): Promise<StreamRunResult> {
   const { provider, modelId, modelMessages, workspacePath, abortSignal, runMetrics, labelBase, conversationId } = opts;
+  const t0 = performance.now();
   const model = getModel(provider, modelId);
   const modelOption = getModelOption(provider, modelId);
   const enabledSkillNames = await getEnabledSkillNames();
+  const t1 = performance.now();
 
   // Ensure external skills (and their resources) are loaded before building tools.
   // Without this, collectAllResources() in skill_resource tool sees an empty store.
@@ -59,9 +61,17 @@ export async function runStreamLoop(
   if (!skillsState.loaded) {
     await skillsState.loadExternalSkills(workspacePath);
   }
+  const t2 = performance.now();
 
   const officeAvailable = await isOfficeAvailable();
+  const t3 = performance.now();
   const soulPrompt = formatSoulPrompt(await readSoul());
+  const t4 = performance.now();
+
+  console.log(
+    `[perf] setup: model+skills=${(t1 - t0).toFixed(0)}ms, loadExtSkills=${(t2 - t1).toFixed(0)}ms, ` +
+    `officeDetect=${(t3 - t2).toFixed(0)}ms, soulRead=${(t4 - t3).toFixed(0)}ms, total=${(t4 - t0).toFixed(0)}ms`,
+  );
 
   // Fire-and-forget: meditation check at conversation start
   const meditateGen = async (p: string) => {
@@ -105,12 +115,29 @@ export async function runStreamLoop(
   // so prior tool history doesn't confuse the model or trigger API errors.
   const messages = supportsTools ? modelMessages : stripToolMessages(modelMessages);
 
+  const systemPrompt = buildSystemPrompt({ workspacePath, officeAvailable, soulPrompt });
+
+  // --- Diagnostic: measure request payload sizes ---
+  {
+    const msgChars = JSON.stringify(messages).length;
+    const toolNames = Object.keys(tools);
+    const toolSchemaChars = JSON.stringify(tools).length;
+    const sysChars = systemPrompt.length;
+    const totalChars = sysChars + msgChars + toolSchemaChars;
+    const estTokens = Math.round(totalChars / 3.5);
+    console.log(
+      `[perf] request payload: system=${sysChars} chars, messages=${msgChars} chars (${messages.length} msgs), ` +
+      `tools=${toolSchemaChars} chars (${toolNames.length} tools: ${toolNames.join(",")}), ` +
+      `total=${totalChars} chars (~${estTokens} tokens)`,
+    );
+  }
+
   let streamResult: StreamResult | null = null;
   for (let attempt = 1; attempt <= RETRYABLE_ATTEMPTS; attempt++) {
     const attemptResult = runAgent({
       model,
       messages,
-      system: buildSystemPrompt({ workspacePath, officeAvailable, soulPrompt }),
+      system: systemPrompt,
       tools,
       abortSignal,
       maxOutputTokens: modelOption?.max_output_tokens,

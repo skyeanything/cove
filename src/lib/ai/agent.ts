@@ -54,14 +54,20 @@ function isStoredToolPart(part: unknown): part is StoredToolPart {
 }
 
 /** 工具结果统一转为字符串再交给模型，避免对象被转成 [object Object] */
-function normalizeToolOutput(result: unknown): NormalizedToolOutput {
+function normalizeToolOutput(result: unknown, maxChars?: number): NormalizedToolOutput {
+  let value: string;
   if (typeof result === "string") {
-    return { type: "text", value: result };
+    value = result;
+  } else {
+    value = JSON.stringify(result ?? null, null, 2);
   }
-  return { type: "text", value: JSON.stringify(result ?? null, null, 2) };
+  if (maxChars && value.length > maxChars) {
+    value = value.slice(0, maxChars) + `... [truncated, ${value.length} total chars]`;
+  }
+  return { type: "text", value };
 }
 
-function reconstructFromParts(partsJson: string, reasoning?: string | null): ModelMessage[] | null {
+function reconstructFromParts(partsJson: string, reasoning?: string | null, maxToolResultChars?: number): ModelMessage[] | null {
   try {
     const parsed = JSON.parse(partsJson) as unknown;
     if (!Array.isArray(parsed)) return null;
@@ -100,7 +106,7 @@ function reconstructFromParts(partsJson: string, reasoning?: string | null): Mod
         // 会因 tool-call 没有匹配的 tool-result 而抛出 MissingToolResultsError。
         // 当 result 缺失时（如流式中断），使用合成的错误结果占位。
         const output = part.result !== undefined
-          ? normalizeToolOutput(part.result)
+          ? normalizeToolOutput(part.result, maxToolResultChars)
           : { type: "text" as const, value: "[Tool execution was interrupted]" };
         toolMessages.push({
           role: "tool",
@@ -171,12 +177,18 @@ export function stripToolMessages(messages: ModelMessage[]): ModelMessage[] {
 export interface ToModelMessagesOptions {
   /** Timestamp: skip non-summary messages with created_at <= this value */
   summaryUpTo?: string;
+  /** Number of recent DB messages to keep tool results at full length (default: 6) */
+  recentFullFidelity?: number;
 }
+
+/** Max chars for truncated tool results in older messages */
+const TRUNCATED_TOOL_RESULT_CHARS = 200;
 
 /**
  * Convert DB messages to AI SDK ModelMessage format.
  * When options.summaryUpTo is set, summary messages (parent_id = "__context_summary__")
  * are injected as the first system message, and older messages are skipped.
+ * Tool results in older messages (beyond recentFullFidelity) are truncated to save tokens.
  */
 export function toModelMessages(
   dbMessages: Message[],
@@ -184,7 +196,15 @@ export function toModelMessages(
 ): ModelMessage[] {
   const result: ModelMessage[] = [];
   const summaryUpTo = options?.summaryUpTo;
+  const recentFull = options?.recentFullFidelity ?? 6;
   let summaryMessage: ModelMessage | null = null;
+
+  // Count effective (non-skipped) messages to determine truncation boundary
+  const effective = dbMessages.filter(
+    (m) => m.parent_id !== "__context_summary__" && !(summaryUpTo && m.created_at <= summaryUpTo),
+  );
+  const truncateBeforeIdx = Math.max(0, effective.length - recentFull);
+  let effectiveIdx = 0;
 
   for (const msg of dbMessages) {
     // Summary message → collect for injection at position 0
@@ -198,6 +218,9 @@ export function toModelMessages(
       continue;
     }
 
+    const maxResultChars = effectiveIdx < truncateBeforeIdx ? TRUNCATED_TOOL_RESULT_CHARS : undefined;
+    effectiveIdx++;
+
     if (msg.role === "user") {
       result.push({
         role: "user",
@@ -205,7 +228,7 @@ export function toModelMessages(
       });
     } else if (msg.role === "assistant") {
       if (msg.parts) {
-        const reconstructed = reconstructFromParts(msg.parts, msg.reasoning);
+        const reconstructed = reconstructFromParts(msg.parts, msg.reasoning, maxResultChars);
         if (reconstructed && reconstructed.length > 0) {
           result.push(...reconstructed);
           continue;
