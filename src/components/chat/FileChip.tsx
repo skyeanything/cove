@@ -72,7 +72,7 @@ export function FileChip({ path, name }: FileChipProps) {
         type="button"
         onClick={handleOpenFile}
         title={openErr ? `无法打开：${path}` : path}
-        className="inline-flex cursor-pointer items-center gap-1.5 px-2 py-0.5 transition-colors duration-150 hover:bg-background-tertiary hover:text-accent"
+        className="inline-flex cursor-pointer items-center gap-1.5 px-2 py-0.5 transition-colors duration-150 hover:bg-background-tertiary"
       >
         {openErr ? (
           <AlertCircle className="size-3.5 shrink-0 text-destructive" strokeWidth={1.5} />
@@ -90,7 +90,7 @@ export function FileChip({ path, name }: FileChipProps) {
         type="button"
         onClick={handleRevealDir}
         title={revealErr ? `无法定位文件：${path}` : `在访达中显示: ${path}`}
-        className="inline-flex cursor-pointer items-center gap-1 px-2 py-0.5 transition-colors duration-150 hover:bg-background-tertiary hover:text-accent"
+        className="inline-flex cursor-pointer items-center gap-1 px-2 py-0.5 transition-colors duration-150 hover:bg-background-tertiary"
       >
         {revealErr ? (
           <AlertCircle className="size-3 shrink-0 text-destructive" strokeWidth={1.5} />
