@@ -118,11 +118,16 @@ function WorkspaceRootNode({
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set());
 
   // Collapse all folders whenever this workspace transitions from inactive → active.
+  // suppressAutoExpandRef prevents the selectedPath auto-expand effect (which shares
+  // activeWorkspaceId in its deps) from immediately re-expanding folders in the same
+  // post-render flush. Reset effect is declared first so it runs first.
   const prevActiveIdRef = useRef<string | undefined>(undefined);
+  const suppressAutoExpandRef = useRef(false);
   useEffect(() => {
     const isNowActive = activeWorkspaceId === workspace.id;
     if (isNowActive && prevActiveIdRef.current !== workspace.id) {
       setExpandedDirs(new Set());
+      suppressAutoExpandRef.current = true;
     }
     prevActiveIdRef.current = activeWorkspaceId;
   }, [activeWorkspaceId, workspace.id]);
@@ -195,9 +200,13 @@ function WorkspaceRootNode({
   }, [workspaceRoot, expandedDirs, fileTreeShowHidden, initFolderOrder]);
 
   useEffect(() => {
+    // If the workspace-activation reset just fired, skip this run to prevent
+    // selectedPath from immediately re-expanding the folders we just collapsed.
+    if (suppressAutoExpandRef.current) {
+      suppressAutoExpandRef.current = false;
+      return;
+    }
     if (activeWorkspaceId !== workspace.id) return;
-    // Only auto-expand when user explicitly selects a file — never on lastOpenedDirPath,
-    // so that re-entering a workspace always shows folders collapsed by default.
     const focusDir = selectedPath ? dirOfPath(selectedPath) : null;
     if (!focusDir) return;
     setExpandedDirs((prev) => {
