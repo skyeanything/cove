@@ -9,6 +9,7 @@ mod office_read;
 mod office_write;
 mod order;
 mod read;
+mod read_absolute;
 mod validation;
 mod walk;
 mod write;
@@ -28,6 +29,8 @@ mod tests_list;
 #[cfg(test)]
 mod tests_read;
 #[cfg(test)]
+mod tests_read_absolute;
+#[cfg(test)]
 mod tests_validation;
 
 pub use copy::*;
@@ -38,6 +41,7 @@ pub use office_read::*;
 pub use office_write::*;
 pub use order::*;
 pub use read::*;
+pub use read_absolute::*;
 pub use walk::*;
 pub use write::*;
 

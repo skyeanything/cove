@@ -155,6 +155,8 @@ pub fn run() {
       fs_commands::list_dir,
       fs_commands::walk_files,
       fs_commands::read_file_as_data_url,
+      fs_commands::read_absolute_file,
+      fs_commands::read_absolute_file_as_data_url,
       fs_commands::open_with_app,
       fs_commands::detect_office_apps,
       fs_commands::create_dir,

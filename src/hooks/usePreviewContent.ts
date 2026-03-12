@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { invoke, convertFileSrc } from "@tauri-apps/api/core";
+import { invoke } from "@tauri-apps/api/core";
 import { useFilePreviewStore } from "@/stores/filePreviewStore";
 import { getPreviewKind } from "@/lib/preview-types";
 
@@ -16,23 +16,14 @@ function isAbsolutePath(p: string): boolean {
 }
 
 async function loadAbsoluteAsText(path: string): Promise<string> {
-  const url = convertFileSrc(path);
-  const resp = await fetch(url);
-  if (!resp.ok) throw new Error(`Failed to read file: ${resp.statusText}`);
-  return resp.text();
+  return invoke<string>("read_absolute_file", { args: { path } });
 }
 
 async function loadAbsoluteAsDataUrl(path: string): Promise<string> {
-  const url = convertFileSrc(path);
-  const resp = await fetch(url);
-  if (!resp.ok) throw new Error(`Failed to read file: ${resp.statusText}`);
-  const blob = await resp.blob();
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = () => reject(new Error("FileReader failed"));
-    reader.readAsDataURL(blob);
+  const result = await invoke<{ dataUrl: string }>("read_absolute_file_as_data_url", {
+    args: { path },
   });
+  return result.dataUrl;
 }
 
 export function usePreviewContent(path: string | null, workspaceRoot: string | null) {
