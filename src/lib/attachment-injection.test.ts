@@ -29,6 +29,8 @@ describe("buildAttachmentInjection", () => {
       expect(result.visionParts).toHaveLength(1);
       expect(result.visionParts[0]).toEqual({ type: "image", image: "data:image/png;base64,abc" });
       expect(result.textBlock).toContain("[Image: photo.png at /ws/photo_123.png]");
+      expect(result.textBlock).toContain("Image attached as multimodal content");
+      expect(result.textBlock).toContain("may not support image input");
     });
 
     it("only adds text when model lacks vision", () => {
@@ -42,6 +44,8 @@ describe("buildAttachmentInjection", () => {
 
       expect(result.visionParts).toHaveLength(0);
       expect(result.textBlock).toContain("[Image: photo.png at /ws/photo_123.png (800x600)]");
+      expect(result.textBlock).toContain("cannot extract text from images");
+      expect(result.textBlock).toContain("vision-capable model");
     });
 
     it("skips vision part when no data URL content", () => {
@@ -53,6 +57,7 @@ describe("buildAttachmentInjection", () => {
 
       expect(result.visionParts).toHaveLength(0);
       expect(result.textBlock).toContain("[Image: photo.png at /ws/photo_123.png]");
+      expect(result.textBlock).toContain("cannot extract text from images");
     });
   });
 
@@ -149,6 +154,9 @@ describe("buildAttachmentInjection", () => {
       expect(result.pdfParts).toHaveLength(1);
       expect(result.pdfParts[0]).toEqual({ type: "file", data: "data:application/pdf;base64,abc", mediaType: "application/pdf" });
       expect(result.textBlock).toContain("[PDF: report.pdf at /ws/report_123.pdf]");
+      expect(result.textBlock).toContain("Extracted text preview:");
+      expect(result.textBlock).toContain("PDF content text");
+      expect(result.textBlock).toContain("PDF attached natively");
     });
 
     it("inlines text content when model lacks native PDF support", () => {

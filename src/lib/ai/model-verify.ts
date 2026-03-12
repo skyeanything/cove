@@ -33,6 +33,30 @@ function parseConfig(provider: Provider): Record<string, unknown> {
   }
 }
 
+async function verifyAnthropicKey(baseUrl: string, apiKey?: string): Promise<void> {
+  const res = await fetch(`${baseUrl}/v1/messages`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-api-key": apiKey || "",
+      "anthropic-version": "2023-06-01",
+    },
+    body: JSON.stringify({ model: "claude-haiku-4-5-20251001", max_tokens: 1, messages: [] }),
+  });
+  if (res.status === 401 || res.status === 403) {
+    throw new Error(`Invalid API key: ${await extractErrorMessage(res)}`);
+  }
+}
+
+async function verifyGoogleKey(baseUrl: string, apiKey?: string): Promise<void> {
+  const googleBase = baseUrl || "https://generativelanguage.googleapis.com";
+  const res = await fetch(`${googleBase}/v1beta/models?key=${apiKey || ""}`);
+  if (res.status === 400 || res.status === 401 || res.status === 403) {
+    throw new Error(`Invalid API key: ${await extractErrorMessage(res)}`);
+  }
+  if (!res.ok) throw new Error(`Connection failed (${res.status}): ${await extractErrorMessage(res)}`);
+}
+
 /**
  * Verify API key validity for providers that don't support model listing.
  * Sends a lightweight request and interprets the response status.
@@ -43,30 +67,11 @@ export async function verifyApiKey(provider: Provider): Promise<void> {
 
   switch (provider.type) {
     case "anthropic": {
-      const res = await fetch(`${baseUrl}/v1/messages`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": provider.api_key || "",
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({ model: "claude-haiku-4-5-20251001", max_tokens: 1, messages: [] }),
-      });
-      if (res.status === 401 || res.status === 403) {
-        throw new Error(`Invalid API key: ${await extractErrorMessage(res)}`);
-      }
-      return;
+      return verifyAnthropicKey(baseUrl, provider.api_key);
     }
 
     case "google": {
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models?key=${provider.api_key || ""}`,
-      );
-      if (res.status === 400 || res.status === 401 || res.status === 403) {
-        throw new Error(`Invalid API key: ${await extractErrorMessage(res)}`);
-      }
-      if (!res.ok) throw new Error(`Connection failed (${res.status}): ${await extractErrorMessage(res)}`);
-      return;
+      return verifyGoogleKey(baseUrl, provider.api_key);
     }
 
     case "azure": {
@@ -136,6 +141,26 @@ export async function verifyApiKey(provider: Provider): Promise<void> {
     }
 
     case "bedrock": {
+      return;
+    }
+
+    case "custom": {
+      const protocol = (parseConfig(provider) as { protocol?: string }).protocol;
+      if (protocol === "anthropic") {
+        return verifyAnthropicKey(baseUrl, provider.api_key);
+      }
+      if (protocol === "google") {
+        return verifyGoogleKey(baseUrl, provider.api_key);
+      }
+      // Default to OpenAI-compatible verification
+      const normalizedBase = normalizeOpenAIBaseUrl(baseUrl);
+      const res = await fetch(`${normalizedBase}/v1/models`, {
+        headers: { Authorization: `Bearer ${provider.api_key || ""}` },
+      });
+      if (res.status === 401 || res.status === 403) {
+        throw new Error(`Invalid API key: ${await extractErrorMessage(res)}`);
+      }
+      if (!res.ok) throw new Error(`Connection failed (${res.status}): ${await extractErrorMessage(res)}`);
       return;
     }
 

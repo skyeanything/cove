@@ -15,31 +15,34 @@ export function WorkspaceContent() {
   const setWsFileTreeWidth = useLayoutStore((s) => s.setWsFileTreeWidth);
   const wsChatWidth = useLayoutStore((s) => s.wsChatWidth);
   const setWsChatWidth = useLayoutStore((s) => s.setWsChatWidth);
+  const wsFileTreeVisible = useLayoutStore((s) => s.wsFileTreeVisible);
   const [modelSelectorOpen, setModelSelectorOpen] = useState(false);
 
   return (
     <div className="flex min-w-0 flex-1">
-      {/* Column 1: File tree */}
-      <div
-        className="relative flex shrink-0 flex-col overflow-hidden border-r border-border"
-        style={{ width: wsFileTreeWidth, minWidth: WS_FILE_TREE_MIN }}
-      >
-        <FileTreePanel />
-        <ResizeHandle
-          side="left"
-          currentWidth={wsFileTreeWidth}
-          onResize={setWsFileTreeWidth}
-          minWidth={WS_FILE_TREE_MIN}
-          maxWidth={WS_FILE_TREE_MAX}
-        />
-      </div>
+      {/* Column 1: File tree (conditionally shown) */}
+      {wsFileTreeVisible && (
+        <div
+          className="relative flex shrink-0 flex-col overflow-hidden border-r border-border"
+          style={{ width: wsFileTreeWidth, minWidth: WS_FILE_TREE_MIN }}
+        >
+          <FileTreePanel />
+          <ResizeHandle
+            side="left"
+            currentWidth={wsFileTreeWidth}
+            onResize={setWsFileTreeWidth}
+            minWidth={WS_FILE_TREE_MIN}
+            maxWidth={WS_FILE_TREE_MAX}
+          />
+        </div>
+      )}
 
-      {/* Column 2: File preview / edit (auto-fill) */}
+      {/* Column 2: File preview (auto-fill) */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         <FilePreviewPanel />
       </div>
 
-      {/* Column 3: Chat area (right side) */}
+      {/* Column 3: Chat area */}
       <div
         className="relative flex shrink-0 flex-col overflow-hidden border-l border-border"
         style={{ width: wsChatWidth, minWidth: WS_CHAT_MIN }}

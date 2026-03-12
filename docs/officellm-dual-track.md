@@ -19,10 +19,8 @@ Cove 中存在两套独立的 office 工具体系：**内嵌（Bundled）** 和 
 
 内置 Skill 是一个 **bootstrap**，默认启用（用户可在设置中关闭），告诉模型：
 
-1. **调用优先级** — 如果外部 `OfficeLLM` Skill 已启用，优先用 `bash` 调 CLI；否则用 Tauri tool
-2. **加载完整参考** — 通过 `skill` 工具加载 `OfficeLLM` 获取完整命令文档
-3. **资源发现** — `doctor` → `home` → `resources/` 路径
-4. **依赖检测** — LibreOffice / poppler / Quarto 的安装指引
+1. **调用方式** — 必须通过 `office` Tauri tool，不能用 `bash` 直接调 CLI
+2. **加载完整参考** — 通过 `skill_resource` 工具按需加载命令文档
 
 文件：`src/skills/office/SKILL.md`
 

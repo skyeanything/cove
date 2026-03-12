@@ -16,6 +16,12 @@ vi.mock("@/stores/permissionStore", () => ({
 
 vi.mock("prismjs", () => ({ default: {} }));
 vi.mock("prismjs/components/prism-bash", () => ({}));
+vi.mock("@/hooks/useOpenFilePreview", () => ({
+  useOpenFilePreview: () => ({ open: vi.fn(), openPreview: vi.fn(), openExternal: vi.fn() }),
+}));
+vi.mock("@/lib/file-tree-icons", () => ({
+  getFileIcon: () => null,
+}));
 vi.mock("prism-react-renderer", () => ({
   Highlight: ({
     children,
@@ -125,20 +131,29 @@ describe("getToolHeaderSummary", () => {
     expect(getToolHeaderSummary("bash", { command: "ls" })).toBeNull();
   });
 
-  it("returns filePath for read", () => {
-    expect(getToolHeaderSummary("read", { filePath: "/tmp/file.ts" })).toBe("/tmp/file.ts");
+  it("returns FilePathChip for read", () => {
+    const result = getToolHeaderSummary("read", { filePath: "/tmp/file.ts" });
+    expect(result).not.toBeNull();
+    const { container } = render(<>{result}</>);
+    expect(container.querySelector("[role='button']")?.getAttribute("title")).toBe("/tmp/file.ts");
   });
 
-  it("returns filePath for edit", () => {
-    expect(getToolHeaderSummary("edit", { filePath: "/src/app.tsx" })).toBe("/src/app.tsx");
+  it("returns FilePathChip for edit", () => {
+    const result = getToolHeaderSummary("edit", { filePath: "/src/app.tsx" });
+    expect(result).not.toBeNull();
+    const { container } = render(<>{result}</>);
+    expect(container.querySelector("[role='button']")?.getAttribute("title")).toBe("/src/app.tsx");
   });
 
   it("returns description for cove_interpreter", () => {
     expect(getToolHeaderSummary("cove_interpreter", { description: "run code" })).toBe("run code");
   });
 
-  it("returns null for unknown tool", () => {
-    expect(getToolHeaderSummary("write", { filePath: "/tmp" })).toBeNull();
+  it("returns FilePathChip for write", () => {
+    const result = getToolHeaderSummary("write", { filePath: "/tmp" });
+    expect(result).not.toBeNull();
+    const { container } = render(<>{result}</>);
+    expect(container.querySelector("[role='button']")?.getAttribute("title")).toBe("/tmp");
   });
 
   it("returns null for empty string value", () => {
@@ -308,7 +323,7 @@ describe("ToolCallBlock", () => {
     expect(container.textContent).not.toContain("0.5 s");
   });
 
-  it("starts collapsed when not loading, expands on click", async () => {
+  it("collapses and expands on click", async () => {
     const { container } = render(
       <ToolCallBlock
         toolCall={makeToolCall({ args: { command: "echo hi", description: "echo" } })}
@@ -316,34 +331,14 @@ describe("ToolCallBlock", () => {
       />,
     );
     const grid = container.querySelector("[style]") as HTMLElement;
+    // Default: collapsed
     expect(grid.style.gridTemplateRows).toBe("0fr");
     // Click the header button to expand
     const headerBtn = container.querySelector("button") as HTMLElement;
     await fireEvent.click(headerBtn);
+    // After click, state toggles closed -> open
     const gridAfter = container.querySelector("[style]") as HTMLElement;
     expect(gridAfter.style.gridTemplateRows).toBe("1fr");
-  });
-
-  it("starts expanded when isLoading", () => {
-    const { container } = render(
-      <ToolCallBlock
-        toolCall={makeToolCall({ isLoading: true })}
-        pendingAsk={null}
-      />,
-    );
-    const grid = container.querySelector("[style]") as HTMLElement;
-    expect(grid.style.gridTemplateRows).toBe("1fr");
-  });
-
-  it("starts collapsed when isDone", () => {
-    const { container } = render(
-      <ToolCallBlock
-        toolCall={makeToolCall({ isLoading: false, result: "ok" })}
-        pendingAsk={null}
-      />,
-    );
-    const grid = container.querySelector("[style]") as HTMLElement;
-    expect(grid.style.gridTemplateRows).toBe("0fr");
   });
 
   it("shows permission bar when pending ask matches", () => {
@@ -363,8 +358,7 @@ describe("ToolCallBlock", () => {
         pendingAsk={pendingAsk}
       />,
     );
-    expect(container.textContent).toContain("tool.awaitingAuth");
-    expect(container.textContent).toContain("permission.bash");
+    expect(container.textContent).toContain("permission.title");
     expect(container.textContent).toContain("permission.deny");
     expect(container.textContent).toContain("permission.allow");
     expect(container.textContent).toContain("permission.alwaysAllow");

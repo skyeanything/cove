@@ -1,14 +1,8 @@
-import { useEffect } from "react";
 import { useDataStore } from "@/stores/dataStore";
 import { useSettingsStore } from "@/stores/settingsStore";
+import type { SelectedProvider } from "@/stores/settingsStore";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -30,50 +24,41 @@ import type { ProviderType } from "@/db/types";
 import { ProviderForm } from "./ProviderForm";
 import { ProviderIcon } from "@/components/common/ProviderIcon";
 
-/** Non-built-in types that can be added via the + button. */
-const ADDABLE_TYPES: { type: ProviderType; label: string }[] = [
-  // { type: "custom", label: "OpenAI Compatible" },
-  // { type: "bedrock", label: "Amazon Bedrock" },
-  // { type: "github-models", label: "GitHub Models" },
-];
-
 export function ProvidersPage() {
   const providers = useDataStore((s) => s.providers);
   const createProvider = useDataStore((s) => s.createProvider);
   const deleteProvider = useDataStore((s) => s.deleteProvider);
-  const selectedType = useSettingsStore((s) => s.selectedProviderType);
+  const selected = useSettingsStore((s) => s.selectedProvider);
   const setSelectedProvider = useSettingsStore((s) => s.setSelectedProvider);
 
-  // 暂时只展示白名单内的内置 provider，其他 provider 入口先隐藏
-  const customProviders: typeof providers = [];
+  const customProviders = providers.filter((p) => p.type === "custom");
 
-  const selectedMeta = selectedType ? PROVIDER_METAS[selectedType] : null;
-  const isSelectedCustom = selectedMeta && !selectedMeta.builtIn;
+  const isSelectedCustom = selected?.type === "custom" && !!selected.id;
 
-  useEffect(() => {
-    if (selectedType && !BUILTIN_PROVIDER_TYPES.includes(selectedType)) {
-      setSelectedProvider("deepseek");
-    }
-  }, [selectedType, setSelectedProvider]);
-
-  async function handleAddCustom(type: ProviderType) {
-    const meta = PROVIDER_METAS[type];
+  async function handleAddCustom() {
+    const id = crypto.randomUUID();
     await createProvider({
-      id: crypto.randomUUID(),
-      name: meta.displayName,
-      type,
+      id,
+      name: "Custom Provider",
+      type: "custom" as ProviderType,
       enabled: 1,
     });
-    setSelectedProvider(type);
+    setSelectedProvider({ type: "custom", id });
   }
 
   async function handleRemoveSelected() {
-    if (!selectedType) return;
-    const provider = providers.find((p) => p.type === selectedType);
+    if (!selected?.id) return;
+    const provider = providers.find((p) => p.id === selected.id);
     if (provider) {
       await deleteProvider(provider.id);
     }
-    setSelectedProvider("deepseek");
+    setSelectedProvider({ type: "deepseek" });
+  }
+
+  function isActive(sel: SelectedProvider | null, type: ProviderType, id?: string): boolean {
+    if (!sel) return false;
+    if (id) return sel.id === id;
+    return sel.type === type && !sel.id;
   }
 
   return (
@@ -86,13 +71,14 @@ export function ProvidersPage() {
             {BUILTIN_PROVIDER_TYPES.map((type) => {
               const meta = PROVIDER_METAS[type];
               const configured = providers.find((p) => p.type === type);
+              const active = isActive(selected, type);
               return (
                 <button
                   key={type}
-                  onClick={() => setSelectedProvider(type)}
+                  onClick={() => setSelectedProvider({ type })}
                   className={cn(
                     "flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm transition-colors duration-150",
-                    selectedType === type
+                    active
                       ? "bg-accent text-accent-foreground"
                       : "text-foreground hover:bg-background-tertiary",
                   )}
@@ -103,7 +89,7 @@ export function ProvidersPage() {
                     <span
                       className={cn(
                         "size-1.5 shrink-0 rounded-full",
-                        selectedType === type ? "bg-accent-foreground/50" : "bg-success",
+                        active ? "bg-accent-foreground/50" : "bg-success",
                       )}
                     />
                   )}
@@ -118,27 +104,27 @@ export function ProvidersPage() {
 
             {/* Custom providers */}
             {customProviders.map((p) => {
-              const meta = PROVIDER_METAS[p.type];
+              const active = isActive(selected, p.type, p.id);
               return (
                 <button
                   key={p.id}
-                  onClick={() => setSelectedProvider(p.type)}
+                  onClick={() => setSelectedProvider({ type: p.type, id: p.id })}
                   className={cn(
                     "flex w-full cursor-pointer items-center gap-2.5 rounded-lg px-2.5 py-1.5 text-left text-sm transition-colors duration-150",
-                    selectedType === p.type
+                    active
                       ? "bg-accent text-accent-foreground"
                       : "text-foreground hover:bg-background-tertiary",
                   )}
                 >
                   <ProviderIcon type={p.type} />
                   <span className="flex-1 truncate">
-                    {p.name || meta.displayName}
+                    {p.name || "Custom Provider"}
                   </span>
                   {p.api_key && (
                     <span
                       className={cn(
                         "size-1.5 shrink-0 rounded-full",
-                        selectedType === p.type ? "bg-accent-foreground/50" : "bg-success",
+                        active ? "bg-accent-foreground/50" : "bg-success",
                       )}
                     />
                   )}
@@ -150,35 +136,14 @@ export function ProvidersPage() {
 
         {/* Bottom toolbar: + / - */}
         <div className="flex items-center gap-0.5 border-t px-2 py-1.5">
-          {ADDABLE_TYPES.length > 0 ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon-sm" className="size-7">
-                  <Plus className="size-3.5" strokeWidth={1.5} />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" side="top">
-                {ADDABLE_TYPES.map((item) => (
-                  <DropdownMenuItem
-                    key={item.type}
-                    onClick={() => handleAddCustom(item.type)}
-                    className="text-sm"
-                  >
-                    {item.label}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : (
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="size-7"
-              disabled
-            >
-              <Plus className="size-3.5" strokeWidth={1.5} />
-            </Button>
-          )}
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="size-7"
+            onClick={handleAddCustom}
+          >
+            <Plus className="size-3.5" strokeWidth={1.5} />
+          </Button>
 
           {isSelectedCustom ? (
             <AlertDialog>
@@ -217,8 +182,8 @@ export function ProvidersPage() {
 
       {/* Right: Config form */}
       <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-        {selectedType ? (
-          <ProviderForm providerType={selectedType} />
+        {selected ? (
+          <ProviderForm providerType={selected.type} providerId={selected.id} />
         ) : (
           <div className="flex flex-1 items-center justify-center text-sm text-muted-foreground">
             Select a provider to configure
@@ -228,4 +193,3 @@ export function ProvidersPage() {
     </div>
   );
 }
-

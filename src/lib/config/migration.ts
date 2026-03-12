@@ -38,6 +38,7 @@ export async function migrateConfigIfNeeded(): Promise<void> {
       theme === "light" || theme === "dark" || theme === "system"
         ? theme
         : CONFIG_DEFAULTS.appearance.theme,
+    fontSize: CONFIG_DEFAULTS.appearance.fontSize,
   };
   await writeConfig("appearance", appearance);
 
@@ -67,6 +68,14 @@ export async function migrateConfigIfNeeded(): Promise<void> {
       typeof layoutState?.filePanelOpen === "boolean"
         ? layoutState.filePanelOpen
         : CONFIG_DEFAULTS.layout.filePanelOpen,
+    fileTreeOpen:
+      typeof layoutState?.fileTreeOpen === "boolean"
+        ? layoutState.fileTreeOpen
+        : CONFIG_DEFAULTS.layout.fileTreeOpen,
+    filePreviewOpen:
+      typeof layoutState?.filePreviewOpen === "boolean"
+        ? layoutState.filePreviewOpen
+        : CONFIG_DEFAULTS.layout.filePreviewOpen,
     fileTreeWidth:
       typeof layoutState?.fileTreeWidth === "number"
         ? layoutState.fileTreeWidth
@@ -89,6 +98,8 @@ export async function migrateConfigIfNeeded(): Promise<void> {
       typeof layoutState?.wsChatWidth === "number"
         ? (layoutState.wsChatWidth as number)
         : CONFIG_DEFAULTS.layout.wsChatWidth,
+    wsFileTreeVisible: CONFIG_DEFAULTS.layout.wsFileTreeVisible,
+    wsChatVisible: CONFIG_DEFAULTS.layout.wsChatVisible,
   };
   await writeConfig("layout", layout);
 

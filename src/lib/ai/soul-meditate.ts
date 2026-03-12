@@ -2,7 +2,8 @@
  * Meditation distillation: cove reflects on accumulated observations
  * and distills them into refined SOUL updates.
  *
- * Triggered at conversation start when enough observations have accumulated.
+ * Triggered at conversation start when enough observations have accumulated,
+ * or manually via the meditate tool.
  * DNA section is immutable. Disposition entry text is immutable (annotations allowed).
  */
 
@@ -13,6 +14,8 @@ import {
   deleteSoulPrivate,
   snapshotSoul,
   findPrivateFile,
+  SOUL_SIZE_LIMITS,
+  DEFAULT_PRIVATE_LIMIT,
   type SoulPrivateFile,
 } from "./soul";
 
@@ -21,18 +24,57 @@ const SUBSEQUENT_MEDITATION_THRESHOLD = 5;
 const MEDITATION_COOLDOWN_MS = 24 * 60 * 60 * 1000;
 const OBSERVATIONS_FILE = "observations.md";
 
+export interface MeditationOutcome {
+  success: boolean;
+  error?: string;
+  snapshotTimestamp?: string;
+  updatedFiles?: string[];
+}
+
+/** Concurrency guard: serialize meditation runs */
+let meditationLock: Promise<MeditationOutcome> | null = null;
+
+function formatLimit(chars: number): string {
+  const approxWords = Math.round(chars / 6);
+  return `~${chars} chars (~${approxWords} words)`;
+}
+
+/**
+ * Force-run meditation regardless of threshold/cooldown.
+ * Returns structured outcome. Serialized via concurrency guard.
+ */
+export async function forceMeditate(
+  generateFn: (prompt: string) => Promise<MeditateGenResult>,
+): Promise<MeditationOutcome> {
+  const run = async (): Promise<MeditationOutcome> => {
+    if (meditationLock) await meditationLock.catch(() => {});
+    return doMeditate(generateFn);
+  };
+  const promise = run();
+  meditationLock = promise;
+  try {
+    return await promise;
+  } finally {
+    if (meditationLock === promise) meditationLock = null;
+  }
+}
+
 /**
  * Check if meditation is needed and perform it if so.
  * Call at conversation start (before first message).
  */
+export interface MeditateGenResult {
+  text: string;
+  finishReason: string;
+}
+
 export async function maybeMeditate(
-  generateFn: (prompt: string) => Promise<string>,
+  generateFn: (prompt: string) => Promise<MeditateGenResult>,
 ): Promise<void> {
   const soul = await readSoul();
   const obsFile = findPrivateFile(soul.private, OBSERVATIONS_FILE);
   if (!obsFile?.content) return;
 
-  // Check cooldown from SOUL.md marker
   const lastMeditation = extractLastMeditationTime(soul.public);
   if (lastMeditation && Date.now() - lastMeditation < MEDITATION_COOLDOWN_MS) {
     return;
@@ -48,39 +90,70 @@ export async function maybeMeditate(
     `[SOUL] meditation triggered: ${observationCount} observations (threshold: ${threshold})`,
   );
 
-  const snapshotTs = await snapshotSoul();
-  console.info(`[SOUL] snapshot saved: ${snapshotTs}`);
+  const outcome = await forceMeditate(generateFn);
+  if (!outcome.success) {
+    console.warn(`[SOUL] auto-meditation failed: ${outcome.error}`);
+  }
+}
 
-  const dnaBefore = extractDnaSection(soul.public);
-  const dispositionBefore = extractDispositionEntries(soul.public);
-  const prompt = buildMeditationPrompt(soul.public, soul.private);
+async function doMeditate(
+  generateFn: (prompt: string) => Promise<MeditateGenResult>,
+): Promise<MeditationOutcome> {
+  const soul = await readSoul();
+  const obsFile = findPrivateFile(soul.private, OBSERVATIONS_FILE);
+  if (!obsFile?.content) {
+    return { success: false, error: "No observations" };
+  }
 
+  let snapshotTs: string | undefined;
   try {
-    const raw = await generateFn(prompt);
+    snapshotTs = await snapshotSoul();
+    console.info(`[SOUL] snapshot saved: ${snapshotTs}`);
+
+    const dnaBefore = extractDnaSection(soul.public);
+    const dispositionBefore = extractDispositionEntries(soul.public);
+    const prompt = buildMeditationPrompt(soul.public, soul.private);
+    const { text: raw, finishReason } = await generateFn(prompt);
+
+    if (finishReason === "length") {
+      console.warn("[SOUL] meditation output truncated (finishReason=length) -- aborting");
+      return { success: false, error: "Output truncated", snapshotTimestamp: snapshotTs };
+    }
+
     const result = parseMeditationResult(raw);
 
     if (!result) {
-      console.warn("[SOUL] meditation parse failed -- aborting");
-      return;
+      return { success: false, error: "Parse failed", snapshotTimestamp: snapshotTs };
     }
 
-    // Verify DNA integrity
     const dnaAfter = extractDnaSection(result.soulMd);
     if (dnaBefore !== dnaAfter) {
-      console.warn("[SOUL] DNA integrity check: FAIL -- aborting");
-      return;
+      return { success: false, error: "DNA integrity check failed", snapshotTimestamp: snapshotTs };
     }
 
-    // Verify Disposition entry text integrity
     const dispositionAfter = extractDispositionEntries(result.soulMd);
     if (!dispositionEntriesMatch(dispositionBefore, dispositionAfter)) {
-      console.warn("[SOUL] Disposition integrity check: FAIL -- aborting");
-      return;
+      return { success: false, error: "Disposition integrity check failed", snapshotTimestamp: snapshotTs };
+    }
+
+    const requiredHeadings = ["## My DNA", "## My Disposition", "## My Style", "## Where I'm Growing"];
+    const missingHeadings = requiredHeadings.filter((h) => !result.soulMd.includes(h));
+    if (missingHeadings.length > 0) {
+      return { success: false, error: `Missing sections: ${missingHeadings.join(", ")}`, snapshotTimestamp: snapshotTs };
     }
 
     console.info("[SOUL] integrity checks: PASS");
 
-    // Write updated SOUL.md with meditation timestamp (strip old markers first)
+    const resultFileNames = new Set(result.privateFiles.map((f) => f.name));
+    const deletedNames = new Set(result.deleteFiles);
+    for (const existing of soul.private) {
+      if (existing.name === OBSERVATIONS_FILE) continue;
+      if (resultFileNames.has(existing.name)) continue;
+      if (deletedNames.has(existing.name)) continue;
+      console.warn(`[SOUL] model omitted ${existing.name} -- carrying forward`);
+      result.privateFiles.push(existing);
+    }
+
     const cleaned = result.soulMd
       .replace(/\n<!-- last-meditation:\S+ -->/g, "")
       .replace(/\n<!-- soul-format:\d+ -->/g, "");
@@ -88,19 +161,22 @@ export async function maybeMeditate(
     const fmtMarker = "\n<!-- soul-format:1 -->";
     await writeSoul(cleaned.trimEnd() + tsMarker + fmtMarker + "\n");
 
-    // Write private files
+    const updatedFiles = ["SOUL.md"];
     for (const file of result.privateFiles) {
       await writeSoulPrivate(file.name, file.content);
+      updatedFiles.push(file.name);
     }
 
-    // Delete files marked for deletion
     for (const name of result.deleteFiles) {
       await deleteSoulPrivate(name);
     }
 
     console.info("[SOUL] meditation complete");
+    return { success: true, snapshotTimestamp: snapshotTs, updatedFiles };
   } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
     console.error("[SOUL] meditation failed:", e);
+    return { success: false, error: msg, snapshotTimestamp: snapshotTs };
   }
 }
 
@@ -117,6 +193,22 @@ function buildMeditationPrompt(
   const privateSection = privateFiles
     .map((f) => `--- ${f.name} ---\n${f.content}`)
     .join("\n\n");
+
+  // Build dynamic output format: existing private files are required
+  const existingPrivateNames = privateFiles
+    .map((f) => f.name)
+    .filter((n) => n !== OBSERVATIONS_FILE);
+
+  const requiredFileBlocks = existingPrivateNames
+    .map((name) => {
+      const limit = SOUL_SIZE_LIMITS[name] ?? DEFAULT_PRIVATE_LIMIT;
+      return `=== PRIVATE:${name} ===\n(required: review and update with new insights; budget: ${formatLimit(limit)})`;
+    })
+    .join("\n\n");
+
+  const optionalBlock = existingPrivateNames.length > 0
+    ? `=== PRIVATE:<new-file>.md ===\n(optional: create additional files to organize your understanding)`
+    : `=== PRIVATE:patterns.md ===\n(optional: create if you have patterns to organize)\n\n=== PRIVATE:<new-file>.md ===\n(optional: create additional files to organize your understanding)`;
 
   return `You have a quiet moment.
 
@@ -141,8 +233,15 @@ Rules:
   These annotations describe how you express this trait with THIS person.
 - Style: rewrite freely based on what you've learned.
 - Growth: rewrite freely.
-- observations.md: move internalized items to other files with a
-  [date -> destination] trace. NEVER delete observations -- only move them.
+- Existing private files: review each one against new observations.
+  Update with new insights and always include in output.
+  Do not silently drop existing files.
+- observations.md is a processing inbox, not an archive.
+  Once an observation has been internalized into Disposition/Style/Growth
+  or distilled into patterns.md / another private file, REPLACE IT with
+  a one-line summary (e.g. "[condensed -> patterns.md: prefers X]").
+  If even the summary adds no value, remove the line entirely.
+  The goal is to keep observations.md short.
 - You may create new files (e.g., patterns.md, relationship.md) to
   organize your understanding. File names and structure are your choice.
 - Technical preferences, project conventions, and factual information
@@ -152,23 +251,33 @@ Rules:
 You can learn HOW to better express your directness with this person,
 but you don't abandon directness itself. Adapt your delivery, not your values.
 
+Structure: your output MUST contain all four section headings
+(## My DNA, ## My Disposition, ## My Style, ## Where I'm Growing).
+
+Size budgets -- each file is injected into a limited context window.
+Stay within these limits. Prioritize and condense rather than exceeding.
+- SOUL.md: ${formatLimit(SOUL_SIZE_LIMITS["SOUL.md"] ?? 4000)}
+- observations.md: ${formatLimit(SOUL_SIZE_LIMITS["observations.md"] ?? 6000)}
+${existingPrivateNames.map((n) => `- ${n}: ${formatLimit(SOUL_SIZE_LIMITS[n] ?? DEFAULT_PRIVATE_LIMIT)}`).join("\n")}
+- New private files: ${formatLimit(DEFAULT_PRIVATE_LIMIT)} each
+
 Don't chase change -- if nothing needs updating, don't update.
+But DO output every existing private file, even if unchanged.
 
 Output format (use these exact markers):
 
 === SOUL.md ===
-(your complete SOUL.md -- DNA unchanged, Disposition/Style/Growth updated as needed)
+(your complete SOUL.md -- DNA unchanged, Disposition/Style/Growth updated as needed; budget: ${formatLimit(SOUL_SIZE_LIMITS["SOUL.md"] ?? 4000)})
 
 === PRIVATE:observations.md ===
-(updated observations.md with internalized items moved out)
+(required: pruned observations -- only unprocessed items remain; budget: ${formatLimit(SOUL_SIZE_LIMITS["observations.md"] ?? 6000)})
 
-=== PRIVATE:patterns.md ===
-(optional: create if you have patterns to organize)
+${requiredFileBlocks ? requiredFileBlocks + "\n\n" : ""}${optionalBlock}
 
 === DELETE:filename.md ===
 (optional: mark a private file for deletion)
 
-Only include files you want to write. Always include SOUL.md and observations.md.`;
+Always include SOUL.md, observations.md, and all existing private files.`;
 }
 
 function parseMeditationResult(raw: string): MeditationResult | null {

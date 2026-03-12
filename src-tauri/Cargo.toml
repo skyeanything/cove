@@ -1,6 +1,6 @@
 [package]
 name = "app"
-version = "1.0.4"
+version = "1.0.9"
 description = "Cove — cowork agent os"
 authors = ["Cove Team"]
 license = "MIT"
@@ -25,6 +25,7 @@ chrono = "0.4"
 calamine = "0.26"
 docx-lite = "0.2"
 dirs = "6"
+glob = "0.3"
 libc = "0.2"
 log = "0.4"
 pdf-extract = "0.10"
@@ -35,11 +36,20 @@ tauri-plugin-sql = { version = "2.3.2", features = ["sqlite"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
 zip = { version = "2.2", default-features = false, features = ["deflate"] }
-reqwest = { version = "0.12", features = ["blocking", "rustls-tls"] }
+reqwest = { version = "0.12", features = ["blocking", "rustls-tls", "gzip", "brotli", "deflate"] }
+rookie = "0.5"
 html2md = "0.2"
 regex = "1.10"
 notify = "6.1"
-rquickjs = { version = "0.11", features = ["bindgen", "parallel"] }
+mlua = { version = "0.10", features = ["lua54", "vendored", "serialize"] }
+ignore = "0.4"
+chromiumoxide = "0.9"
+futures = "0.3"
+tokio = { version = "1", features = ["sync", "time", "macros"] }
+
+[target.'cfg(windows)'.dependencies]
+sha2 = "0.10"
+hex = "0.4"
 
 [dev-dependencies]
 tempfile = "3"

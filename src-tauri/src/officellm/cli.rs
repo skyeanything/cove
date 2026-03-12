@@ -15,6 +15,8 @@ const DEFAULT_TIMEOUT_SECS: u64 = 120;
 /// 等价于：`officellm <cmd> --result-schema v2 --strict [--key value ...]`
 /// 解析 stdout JSON 并返回 `CommandResult`。
 pub fn call(cmd: &str, args: &[String], home: &Path, workdir: &Path) -> Result<CommandResult, String> {
+    super::init::wait_for_init();
+
     let bin = super::detect::bin_path()?;
 
     let mut command = Command::new(&bin);

@@ -93,6 +93,42 @@ pub fn delete_skill(name: String) -> Result<(), String> {
     Ok(())
 }
 
+/// Open a skill directory in the system file browser.
+/// Accepts any absolute path — no workspace restriction.
+#[tauri::command]
+pub fn open_skill_folder(path: String) -> Result<(), String> {
+    let dir = PathBuf::from(&path);
+    if !dir.is_dir() {
+        return Err(format!("Not a directory: {path}"));
+    }
+
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| format!("Failed to open folder: {e}"))?;
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| format!("Failed to open folder: {e}"))?;
+    }
+
+    #[cfg(not(any(target_os = "macos", target_os = "windows")))]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(&path)
+            .spawn()
+            .map_err(|e| format!("Failed to open folder: {e}"))?;
+    }
+
+    Ok(())
+}
+
 /// Read SKILL.md from an arbitrary user-selected folder path.
 /// Used by the import-from-folder flow via Tauri's native dialog.
 #[tauri::command]

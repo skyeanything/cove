@@ -3,18 +3,9 @@ import { z } from "zod/v4";
 import { handleSettings } from "./settings-handlers";
 
 export const settingsTool = tool({
-  description: `Read and modify application settings. Categories and their keys:
-
-- appearance: theme (light|dark|system)
-- layout: leftSidebarOpen, leftSidebarWidth, chatWidth, filePanelOpen, fileTreeWidth, filePreviewWidth, fileTreeShowHidden
-- general: locale (zh|en), sendShortcut (enter|modifierEnter)
-- skills: enabled (comma-separated names), dirPaths
-- provider: enabled, api_key, base_url (use provider_type to identify)
-- assistant: name, model, temperature, top_p, max_tokens, frequency_penalty, presence_penalty, tools_enabled, web_search_enabled, system_instruction (use assistant_name to identify)
-
-Actions: get (single key), set (change value), list (show all in category)`,
+  description: `Read/modify app settings. Categories: appearance, layout, general, skills, provider, assistant. Actions: get, set, list, create (provider), delete (provider), validate (provider), fetch_models (provider), probe (provider, needs model_id). Use 'list' to discover available keys in a category.`,
   inputSchema: z.object({
-    action: z.enum(["get", "set", "list"]),
+    action: z.enum(["get", "set", "list", "create", "delete", "validate", "fetch_models", "probe"]),
     category: z.enum([
       "appearance",
       "layout",
@@ -29,10 +20,26 @@ Actions: get (single key), set (change value), list (show all in category)`,
       .string()
       .optional()
       .describe("Provider type identifier (for provider category)"),
+    provider_id: z
+      .string()
+      .optional()
+      .describe("Provider ID (for custom provider operations)"),
+    provider_name: z
+      .string()
+      .optional()
+      .describe("Provider display name (for create action)"),
+    protocol: z
+      .string()
+      .optional()
+      .describe("API protocol: openai, anthropic, or google (for custom providers)"),
     assistant_name: z
       .string()
       .optional()
       .describe("Assistant name (for assistant category)"),
+    model_id: z
+      .string()
+      .optional()
+      .describe("Model ID within provider (for probe action)"),
   }),
   execute: async (input) => {
     try {

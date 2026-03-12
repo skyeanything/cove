@@ -126,13 +126,78 @@ jobs:
           path: src-tauri/target/release/bundle/macos/*.app.tar.gz
           if-no-files-found: warn
 
-  # ── Windows (placeholder) ────────────────────────────────────────────
+  # ── Windows x64 ─────────────────────────────────────────────────────
   build-windows:
     runs-on: windows-latest
-    timeout-minutes: 5
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
-      - run: echo "Windows build placeholder - pending officellm multi-platform support"
+
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Validate version consistency
+        shell: bash
+        run: |
+          TAG_VERSION="${GITHUB_REF#refs/tags/v}"
+          PKG_VERSION=$(jq -r .version package.json)
+          TAURI_VERSION=$(jq -r .version src-tauri/tauri.conf.json)
+          if [ "$TAG_VERSION" != "$PKG_VERSION" ] || [ "$TAG_VERSION" != "$TAURI_VERSION" ]; then
+            echo "::error::Version mismatch: tag=$TAG_VERSION package.json=$PKG_VERSION tauri.conf.json=$TAURI_VERSION"
+            exit 1
+          fi
+          echo "VERSION=$TAG_VERSION" >> "$GITHUB_ENV"
+
+      - name: Pull officellm binary
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.OFFICELLM_REPO_TOKEN }}
+        run: bash scripts/pull-officellm.sh
+
+      - name: Build frontend
+        run: pnpm build
+
+      - name: Build Tauri app
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.OFFICELLM_REPO_TOKEN }}
+          LIBCLANG_PATH: "C:\\Program Files\\LLVM\\lib"
+        run: |
+          pnpm tauri build --config '{"build":{"beforeBuildCommand":""}}'
+
+      - name: Upload NSIS installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Cove-windows-x64-nsis
+          path: src-tauri/target/release/bundle/nsis/*.exe
+          if-no-files-found: error
+
+      - name: Upload MSI installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: Cove-windows-x64-msi
+          path: src-tauri/target/release/bundle/msi/*.msi
+          if-no-files-found: warn
+
+      - name: Upload updater bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: Cove-windows-x64-updater
+          path: |
+            src-tauri/target/release/bundle/nsis/*.nsis.zip
+            src-tauri/target/release/bundle/msi/*.msi.zip
+          if-no-files-found: warn
 
   # ── Linux (placeholder) ──────────────────────────────────────────────
   build-linux:
@@ -171,8 +236,10 @@ jobs:
           done < <(find artifacts -type f \( \
             -name "*.dmg" \
             -o -name "*.app.tar.gz" \
+            -o -name "*-setup.exe" \
             -o -name "*.msi" \
             -o -name "*.nsis.zip" \
+            -o -name "*.msi.zip" \
             -o -name "*.AppImage" \
             -o -name "*.deb" \
           \) -print0)

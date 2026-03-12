@@ -69,7 +69,8 @@ export const writeTool = tool({
           args: { workspaceRoot, path: filePath, content },
         });
         if (conversationId) recordRead(conversationId, resolvedPath);
-        return `已创建 Office 文档：${absPath}`;
+        const officeFileName = absPath.split("/").pop() ?? filePath;
+        return `已创建 Office 文档：[${officeFileName}](file://${absPath})\n完整路径：${absPath}`;
       } catch (err) {
         if (isFsError(err)) {
           if (err.kind === "OutsideWorkspace") return "该路径不在当前工作区内。";
@@ -115,7 +116,11 @@ export const writeTool = tool({
         recordRead(conversationId, resolvedPath);
       }
       const diff = createPatch(filePath, existingRaw, content);
-      const intro = existingRaw !== "" ? `已写入 ${filePath}。` : `已创建并写入 ${filePath}。`;
+      const fileName = filePath.split("/").pop() ?? filePath;
+      const intro =
+        existingRaw !== ""
+          ? `已写入 [${fileName}](file://${resolvedPath})。`
+          : `已创建并写入 [${fileName}](file://${resolvedPath})。`;
       return `${intro}\n\n--- Diff ---\n${diff}`;
     } catch (err) {
       if (isFsError(err)) {

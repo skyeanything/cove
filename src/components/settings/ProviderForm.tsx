@@ -20,11 +20,18 @@ import {
   useProviderSave, useProviderDebounce, fetchProviderModels, testProviderModel,
 } from "@/hooks/useProviderForm";
 
+const PROTOCOL_OPTIONS = [
+  { value: "openai", label: "OpenAI Compatible" },
+  { value: "anthropic", label: "Anthropic Compatible" },
+  { value: "google", label: "Google AI Compatible" },
+] as const;
+
 interface ProviderFormProps {
   providerType: ProviderType;
+  providerId?: string;
 }
 
-export function ProviderForm({ providerType }: ProviderFormProps) {
+export function ProviderForm({ providerType, providerId }: ProviderFormProps) {
   const { t } = useTranslation();
   const providers = useDataStore((s) => s.providers);
   const toggleProvider = useDataStore((s) => s.toggleProvider);
@@ -32,8 +39,14 @@ export function ProviderForm({ providerType }: ProviderFormProps) {
 
   const meta = PROVIDER_METAS[providerType];
   const descriptionText = meta.descriptionKey ? t(meta.descriptionKey) : meta.description ?? "";
-  const existing = providers.find((p) => p.type === providerType);
+  const existing = providerId
+    ? providers.find((p) => p.id === providerId)
+    : providers.find((p) => p.type === providerType);
 
+  const isCustom = providerType === "custom";
+
+  const [name, setName] = useState("");
+  const [protocol, setProtocol] = useState("openai");
   const [apiKey, setApiKey] = useState("");
   const [baseUrl, setBaseUrl] = useState("");
   const [showKey, setShowKey] = useState(false);
@@ -55,18 +68,23 @@ export function ProviderForm({ providerType }: ProviderFormProps) {
   const resetDone = useRef(false);
 
   const { save } = useProviderSave({
-    providerType, apiKey, baseUrl, deployment, apiVersion,
+    providerType, providerId, apiKey, baseUrl, deployment, apiVersion,
     awsRegion, awsAccessKeyId, awsSecretAccessKey, disabledModels,
+    name: isCustom ? name : undefined,
+    protocol: isCustom ? protocol : undefined,
   });
 
   /* ---- reset form when provider switches ---- */
   useEffect(() => {
     resetDone.current = false;
-    const p = useDataStore.getState().providers.find((r) => r.type === providerType);
+    const p = providerId
+      ? useDataStore.getState().providers.find((r) => r.id === providerId)
+      : useDataStore.getState().providers.find((r) => r.type === providerType);
     setApiKey(p?.api_key ?? "");
     setBaseUrl(p?.base_url ?? "");
     setShowKey(false);
     setFetchError("");
+    setName(p?.name ?? "");
     if (p?.config) {
       try {
         const cfg = JSON.parse(p.config) as ProviderConfig;
@@ -77,27 +95,31 @@ export function ProviderForm({ providerType }: ProviderFormProps) {
         setAwsSecretAccessKey(cfg.aws_secret_access_key ?? "");
         setDisabledModels(new Set(cfg.disabled_models ?? []));
         setModels(cfg.cached_models ?? []);
+        setProtocol(cfg.protocol ?? "openai");
       } catch {
         setDeployment(""); setApiVersion(""); setAwsRegion("");
         setAwsAccessKeyId(""); setAwsSecretAccessKey("");
         setDisabledModels(new Set()); setModels([]);
+        setProtocol("openai");
       }
     } else {
       setDeployment(""); setApiVersion(""); setAwsRegion("");
       setAwsAccessKeyId(""); setAwsSecretAccessKey("");
       setDisabledModels(new Set()); setModels([]);
+      setProtocol("openai");
     }
     resetDone.current = true;
     setModelSearch("");
     setTestingModelId(null);
     setTestResult(null);
-  }, [providerType]);
+  }, [providerType, providerId]);
 
-  useProviderDebounce(() => void save(), resetDone, [apiKey, baseUrl, providerType]);
+  useProviderDebounce(() => void save(), resetDone, [apiKey, baseUrl, providerType, providerId]);
 
   async function handleFetchModels() {
+    const cfgStr = existing?.config ?? (isCustom ? JSON.stringify({ protocol }) : undefined);
     await fetchProviderModels(providerType, apiKey, baseUrl, updateProvider,
-      setModels, setFetchError, setModelsLoading);
+      setModels, setFetchError, setModelsLoading, providerId, cfgStr);
   }
 
   function handleToggleModel(modelId: string, checked: boolean) {
@@ -114,7 +136,8 @@ export function ProviderForm({ providerType }: ProviderFormProps) {
   }
 
   const noKeyNeeded = !meta.requiresApiKey;
-  const isConfigured = noKeyNeeded ? !!existing : !!apiKey;
+  const isConfigured = isCustom ? !!existing : noKeyNeeded ? !!existing : !!apiKey;
+  const headerName = isCustom && existing ? (existing.name || "Custom Provider") : meta.displayName;
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
@@ -125,7 +148,7 @@ export function ProviderForm({ providerType }: ProviderFormProps) {
             <ProviderIcon type={providerType} className="size-5 shrink-0 mt-0.5" />
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="text-[15px] font-semibold">{meta.displayName}</h3>
+                <h3 className="text-[15px] font-semibold">{headerName}</h3>
                 {existing?.enabled ? (
                   <Badge className="rounded-[4px] border-0 bg-emerald-500/15 text-emerald-700 dark:text-emerald-400 dark:bg-emerald-500/20 text-[10px] font-normal px-1 py-0.5 leading-tight">
                     {t("provider.form.active")}
@@ -152,6 +175,33 @@ export function ProviderForm({ providerType }: ProviderFormProps) {
       {/* Form */}
       <ScrollArea className="flex-1">
         <div className="flex flex-col gap-5 p-5">
+          {/* Name (custom only) */}
+          {isCustom && (
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-[13px]">Name</Label>
+              <Input value={name} onChange={(e) => setName(e.target.value)}
+                onBlur={() => void save()} placeholder="My Custom Provider"
+                className="h-[2.4rem] rounded-[4px] text-sm" />
+            </div>
+          )}
+
+          {/* Protocol (custom only) */}
+          {isCustom && (
+            <div className="flex flex-col gap-1.5">
+              <Label className="text-[13px]">Protocol</Label>
+              <Select value={protocol} onValueChange={(v) => { setProtocol(v); setTimeout(() => void save(), 0); }}>
+                <SelectTrigger className="h-[2.4rem] w-full rounded-[4px] text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PROTOCOL_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           {/* API Key */}
           {meta.type !== "bedrock" && meta.type !== "ollama" && (
             <div className="flex flex-col gap-1.5">
@@ -170,7 +220,7 @@ export function ProviderForm({ providerType }: ProviderFormProps) {
           )}
 
           {/* Base URL */}
-          {meta.requiresBaseUrl && (
+          {(meta.requiresBaseUrl || isCustom) && (
             <div className="flex flex-col gap-1.5">
               <Label className="text-[13px]">
                 {meta.baseUrlOptions?.length ? t("provider.form.region") : t("provider.form.apiBaseUrl")}

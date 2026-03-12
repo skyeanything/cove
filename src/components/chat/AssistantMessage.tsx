@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, memo } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Copy,
@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { useChatStore } from "@/stores/chatStore";
 import type { ToolCallInfo, MessagePart } from "@/stores/chatStore";
+import { useIsStreaming } from "@/hooks/useChatStreamState";
 import { usePermissionStore } from "@/stores/permissionStore";
 import { cn, stripMarkdown } from "@/lib/utils";
 import { splitThinkBlocks } from "@/lib/splitThinkBlocks";
@@ -130,7 +131,7 @@ export function renderMessageContent(
   );
 }
 
-export function AssistantMessage({
+export const AssistantMessage = memo(function AssistantMessage({
   messageId,
   content,
   reasoning,
@@ -155,7 +156,7 @@ export function AssistantMessage({
   const [messageHovered, setMessageHovered] = useState(false);
   const [copiedWhich, setCopiedWhich] = useState<"plain" | "markdown" | null>(null);
   const regenerateMessage = useChatStore((s) => s.regenerateMessage);
-  const isStreaming = useChatStore((s) => s.isStreaming);
+  const isStreaming = useIsStreaming();
   const showTokens = (tokensInput != null && tokensInput > 0) || (tokensOutput != null && tokensOutput > 0);
 
   const handleRegenerate = useCallback(() => {
@@ -237,7 +238,7 @@ export function AssistantMessage({
               {orderedParts!.map((part, index) =>
                 part.type === "text" ? (
                   part.text ? (
-                    <div key={index} className="text-[14px] leading-relaxed">
+                    <div key={index} className="text-[14px] leading-relaxed break-words">
                       {renderMessageContent(part.text, !!streaming, index === orderedParts!.length - 1)}
                     </div>
                   ) : null
@@ -257,7 +258,7 @@ export function AssistantMessage({
                 )
               )}
               {content?.trim() && copyContent !== content && (
-                <div className="mt-1 text-[14px] leading-relaxed">
+                <div className="mt-1 text-[14px] leading-relaxed break-words">
                   {renderMessageContent(content, !!streaming, true)}
                 </div>
               )}
@@ -271,7 +272,7 @@ export function AssistantMessage({
                   ))}
                 </div>
               )}
-              <div className="text-[14px] leading-relaxed">
+              <div className="text-[14px] leading-relaxed break-words">
                 {renderMessageContent(content ?? "", !!streaming, true)}
                 {streaming && !content && (toolCalls?.length ?? 0) === 0 && (
                   <span className="cursor-blink ml-0.5 inline-block h-4 w-0.5 bg-brand align-middle" aria-hidden />
@@ -283,7 +284,7 @@ export function AssistantMessage({
 
         {!streaming && (copyContent || showTokens) && (
           <div className={cn(
-            "mb-2 -ml-1 min-h-8",
+            "mb-2 -ml-1 min-h-8 pointer-events-none",
             hasOrderedParts
               ? (orderedParts![orderedParts!.length - 1]?.type === "tool" && !(content?.trim() && copyContent !== content))
                 ? "mt-1" : "-mt-4"
@@ -291,7 +292,7 @@ export function AssistantMessage({
                 ? "mt-1" : "-mt-4",
           )}>
             {messageHovered && (
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 pointer-events-none">
                 {copyContent && (
                   <>
                     <ActionButton
@@ -323,4 +324,4 @@ export function AssistantMessage({
       </div>
     </div>
   );
-}
+});

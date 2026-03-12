@@ -39,7 +39,13 @@ export function buildMentionItems(
     items.push({ type: "skill", id: s.name, label: s.name, description: s.description, emoji: s.emoji });
   }
   for (const f of files) {
-    items.push({ type: "file", id: f.path, label: f.name, isDir: f.isDir });
+    items.push({
+      type: "file",
+      id: f.path,
+      label: f.name,
+      description: f.parentDir || undefined,
+      isDir: f.isDir,
+    });
   }
   return items;
 }

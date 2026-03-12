@@ -7,14 +7,20 @@ mod list;
 mod office;
 mod office_read;
 mod office_write;
+mod order;
 mod read;
 mod validation;
+mod walk;
 mod write;
 
 #[cfg(test)]
 mod tests;
 #[cfg(test)]
+mod tests_walk;
+#[cfg(test)]
 mod tests_copy;
+#[cfg(test)]
+mod tests_copy_external;
 #[cfg(test)]
 mod tests_detection;
 #[cfg(test)]
@@ -30,9 +36,12 @@ pub use list::*;
 pub use office::*;
 pub use office_read::*;
 pub use office_write::*;
+pub use order::*;
 pub use read::*;
+pub use walk::*;
 pub use write::*;
 
+pub(crate) use detection::{is_binary_content, path_has_binary_extension};
 pub(crate) use validation::ensure_inside_workspace_exists;
 pub(crate) use validation::ensure_inside_workspace_may_not_exist;
 

@@ -66,7 +66,7 @@ export function ModelSelector({ open, onOpenChange }: ModelSelectorProps) {
   }, [open, loadFromDb]);
 
   const enabledProviders = providers.filter(
-    (p) => p.enabled && BUILTIN_PROVIDER_TYPES.includes(p.type),
+    (p) => p.enabled && (BUILTIN_PROVIDER_TYPES.includes(p.type) || p.type === "custom"),
   );
   const models = useMemo(
     () => getModelsForProviders(enabledProviders),

@@ -70,6 +70,8 @@ export interface ProviderConfig {
   disabled_models?: string[];
   // Per-model options (context, max tokens, capabilities)
   model_options?: Record<string, ModelOption>;
+  // Custom provider protocol
+  protocol?: "openai" | "anthropic" | "google";
   // Proxy
   proxy_url?: string;
 }

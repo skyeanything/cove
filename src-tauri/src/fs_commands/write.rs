@@ -36,6 +36,36 @@ pub fn write_file(args: WriteFileArgs) -> Result<(), FsError> {
 }
 
 // ---------------------------------------------------------------------------
+// create_new_file: atomic create-only, fails if file already exists
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CreateNewFileArgs {
+    pub workspace_root: String,
+    pub path: String,
+}
+
+#[tauri::command]
+pub fn create_new_file(args: CreateNewFileArgs) -> Result<(), FsError> {
+    let abs = ensure_inside_workspace_may_not_exist(&args.workspace_root, &args.path)?;
+    if abs.is_dir() {
+        return Err(FsError::NotAllowed("path is a directory".into()));
+    }
+    if let Some(p) = abs.parent().filter(|p| !p.exists()) {
+        fs::create_dir_all(p).map_err(FsError::from)?;
+    }
+    fs::File::options().write(true).create_new(true).open(&abs).map_err(|e| {
+        if e.kind() == std::io::ErrorKind::AlreadyExists {
+            FsError::NotAllowed("already exists".into())
+        } else {
+            FsError::from(e)
+        }
+    })?;
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
 // create_dir
 // ---------------------------------------------------------------------------
 

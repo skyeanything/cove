@@ -91,8 +91,9 @@ export const PROVIDER_DEFS_EXTRA: Record<Extract<ProviderType, "perplexity" | "t
   },
   custom: {
     type: "custom",
-    displayName: "OpenAI Compatible",
-    description: "兼容 OpenAI API 的自定义端点",
+    displayName: "Custom",
+    description: "Custom API endpoint with protocol selection",
+    descriptionKey: "provider.custom.description",
     requiresApiKey: false,
     requiresBaseUrl: true,
     supportsModelFetch: true,

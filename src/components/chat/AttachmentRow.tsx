@@ -2,13 +2,12 @@ import { useCallback, useState } from "react";
 import type { KeyboardEvent } from "react";
 import type { Attachment } from "@/db/types";
 import { useFilePreviewStore } from "@/stores/filePreviewStore";
-import { useLayoutStore } from "@/stores/layoutStore";
+import { useOpenFilePreview } from "@/hooks/useOpenFilePreview";
 import { FileTypeBadge, getAttachmentPreviewSrc } from "./AttachmentVisual";
 
 function useOpenAttachmentPreview() {
-  const setSelected = useFilePreviewStore((s) => s.setSelected);
   const setContent = useFilePreviewStore((s) => s.setContent);
-  const setFilePanelOpen = useLayoutStore((s) => s.setFilePanelOpen);
+  const { openPreview } = useOpenFilePreview();
 
   return useCallback(
     (attachment: Attachment) => {
@@ -27,13 +26,9 @@ function useOpenAttachmentPreview() {
         });
       }
 
-      setSelected(path);
-
-      if (!useLayoutStore.getState().filePanelOpen) {
-        setFilePanelOpen(true);
-      }
+      openPreview(path);
     },
-    [setSelected, setContent, setFilePanelOpen],
+    [setContent, openPreview],
   );
 }
 

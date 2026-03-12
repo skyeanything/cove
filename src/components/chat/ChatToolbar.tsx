@@ -7,6 +7,7 @@ import {
 import { useTranslation } from "react-i18next";
 import { ToolbarIcon } from "./ToolbarIcon";
 import { SkillsPopover } from "./SkillsPopover";
+import { WorkspacePopover } from "./WorkspacePopover";
 import { ModelSelector } from "./ModelSelector";
 import { cn } from "@/lib/utils";
 
@@ -52,6 +53,7 @@ export function ChatToolbar({
         <Globe className="size-[15px]" strokeWidth={1.5} />
       </button>
       <SkillsPopover />
+      <WorkspacePopover />
       <ModelSelector open={modelSelectorOpen} onOpenChange={onModelSelectorOpenChange} />
 
       <div className="flex-1" />

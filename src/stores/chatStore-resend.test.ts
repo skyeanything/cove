@@ -34,10 +34,7 @@ vi.mock("./dataStore", () => ({
 const mockWorkspaceStore = { activeWorkspace: null, loadFromConversation: vi.fn().mockResolvedValue(undefined) };
 vi.mock("./workspaceStore", () => ({ useWorkspaceStore: { getState: () => mockWorkspaceStore } }));
 vi.mock("./chat-stream-runner", () => ({ runStreamLoop: vi.fn() }));
-vi.mock("./chat-url-utils", () => ({
-  getFetchBlockForText: vi.fn().mockResolvedValue(""),
-  injectFetchBlockIntoLastUserMessage: vi.fn(),
-}));
+vi.mock("./chat-url-utils", () => ({}));
 vi.mock("@/lib/ai/model-service", () => ({ getModelOption: vi.fn().mockReturnValue(null) }));
 vi.mock("@/lib/ai/agent", () => ({ toModelMessages: vi.fn().mockReturnValue([]) }));
 vi.mock("@/lib/ai/agent-metrics", () => ({
@@ -52,6 +49,16 @@ vi.mock("@/lib/attachment-utils", () => ({
   isPdfAttachment: vi.fn().mockReturnValue(false),
 }));
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
+const mockStreamStore = {
+  streams: {},
+  startStream: vi.fn(),
+  updateStream: vi.fn(),
+  endStream: vi.fn(),
+  abortStream: vi.fn(),
+  getStream: vi.fn().mockReturnValue(undefined),
+  isConversationStreaming: vi.fn().mockReturnValue(false),
+};
+vi.mock("./streamStore", () => ({ useStreamStore: { getState: () => mockStreamStore } }));
 
 // --- imports after mocks ---
 
@@ -171,7 +178,7 @@ describe("chatStore — regenerateMessage", () => {
       expect(finalMessages).toHaveLength(2);
       expect(finalMessages[1]!.role).toBe("assistant");
       expect(finalMessages[1]!.content).toBe("AI response");
-      expect(useChatStore.getState().isStreaming).toBe(false);
+      expect(mockStreamStore.endStream).toHaveBeenCalledWith("conv-1");
     });
   });
 
@@ -181,7 +188,7 @@ describe("chatStore — regenerateMessage", () => {
       vi.mocked(runStreamLoop).mockRejectedValue(new DOMException("aborted", "AbortError"));
       await useChatStore.getState().regenerateMessage(assistantMsg.id);
       expect(reportAgentRunMetrics).toHaveBeenCalledWith(expect.anything(), { aborted: true });
-      expect(useChatStore.getState().isStreaming).toBe(false);
+      expect(mockStreamStore.endStream).toHaveBeenCalledWith("conv-1");
       // Unlike sendMessage, regenerate does NOT save partial content
       expect(messageRepo.create).not.toHaveBeenCalled();
     });
@@ -191,7 +198,7 @@ describe("chatStore — regenerateMessage", () => {
       vi.mocked(runStreamLoop).mockRejectedValue(new Error("Network error"));
       await useChatStore.getState().regenerateMessage(assistantMsg.id);
       expect(useChatStore.getState().error).toBe("Network error");
-      expect(useChatStore.getState().isStreaming).toBe(false);
+      expect(mockStreamStore.endStream).toHaveBeenCalledWith("conv-1");
       expect(reportAgentRunMetrics).toHaveBeenCalledWith(expect.anything(), { error: "Network error" });
     });
   });
@@ -249,7 +256,7 @@ describe("chatStore — editAndResend", () => {
       const finalMessages = useChatStore.getState().messages;
       expect(finalMessages).toHaveLength(2);
       expect(finalMessages[1]!.role).toBe("assistant");
-      expect(useChatStore.getState().isStreaming).toBe(false);
+      expect(mockStreamStore.endStream).toHaveBeenCalledWith("conv-1");
     });
   });
 
@@ -259,8 +266,7 @@ describe("chatStore — editAndResend", () => {
       vi.mocked(runStreamLoop).mockRejectedValue(new DOMException("aborted", "AbortError"));
       await useChatStore.getState().editAndResend(userMsg.id, "edited");
       expect(reportAgentRunMetrics).toHaveBeenCalledWith(expect.anything(), { aborted: true });
-      expect(useChatStore.getState().isStreaming).toBe(false);
-      expect(useChatStore.getState().error).toBeNull();
+      expect(mockStreamStore.endStream).toHaveBeenCalledWith("conv-1");
     });
 
     it("sets error on stream failure", async () => {
@@ -268,7 +274,7 @@ describe("chatStore — editAndResend", () => {
       vi.mocked(runStreamLoop).mockRejectedValue(new Error("Server error"));
       await useChatStore.getState().editAndResend(userMsg.id, "edited");
       expect(useChatStore.getState().error).toBe("Server error");
-      expect(useChatStore.getState().isStreaming).toBe(false);
+      expect(mockStreamStore.endStream).toHaveBeenCalledWith("conv-1");
       expect(reportAgentRunMetrics).toHaveBeenCalledWith(expect.anything(), { error: "Server error" });
     });
   });

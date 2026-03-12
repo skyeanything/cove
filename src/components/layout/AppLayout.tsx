@@ -15,7 +15,6 @@ import { WorkspaceContent } from "./WorkspaceContent";
 import { ResizeHandle } from "./ResizeHandle";
 import { openSettingsWindow } from "@/lib/settings-window";
 import { useEffect, useState, useCallback, useRef, lazy, Suspense } from "react";
-import { PanelLeft, PanelRight } from "lucide-react";
 
 const ExtensionMarketPage = lazy(
   () => import("@/components/extensions/ExtensionMarketPage"),
@@ -25,7 +24,6 @@ export function AppLayout() {
   const activePage = useLayoutStore((s) => s.activePage);
   const leftSidebarMode = useLayoutStore((s) => s.leftSidebarMode);
   const toggleLeft = useLayoutStore((s) => s.toggleLeftSidebar);
-  const setLeftSidebarFull = useLayoutStore((s) => s.setLeftSidebarFull);
   const leftSidebarWidth = useLayoutStore((s) => s.leftSidebarWidth);
   const setLeftSidebarWidth = useLayoutStore((s) => s.setLeftSidebarWidth);
   const setActivePage = useLayoutStore((s) => s.setActivePage);
@@ -156,7 +154,13 @@ export function AppLayout() {
         e.preventDefault();
         setSearchMessagesOpen(true);
       }
-      if (meta && e.key === ",") {
+      // macOS: ⌘,  |  Windows/Linux: Ctrl+Shift+,
+      // Use e.code ("Comma") instead of e.key (",") because Shift changes e.key to "<" on standard keyboards
+      const isMac = /Mac|iPhone|iPad/.test(navigator.userAgent);
+      if (
+        (isMac && e.metaKey && !e.shiftKey && e.code === "Comma") ||
+        (!isMac && e.ctrlKey && e.shiftKey && e.code === "Comma")
+      ) {
         e.preventDefault();
         openSettingsWindow();
       }
@@ -196,19 +200,6 @@ export function AppLayout() {
         {/* Traffic-light safe zone — hidden in fullscreen */}
         {!isFullscreen && <div className="w-[76px] shrink-0" />}
 
-        {/* Sidebar toggle */}
-        <div className="flex items-center px-1.5">
-          <button
-            onClick={leftSidebarMode === "full" ? toggleLeft : setLeftSidebarFull}
-            className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
-            title={leftSidebarMode === "full" ? "收起侧边栏 (⌘B)" : "展开侧边栏 (⌘B)"}
-          >
-            {leftSidebarMode === "full"
-              ? <PanelLeft className="size-[18px]" strokeWidth={1.5} />
-              : <PanelRight className="size-[18px]" strokeWidth={1.5} />
-            }
-          </button>
-        </div>
       </div>
 
       {/* ═══════════════════════════════════════════════════════════════

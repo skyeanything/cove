@@ -6,6 +6,7 @@ import { PROVIDER_METAS } from "@/lib/ai/provider-meta";
 
 interface SaveParams {
   providerType: ProviderType;
+  providerId?: string;
   apiKey: string;
   baseUrl: string;
   deployment: string;
@@ -14,10 +15,12 @@ interface SaveParams {
   awsAccessKeyId: string;
   awsSecretAccessKey: string;
   disabledModels: Set<string>;
+  name?: string;
+  protocol?: string;
 }
 
 export function useProviderSave(params: SaveParams) {
-  const { providerType, apiKey, baseUrl, deployment, apiVersion,
+  const { providerType, providerId, apiKey, baseUrl, deployment, apiVersion,
     awsRegion, awsAccessKeyId, awsSecretAccessKey } = params;
   const meta = PROVIDER_METAS[providerType];
   const updateProvider = useDataStore((s) => s.updateProvider);
@@ -25,7 +28,9 @@ export function useProviderSave(params: SaveParams) {
 
   async function save(overrides: { disabledModels?: Set<string> } = {}) {
     const { providers: latest } = useDataStore.getState();
-    const current = latest.find((p) => p.type === providerType);
+    const current = providerId
+      ? latest.find((p) => p.id === providerId)
+      : latest.find((p) => p.type === providerType);
 
     const existingCfg: ProviderConfig = current?.config
       ? (JSON.parse(current.config) as ProviderConfig) : {};
@@ -36,6 +41,14 @@ export function useProviderSave(params: SaveParams) {
       cfg.aws_region = awsRegion;
       cfg.aws_access_key_id = awsAccessKeyId;
       cfg.aws_secret_access_key = awsSecretAccessKey;
+    }
+    if (providerType === "custom" && params.protocol) {
+      const oldProtocol = cfg.protocol;
+      cfg.protocol = params.protocol as ProviderConfig["protocol"];
+      if (oldProtocol && oldProtocol !== params.protocol) {
+        cfg.cached_models = undefined;
+        cfg.cached_models_at = undefined;
+      }
     }
 
     const dm = overrides.disabledModels ?? params.disabledModels;
@@ -49,19 +62,20 @@ export function useProviderSave(params: SaveParams) {
         ...current, api_key: apiKey,
         base_url: baseUrl || meta.defaultBaseUrl || "",
         ...(hasConfig ? { config: configStr ?? undefined } : {}),
+        ...(params.name != null ? { name: params.name } : {}),
       };
       useDataStore.setState({ providers: latest.map((p) => (p.id === current.id ? updated : p)) });
       try {
         const dbData: Partial<Provider> = { api_key: apiKey, base_url: baseUrl || meta.defaultBaseUrl || "" };
         if (hasConfig) dbData.config = configStr ?? undefined;
+        if (params.name != null) dbData.name = params.name;
         await updateProvider(current.id, dbData);
-        // Optimistic update already applied above; log DB error but don't revert UI state
       } catch (err) { console.error("[ProviderForm] Failed to update provider:", err); }
     } else {
       if (!apiKey && meta.requiresApiKey) return;
       const now = new Date().toISOString();
       const newRow: Provider = {
-        id: crypto.randomUUID(), name: meta.displayName, type: providerType,
+        id: crypto.randomUUID(), name: params.name || meta.displayName, type: providerType,
         api_key: apiKey, base_url: baseUrl || meta.defaultBaseUrl || "",
         config: configStr ?? undefined, enabled: 1, created_at: now, updated_at: now,
       };
@@ -71,7 +85,6 @@ export function useProviderSave(params: SaveParams) {
           id: newRow.id, name: newRow.name, type: newRow.type, api_key: newRow.api_key,
           base_url: newRow.base_url, config: newRow.config, enabled: newRow.enabled,
         });
-        // Optimistic update already applied above; log DB error but don't revert UI state
       } catch (err) { console.error("[ProviderForm] Failed to create provider:", err); }
     }
   }
@@ -100,22 +113,26 @@ export async function fetchProviderModels(
   setModels: (m: string[]) => void,
   setFetchError: (e: string) => void,
   setModelsLoading: (v: boolean) => void,
+  providerId?: string,
+  config?: string,
 ) {
   const meta = PROVIDER_METAS[providerType];
   setModelsLoading(true);
   setFetchError("");
   try {
     const tmp: Provider = {
-      id: "", name: meta.displayName, type: providerType,
+      id: providerId ?? "", name: meta.displayName, type: providerType,
       api_key: apiKey || undefined, base_url: baseUrl || meta.defaultBaseUrl || undefined,
-      enabled: 1, config: undefined, created_at: "", updated_at: "",
+      enabled: 1, config: config ?? undefined, created_at: "", updated_at: "",
     };
     const raw: VerifyAndFetchResult = await verifyAndFetchModels(tmp);
     const fetched = Array.isArray(raw) ? raw : raw.modelIds;
     const modelOptions = Array.isArray(raw) ? undefined : raw.modelOptions;
     setModels(fetched);
     setFetchError("");
-    const row = useDataStore.getState().providers.find((p) => p.type === providerType);
+    const row = providerId
+      ? useDataStore.getState().providers.find((p) => p.id === providerId)
+      : useDataStore.getState().providers.find((p) => p.type === providerType);
     if (row) {
       const c: ProviderConfig = row.config ? (JSON.parse(row.config) as ProviderConfig) : {};
       c.cached_models = fetched;

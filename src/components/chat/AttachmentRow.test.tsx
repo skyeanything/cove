@@ -20,13 +20,14 @@ vi.mock("@/stores/filePreviewStore", () => ({
 
 // Mock layoutStore.
 const mockSetFilePanelOpen = vi.fn();
+const mockSetFilePreviewOpen = vi.fn();
 
 vi.mock("@/stores/layoutStore", () => ({
   useLayoutStore: Object.assign(
     (selector: (s: Record<string, unknown>) => unknown) =>
-      selector({ setFilePanelOpen: mockSetFilePanelOpen }),
+      selector({ setFilePanelOpen: mockSetFilePanelOpen, setFilePreviewOpen: mockSetFilePreviewOpen }),
     {
-      getState: () => ({ filePanelOpen: false }),
+      getState: () => ({ filePanelOpen: false, filePreviewOpen: true }),
     },
   ),
 }));

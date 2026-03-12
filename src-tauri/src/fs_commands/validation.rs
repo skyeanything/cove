@@ -21,16 +21,13 @@ pub(super) fn normalize_path_components(p: &Path) -> PathBuf {
 pub(crate) fn ensure_inside_workspace_exists(workspace_root: &str, path: &str) -> Result<PathBuf, FsError> {
     let root = Path::new(workspace_root)
         .canonicalize()
-        .map_err(|_| FsError::NotFound)?
-        .into_os_string()
-        .into_string()
-        .map_err(|_| FsError::Io("workspace path invalid utf-8".into()))?;
+        .map_err(|_| FsError::NotFound)?;
 
     let p = Path::new(path);
     let resolved = if p.is_absolute() {
         PathBuf::from(path)
     } else {
-        Path::new(&root).join(path)
+        root.join(path)
     };
     let canonical = resolved.canonicalize().map_err(|e| {
         if e.kind() == std::io::ErrorKind::NotFound {
@@ -39,14 +36,10 @@ pub(crate) fn ensure_inside_workspace_exists(workspace_root: &str, path: &str) -
             FsError::Io(e.to_string())
         }
     })?;
-    let canonical_str = canonical
-        .into_os_string()
-        .into_string()
-        .map_err(|_| FsError::Io("resolved path invalid utf-8".into()))?;
-    if !canonical_str.starts_with(&root) {
+    if !canonical.starts_with(&root) {
         return Err(FsError::OutsideWorkspace);
     }
-    Ok(PathBuf::from(canonical_str))
+    Ok(canonical)
 }
 
 /// 路径可以不存在（如写入新文件）：规范为绝对路径并校验在工作区内。

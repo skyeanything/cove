@@ -138,7 +138,7 @@ describe("getModel", () => {
     expect(createOpenAI).toHaveBeenCalledWith(
       expect.objectContaining({ baseURL: "http://localhost:11434/v1" }),
     );
-    expect(mockProvider).toHaveBeenCalledWith("llama3");
+    expect(mockProvider.chat).toHaveBeenCalledWith("llama3");
   });
 
   it("ollama: uses default localhost URL when base_url is empty", () => {
@@ -147,6 +147,7 @@ describe("getModel", () => {
     expect(createOpenAI).toHaveBeenCalledWith(
       expect.objectContaining({ baseURL: "http://localhost:11434/v1" }),
     );
+    expect(mockProvider.chat).toHaveBeenCalledWith("llama3");
   });
 
   it("aliyun: uses createOpenAI with given base_url and calls .chat(modelId)", () => {

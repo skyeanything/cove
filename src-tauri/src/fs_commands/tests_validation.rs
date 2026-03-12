@@ -105,6 +105,25 @@ fn workspace_exists_symlink_escaping() {
     assert!(matches!(result, Err(FsError::OutsideWorkspace)));
 }
 
+#[test]
+fn workspace_exists_sibling_dir_not_confused() {
+    let dir = tempfile::tempdir().unwrap();
+    let sibling_name = format!("{}-evil", dir.path().to_str().unwrap());
+    let sibling = std::path::Path::new(&sibling_name);
+    std::fs::create_dir_all(&sibling).unwrap();
+    let file = sibling.join("secret.txt");
+    std::fs::write(&file, "secret").unwrap();
+
+    let result = ensure_inside_workspace_exists(
+        dir.path().to_str().unwrap(),
+        file.to_str().unwrap(),
+    );
+    assert!(matches!(result, Err(FsError::OutsideWorkspace)));
+
+    // cleanup
+    std::fs::remove_dir_all(&sibling).ok();
+}
+
 // ---------------------------------------------------------------------------
 // ensure_inside_workspace_may_not_exist
 // ---------------------------------------------------------------------------

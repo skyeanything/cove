@@ -66,12 +66,13 @@ function handleImage(
 ): void {
   const pathInfo = a.workspace_path ?? a.path ?? a.name ?? "unknown";
   const dims = a.parsed_summary;
+  const label = `[Image: ${a.name ?? "image"} at ${pathInfo}${dims ? ` (${dims})` : ""}]`;
 
   if (options.modelSupportsVision && a.content?.startsWith("data:image/")) {
     visionParts.push({ type: "image", image: a.content });
-    textBlocks.push(`[Image: ${a.name ?? "image"} at ${pathInfo}${dims ? ` (${dims})` : ""}]`);
+    textBlocks.push(label + "\nImage attached as multimodal content. If you cannot view it, tell the user this model may not support image input.");
   } else {
-    textBlocks.push(`[Image: ${a.name ?? "image"} at ${pathInfo}${dims ? ` (${dims})` : ""}]`);
+    textBlocks.push(label + "\nThis is an image file. You cannot extract text from images. Describe available metadata to the user, or suggest a vision-capable model.");
   }
 }
 
@@ -90,7 +91,15 @@ function handlePdf(
       : undefined;
     if (dataUrl) {
       pdfParts.push({ type: "file", data: dataUrl, mediaType: "application/pdf" });
-      textBlocks.push(`[PDF: ${a.name ?? "document"} at ${pathInfo}]`);
+      let block = `[PDF: ${a.name ?? "document"} at ${pathInfo}]`;
+      if (a.parsed_content) {
+        const preview = a.parsed_content.length <= threshold
+          ? a.parsed_content
+          : (a.parsed_summary ?? a.parsed_content.slice(0, 800));
+        block += `\nExtracted text preview:\n\`\`\`\n${preview}\n\`\`\``;
+      }
+      block += "\nPDF attached natively. If you cannot process it, use the extracted text above or the parse_document tool.";
+      textBlocks.push(block);
       return;
     }
     // No PDF data URL available -- fall through to text-based injection

@@ -72,6 +72,10 @@ vi.mock("@/lib/chat-input-utils", () => ({
   imageFilesToDraftAttachments: async () => [],
   nonImageFilesToDraftAttachments: async () => [],
 }));
+const mockClipboardFilesToDraftAttachments = vi.fn().mockResolvedValue([]);
+vi.mock("@/lib/clipboard-files", () => ({
+  clipboardFilesToDraftAttachments: (...args: unknown[]) => mockClipboardFilesToDraftAttachments(...args),
+}));
 vi.mock("@/hooks/useAttachFiles", () => ({
   pickAndSaveAttachments: vi.fn(),
 }));
@@ -189,6 +193,41 @@ describe("ChatInput", () => {
     await user.type(textarea, "hello");
     fireEvent.keyDown(textarea, { key: "Enter" });
     expect(mockSendMessage).toHaveBeenCalledTimes(1);
+  });
+
+  it("tries native clipboard files when paste has no images and no text", async () => {
+    mockClipboardFilesToDraftAttachments.mockResolvedValue([
+      { id: "1", type: "file", name: "doc.pdf", status: "ready" },
+    ]);
+    render(<ChatInput />);
+    const textarea = screen.getByRole("textbox");
+    // Simulate paste with no files and no text (macOS Finder copy)
+    const pasteEvent = new Event("paste", { bubbles: true }) as unknown as ClipboardEvent;
+    Object.defineProperty(pasteEvent, "clipboardData", {
+      value: {
+        items: [{ kind: "string", type: "text/plain", getAsFile: () => null }],
+        getData: () => "",
+      },
+    });
+    fireEvent(textarea, pasteEvent);
+    // Wait for async handler
+    await vi.waitFor(() => {
+      expect(mockClipboardFilesToDraftAttachments).toHaveBeenCalled();
+    });
+  });
+
+  it("does not try native clipboard when paste has normal text", () => {
+    render(<ChatInput />);
+    const textarea = screen.getByRole("textbox");
+    const pasteEvent = new Event("paste", { bubbles: true }) as unknown as ClipboardEvent;
+    Object.defineProperty(pasteEvent, "clipboardData", {
+      value: {
+        items: [{ kind: "string", type: "text/plain", getAsFile: () => null }],
+        getData: () => "hello world",
+      },
+    });
+    fireEvent(textarea, pasteEvent);
+    expect(mockClipboardFilesToDraftAttachments).not.toHaveBeenCalled();
   });
 
   it("shows slash commands when message starts with /", async () => {

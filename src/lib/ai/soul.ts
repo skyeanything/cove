@@ -64,15 +64,43 @@ export function findPrivateFile(
   return files.find((f) => f.name === name);
 }
 
+/** Per-file character limits for system prompt injection. */
+export const SOUL_SIZE_LIMITS: Record<string, number> = {
+  "SOUL.md": 4000,
+  "observations.md": 6000,
+  "patterns.md": 4000,
+};
+export const DEFAULT_PRIVATE_LIMIT = 3000;
+
+/**
+ * Truncate content to a character limit.
+ * @param keepEnd - if true, keep the end (for observations: most recent first)
+ */
+export function truncateToLimit(
+  content: string,
+  limit: number,
+  keepEnd: boolean,
+): string {
+  if (content.length <= limit) return content;
+  if (keepEnd) {
+    return "(earlier content omitted)\n\n" + content.slice(-limit);
+  }
+  return content.slice(0, limit) + "\n\n(truncated)";
+}
+
 /** Format SOUL content for system prompt injection. */
 export function formatSoulPrompt(soul: SoulContent): string {
   const parts: string[] = [];
   if (soul.public) {
-    parts.push(`[SOUL]\n${soul.public}`);
+    const limit = SOUL_SIZE_LIMITS["SOUL.md"] ?? 4000;
+    parts.push(`[SOUL]\n${truncateToLimit(soul.public, limit, false)}`);
   }
   for (const file of soul.private) {
     if (file.content.trim()) {
-      parts.push(`[SOUL:private:${file.name}]\n${file.content}`);
+      const limit = SOUL_SIZE_LIMITS[file.name] ?? DEFAULT_PRIVATE_LIMIT;
+      const keepEnd = file.name === "observations.md";
+      const truncated = truncateToLimit(file.content, limit, keepEnd);
+      parts.push(`[SOUL:private:${file.name}]\n${truncated}`);
     }
   }
   return parts.join("\n\n");

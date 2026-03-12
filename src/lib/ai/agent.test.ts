@@ -10,7 +10,7 @@ vi.mock("./context", () => ({
 }));
 import { streamText, stepCountIs } from "ai";
 import { buildSystemPrompt } from "./context";
-import { toModelMessages, runAgent } from "./agent";
+import { toModelMessages, runAgent, stripToolMessages } from "./agent";
 
 const mockStreamText = vi.mocked(streamText);
 const mockStepCountIs = vi.mocked(stepCountIs);
@@ -260,6 +260,102 @@ describe("toModelMessages", () => {
   });
 });
 
+// ---------- stripToolMessages ----------
+
+describe("stripToolMessages", () => {
+  it("passes through plain text messages unchanged", () => {
+    const messages = [
+      { role: "user", content: [{ type: "text", text: "hi" }] },
+      { role: "assistant", content: [{ type: "text", text: "hello" }] },
+    ] as never[];
+    expect(stripToolMessages(messages)).toEqual(messages);
+  });
+
+  it("drops role:tool messages", () => {
+    const messages = [
+      { role: "user", content: [{ type: "text", text: "hi" }] },
+      { role: "assistant", content: [
+        { type: "text", text: "let me check" },
+        { type: "tool-call", toolCallId: "tc-1", toolName: "read", input: {} },
+      ]},
+      { role: "tool", content: [
+        { type: "tool-result", toolCallId: "tc-1", toolName: "read", output: { type: "text", value: "file content" } },
+      ]},
+    ] as never[];
+    const result = stripToolMessages(messages);
+    expect(result.every((m: Record<string, unknown>) => m.role !== "tool")).toBe(true);
+  });
+
+  it("strips tool-call parts from assistant messages, keeps text", () => {
+    const messages = [
+      { role: "assistant", content: [
+        { type: "text", text: "let me check" },
+        { type: "tool-call", toolCallId: "tc-1", toolName: "read", input: {} },
+      ]},
+    ] as never[];
+    const result = stripToolMessages(messages);
+    expect(result).toHaveLength(1);
+    const content = (result[0] as Record<string, unknown>).content as Array<Record<string, unknown>>;
+    expect(content).toEqual([{ type: "text", text: "let me check" }]);
+  });
+
+  it("drops assistant messages that only had tool-call parts", () => {
+    const messages = [
+      { role: "user", content: [{ type: "text", text: "do something" }] },
+      { role: "assistant", content: [
+        { type: "tool-call", toolCallId: "tc-1", toolName: "bash", input: {} },
+      ]},
+      { role: "tool", content: [
+        { type: "tool-result", toolCallId: "tc-1", toolName: "bash", output: { type: "text", value: "done" } },
+      ]},
+      { role: "assistant", content: [{ type: "text", text: "done" }] },
+    ] as never[];
+    const result = stripToolMessages(messages);
+    expect(result).toHaveLength(2);
+    expect((result[0] as Record<string, unknown>).role).toBe("user");
+    expect((result[1] as Record<string, unknown>).role).toBe("assistant");
+    const content = (result[1] as Record<string, unknown>).content as Array<Record<string, unknown>>;
+    expect(content).toEqual([{ type: "text", text: "done" }]);
+  });
+
+  it("preserves system and user messages", () => {
+    const messages = [
+      { role: "system", content: "you are helpful" },
+      { role: "user", content: [{ type: "text", text: "hello" }] },
+    ] as never[];
+    expect(stripToolMessages(messages)).toEqual(messages);
+  });
+
+  it("handles conversation switching from tool-capable to no-tool model", () => {
+    // Simulates a conversation that used tools, then model is switched to one without tools
+    const parts = JSON.stringify([
+      { type: "text", text: "I'll read the file" },
+      { type: "tool", id: "tc-1", toolName: "read", args: { filePath: "a.ts" }, result: "content" },
+    ]);
+    const dbMessages: Message[] = [
+      { id: "1", conversation_id: "c1", role: "user", content: "read a.ts", created_at: "t1" },
+      { id: "2", conversation_id: "c1", role: "assistant", content: "I'll read the file", parts, created_at: "t2" },
+      { id: "3", conversation_id: "c1", role: "user", content: "thanks, now just chat", created_at: "t3" },
+    ];
+    const modelMessages = toModelMessages(dbMessages);
+    // modelMessages has tool-call and tool-result messages
+    expect(modelMessages.some((m: Record<string, unknown>) => m.role === "tool")).toBe(true);
+
+    const stripped = stripToolMessages(modelMessages);
+    // No tool messages remain
+    expect(stripped.every((m: Record<string, unknown>) => m.role !== "tool")).toBe(true);
+    // No tool-call parts in any assistant message
+    for (const msg of stripped) {
+      const content = (msg as Record<string, unknown>).content;
+      if (Array.isArray(content)) {
+        expect(content.every((p: Record<string, unknown>) => p.type !== "tool-call")).toBe(true);
+      }
+    }
+    // Text content is preserved
+    expect(stripped.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
 // ---------- runAgent ----------
 
 describe("runAgent", () => {
@@ -327,5 +423,21 @@ describe("runAgent", () => {
     const result = runAgent({ model: fakeModel, messages: fakeMessages, tools: fakeTools });
 
     expect(result).toBe("stream-result");
+  });
+
+  it("omits tools and stopWhen when tools is empty", () => {
+    runAgent({ model: fakeModel, messages: fakeMessages, tools: {} });
+
+    const call = mockStreamText.mock.calls[0]![0];
+    expect(call.tools).toBeUndefined();
+    expect(call.stopWhen).toBeUndefined();
+  });
+
+  it("omits tools and stopWhen when tools is undefined", () => {
+    runAgent({ model: fakeModel, messages: fakeMessages });
+
+    const call = mockStreamText.mock.calls[0]![0];
+    expect(call.tools).toBeUndefined();
+    expect(call.stopWhen).toBeUndefined();
   });
 });

@@ -34,11 +34,19 @@ vi.mock("./dataStore", () => ({ useDataStore: { getState: () => mockDataStore } 
 const mockWorkspaceStore = { activeWorkspace: null, loadFromConversation: vi.fn().mockResolvedValue(undefined) };
 vi.mock("./workspaceStore", () => ({ useWorkspaceStore: { getState: () => mockWorkspaceStore } }));
 
+const mockStreamStore = {
+  streams: {},
+  startStream: vi.fn(),
+  updateStream: vi.fn(),
+  endStream: vi.fn(),
+  abortStream: vi.fn(),
+  getStream: vi.fn().mockReturnValue(undefined),
+  isConversationStreaming: vi.fn().mockReturnValue(false),
+};
+vi.mock("./streamStore", () => ({ useStreamStore: { getState: () => mockStreamStore } }));
+
 vi.mock("./chat-stream-runner", () => ({ runStreamLoop: vi.fn() }));
-vi.mock("./chat-url-utils", () => ({
-  getFetchBlockForText: vi.fn().mockResolvedValue(""),
-  injectFetchBlockIntoLastUserMessage: vi.fn(),
-}));
+vi.mock("./chat-url-utils", () => ({}));
 vi.mock("@/lib/ai/model-service", () => ({ getModelOption: vi.fn().mockReturnValue(null) }));
 vi.mock("@/lib/ai/agent", () => ({
   toModelMessages: vi.fn().mockReturnValue([{ role: "user", content: [{ type: "text", text: "hello" }] }]),
@@ -64,7 +72,7 @@ import { attachmentRepo } from "@/db/repos/attachmentRepo";
 import { conversationRepo } from "@/db/repos/conversationRepo";
 import { providerRepo } from "@/db/repos/providerRepo";
 import { runStreamLoop } from "./chat-stream-runner";
-import { getFetchBlockForText, injectFetchBlockIntoLastUserMessage } from "./chat-url-utils";
+
 import { getModelOption } from "@/lib/ai/model-service";
 import { toModelMessages } from "@/lib/ai/agent";
 import { reportAgentRunMetrics } from "@/lib/ai/agent-metrics";
@@ -92,7 +100,10 @@ function setupDefaultMocks() {
 
 // --- setup ---
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  mockStreamStore.getStream.mockReturnValue(undefined);
+});
 afterEach(() => resetStore());
 
 // --- tests ---
@@ -276,28 +287,6 @@ describe("chatStore — sendMessage", () => {
     });
   });
 
-  describe("url fetch", () => {
-    it("injects fetchBlock when no attachments", async () => {
-      setupDefaultMocks();
-      vi.mocked(getFetchBlockForText).mockResolvedValue("<fetched>");
-      await useChatStore.getState().sendMessage("hello");
-      expect(injectFetchBlockIntoLastUserMessage).toHaveBeenCalledWith(expect.anything(), "<fetched>");
-    });
-
-    it("includes fetchBlock in text when attachments present", async () => {
-      setupDefaultMocks();
-      const msgs = [{ role: "user", content: [{ type: "text", text: "hello" }] }];
-      vi.mocked(toModelMessages).mockReturnValue(msgs as ReturnType<typeof toModelMessages>);
-      const draft: DraftAttachment = { id: "a1", type: "file", name: "f.txt" };
-      setStoreState(useChatStore, { ...useChatStore.getState(), draftAttachments: [draft] });
-      vi.mocked(getFetchBlockForText).mockResolvedValue("<fetched>");
-
-      await useChatStore.getState().sendMessage("hello");
-      // When attachments present, fetchBlock is appended to userText, not via injectFetchBlock
-      expect(injectFetchBlockIntoLastUserMessage).not.toHaveBeenCalled();
-    });
-  });
-
   describe("streaming success", () => {
     it("calls runStreamLoop with correct params", async () => {
       setupDefaultMocks();
@@ -319,9 +308,7 @@ describe("chatStore — sendMessage", () => {
     it("resets streaming state after success", async () => {
       setupDefaultMocks();
       await useChatStore.getState().sendMessage("hello");
-      expect(useChatStore.getState().isStreaming).toBe(false);
-      expect(useChatStore.getState().abortController).toBeNull();
-      expect(useChatStore.getState().streamingContent).toBe("");
+      expect(mockStreamStore.endStream).toHaveBeenCalledWith("conv-1");
     });
   });
 
@@ -334,11 +321,12 @@ describe("chatStore — sendMessage", () => {
       });
       await useChatStore.getState().sendMessage("hello");
       expect(useChatStore.getState().error).toBe("rate limit");
-      expect(useChatStore.getState().isStreaming).toBe(false);
+      expect(mockStreamStore.endStream).toHaveBeenCalledWith("conv-1");
     });
 
     it("saves partial content on AbortError", async () => {
       setupDefaultMocks();
+      mockStreamStore.getStream.mockReturnValue({ streamingContent: "partial response", streamingReasoning: "" });
       vi.mocked(runStreamLoop).mockImplementation(async (_opts, callbacks) => {
         callbacks.onUpdate({ streamingContent: "partial response" });
         throw Object.assign(new Error("Aborted"), { name: "AbortError" });

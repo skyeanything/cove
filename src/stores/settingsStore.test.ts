@@ -24,14 +24,19 @@ describe("settingsStore", () => {
   });
 
   describe("setSelectedProvider", () => {
-    it("updates selectedProviderType", () => {
-      useSettingsStore.getState().setSelectedProvider("openai");
-      expect(useSettingsStore.getState().selectedProviderType).toBe("openai");
+    it("updates selectedProvider", () => {
+      useSettingsStore.getState().setSelectedProvider({ type: "openai" });
+      expect(useSettingsStore.getState().selectedProvider).toEqual({ type: "openai" });
+    });
+
+    it("supports custom provider with id", () => {
+      useSettingsStore.getState().setSelectedProvider({ type: "custom", id: "abc" });
+      expect(useSettingsStore.getState().selectedProvider).toEqual({ type: "custom", id: "abc" });
     });
 
     it("can set to null", () => {
       useSettingsStore.getState().setSelectedProvider(null);
-      expect(useSettingsStore.getState().selectedProviderType).toBeNull();
+      expect(useSettingsStore.getState().selectedProvider).toBeNull();
     });
   });
 

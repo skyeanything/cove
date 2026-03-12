@@ -43,6 +43,8 @@ export interface FetchUrlResult {
   content_md?: string;
   error?: string;
   source: string;
+  retry_with_cookies?: boolean;
+  low_quality?: boolean;
 }
 
 /**

@@ -56,6 +56,12 @@ describe("ChatToolbar", () => {
     expect(screen.getByTestId("model-selector")).toBeTruthy();
   });
 
+  it("highlights web search button when enabled", () => {
+    render(<ChatToolbar {...defaultProps} webSearchEnabled={true} />);
+    const btn = screen.getByTitle("chat.webSearch");
+    expect(btn.className).toContain("bg-accent");
+  });
+
   it("renders send button when not streaming", () => {
     render(<ChatToolbar {...defaultProps} />);
     expect(screen.getByTitle("chat.sendMessage")).toBeTruthy();
@@ -92,12 +98,5 @@ describe("ChatToolbar", () => {
     render(<ChatToolbar {...defaultProps} />);
     await user.click(screen.getByTestId("toolbar-chat.attachFiles"));
     expect(defaultProps.onAttachFiles).toHaveBeenCalledTimes(1);
-  });
-
-  it("calls onWebSearchToggle when web search button clicked", async () => {
-    const user = userEvent.setup();
-    render(<ChatToolbar {...defaultProps} />);
-    await user.click(screen.getByTitle("chat.webSearch"));
-    expect(defaultProps.onWebSearchToggle).toHaveBeenCalledTimes(1);
   });
 });

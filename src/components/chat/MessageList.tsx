@@ -6,7 +6,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, memo } from "react";
 import { useTranslation } from "react-i18next";
 import { useChatStore } from "@/stores/chatStore";
 import type { MessagePart } from "@/stores/chatStore";
@@ -20,16 +20,14 @@ import {
 } from "./AssistantMessage";
 import { useAutoScroll } from "@/hooks/useAutoScroll";
 import { ScrollToBottomButton } from "./ScrollToBottomButton";
+import { renderContentWithMentions } from "@/lib/render-mentions";
+import { useChatStreamState, useIsStreaming } from "@/hooks/useChatStreamState";
 
 const EMPTY_ATTACHMENTS: Attachment[] = [];
 
 export function MessageList() {
   const messages = useChatStore((s) => s.messages);
-  const isStreaming = useChatStore((s) => s.isStreaming);
-  const streamingContent = useChatStore((s) => s.streamingContent);
-  const streamingReasoning = useChatStore((s) => s.streamingReasoning);
-  const streamingToolCalls = useChatStore((s) => s.streamingToolCalls);
-  const streamingParts = useChatStore((s) => s.streamingParts);
+  const { isStreaming, streamingContent, streamingReasoning, streamingToolCalls, streamingParts } = useChatStreamState();
 
   const hasOrderedStreamingParts = streamingParts.length > 0;
   const renderedContent = streamingContent;
@@ -47,7 +45,7 @@ export function MessageList() {
 
   return (
     <div className="relative min-h-0 flex-1">
-      <div ref={scrollRef} className="absolute inset-0 overflow-y-auto">
+      <div ref={scrollRef} className="absolute inset-0 overflow-y-auto overflow-x-hidden">
         <div className="mx-auto w-full max-w-[896px] px-4 py-6">
           {messages.map((msg) => (
             <MessageBubble key={msg.id} message={msg} />
@@ -68,7 +66,7 @@ export function MessageList() {
   );
 }
 
-function MessageBubble({ message }: { message: Message }) {
+const MessageBubble = memo(function MessageBubble({ message }: { message: Message }) {
   // Summary card for context compression
   if (message.parent_id === "__context_summary__") {
     return <SummaryCard content={message.content ?? ""} />;
@@ -104,7 +102,7 @@ function MessageBubble({ message }: { message: Message }) {
     );
   }
   return null;
-}
+});
 
 function UserMessage({ messageId, content }: { messageId: string; content: string }) {
   const { t } = useTranslation();
@@ -114,7 +112,7 @@ function UserMessage({ messageId, content }: { messageId: string; content: strin
   const [hovered, setHovered] = useState(false);
   const editAndResend = useChatStore((s) => s.editAndResend);
   const attachments = useChatStore((s) => s.attachmentsByMessage[messageId] ?? EMPTY_ATTACHMENTS);
-  const isStreaming = useChatStore((s) => s.isStreaming);
+  const isStreamingForEdit = useIsStreaming();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleCopy = useCallback(() => {
@@ -135,10 +133,10 @@ function UserMessage({ messageId, content }: { messageId: string; content: strin
   }, [content]);
 
   const handleConfirm = useCallback(() => {
-    if (!editContent.trim() || isStreaming) return;
+    if (!editContent.trim() || isStreamingForEdit) return;
     setIsEditing(false);
     editAndResend(messageId, editContent.trim());
-  }, [editContent, isStreaming, editAndResend, messageId]);
+  }, [editContent, isStreamingForEdit, editAndResend, messageId]);
 
   // Auto-resize textarea and focus
   useEffect(() => {
@@ -195,13 +193,13 @@ function UserMessage({ messageId, content }: { messageId: string; content: strin
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
     >
-      <div className="flex max-w-[85%] flex-col items-end">
+      <div className="flex max-w-[85%] min-w-0 flex-col items-end">
         {attachments.length > 0 && (
           <UserAttachmentList attachments={attachments} />
         )}
         {content.trim() && (
-          <div className="rounded-[4px] bg-background-tertiary px-3 py-1.5 text-[14px] leading-relaxed whitespace-pre-wrap">
-            {content}
+          <div className="max-w-full rounded-[4px] bg-background-tertiary px-3 py-1.5 text-[14px] leading-relaxed whitespace-pre-wrap break-words">
+            {renderContentWithMentions(content)}
           </div>
         )}
         {/* 操作图标：仅悬停时渲染 DOM，避免 CSS 被覆盖导致不隐藏 */}

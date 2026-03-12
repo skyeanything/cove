@@ -1,7 +1,8 @@
 // FILE_SIZE_EXCEPTION: complex editor + auto-save + version history logic across multiple file types
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Code, Eye } from "lucide-react";
+import { Code, Eye, Languages, PanelLeftClose, PanelLeft } from "lucide-react";
+import { useLayoutStore } from "@/stores/layoutStore";
 import { invoke } from "@tauri-apps/api/core";
 import { MarkdownContent } from "@/components/chat/MarkdownContent";
 import { CodeViewer } from "@/components/preview/CodeViewer";
@@ -28,6 +29,7 @@ import {
   useOpenExternally,
 } from "./PreviewFileHeader";
 import { usePreviewContent } from "@/hooks/usePreviewContent";
+import { useTranslatePreview } from "@/hooks/useTranslatePreview";
 
 const AUTO_SAVE_DELAY_MS = 1500;
 const SAVED_INDICATOR_DURATION_MS = 3000;
@@ -67,10 +69,49 @@ function ViewTabBar({
   );
 }
 
+// ── Translate button ──────────────────────────────────────────────────────────
+
+function TranslateButton({
+  isActive,
+  loading,
+  onClick,
+}: {
+  isActive: boolean;
+  loading: boolean;
+  onClick: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={loading}
+      title={isActive ? t("preview.translateOff") : t("preview.translateOn")}
+      className={cn(
+        "flex items-center gap-1 rounded-md px-2 py-1 text-[11px] transition-colors",
+        isActive
+          ? "bg-accent text-accent-foreground"
+          : "text-muted-foreground hover:bg-background-tertiary hover:text-foreground",
+        loading && "opacity-60",
+      )}
+    >
+      <Languages className="size-3" strokeWidth={1.5} />
+      {loading
+        ? t("preview.translating")
+        : isActive
+          ? t("preview.showOriginal")
+          : t("preview.translate")}
+    </button>
+  );
+}
+
 // ── Main panel ───────────────────────────────────────────────────────────────
 
 export function FilePreviewPanel() {
   const { t } = useTranslation();
+  const activePage = useLayoutStore((s) => s.activePage);
+  const wsFileTreeVisible = useLayoutStore((s) => s.wsFileTreeVisible);
+  const toggleWsFileTree = useLayoutStore((s) => s.toggleWsFileTree);
   const selectedPath = useFilePreviewStore((s) => s.selectedPath);
   const selectedIsDir = useFilePreviewStore((s) => s.selectedIsDir);
   const previewError = useFilePreviewStore((s) => s.previewError);
@@ -85,6 +126,8 @@ export function FilePreviewPanel() {
   const [autoSaveError, setAutoSaveError] = useState<string | null>(null);
   // When pure-JS DOCX renderer fails, fall back to UnsupportedFallback
   const [docxRenderFailed, setDocxRenderFailed] = useState(false);
+  const { isTranslateMode, translating, translated, toggleTranslate, reset: resetTranslate } =
+    useTranslatePreview();
 
   // Refs for cleanup effect (stale closure avoidance)
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -133,6 +176,8 @@ export function FilePreviewPanel() {
     setAutoSaveError(null);
     setDocxRenderFailed(false);
     isDirtyRef.current = false;
+    resetTranslate();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPath]);
 
   const savedText = cached?.type === "text" ? (cached.text ?? "") : "";
@@ -205,9 +250,28 @@ export function FilePreviewPanel() {
 
   const headerProps = { workspaceRoot, officeApps };
 
+  const fileTreeToggle = activePage === "workspace" ? (
+    <button
+      type="button"
+      onClick={toggleWsFileTree}
+      title={wsFileTreeVisible ? "收起文件树" : "展开文件树"}
+      className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-background-tertiary hover:text-foreground"
+    >
+      {wsFileTreeVisible
+        ? <PanelLeftClose className="size-3.5" strokeWidth={1.5} />
+        : <PanelLeft className="size-3.5" strokeWidth={1.5} />
+      }
+    </button>
+  ) : null;
+
   if (!selectedPath) {
     return (
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
+        {activePage === "workspace" && (
+          <div className="flex h-8 shrink-0 items-center border-b border-border px-3">
+            {fileTreeToggle}
+          </div>
+        )}
         <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-muted-foreground">
           {previewError === "file-deleted" ? t("preview.fileDeleted") : t("preview.selectFile")}
         </div>
@@ -224,7 +288,7 @@ export function FilePreviewPanel() {
   if (loading) {
     return (
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
-        <PreviewFileHeader path={selectedPath} {...headerProps} />
+        <PreviewFileHeader path={selectedPath} {...headerProps} leftActions={fileTreeToggle} />
         <div className="flex flex-1 items-center justify-center p-6 text-sm text-muted-foreground">
           {t("preview.loading")}
         </div>
@@ -235,7 +299,7 @@ export function FilePreviewPanel() {
   if (error) {
     return (
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
-        <PreviewFileHeader path={selectedPath} {...headerProps} />
+        <PreviewFileHeader path={selectedPath} {...headerProps} leftActions={fileTreeToggle} />
         <div className="flex flex-1 flex-col items-center justify-center gap-2 p-6 text-center text-sm text-destructive">
           <span>{error}</span>
         </div>
@@ -246,7 +310,7 @@ export function FilePreviewPanel() {
   if (kind === "unsupported") {
     return (
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
-        <PreviewFileHeader path={selectedPath} {...headerProps} />
+        <PreviewFileHeader path={selectedPath} {...headerProps} leftActions={fileTreeToggle} />
         <UnsupportedFallback
           path={selectedPath}
           workspaceRoot={workspaceRoot}
@@ -261,18 +325,29 @@ export function FilePreviewPanel() {
     const txtDraft = draft ?? cached.text;
     return (
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
-        <PreviewFileHeader path={selectedPath} {...headerProps}>
+        <PreviewFileHeader path={selectedPath} {...headerProps} leftActions={fileTreeToggle}>
           {absolutePath && (
             <HistoryPopover originalPath={absolutePath} onRestore={handleRestore} />
           )}
+          <TranslateButton
+            isActive={isTranslateMode}
+            loading={translating}
+            onClick={() => toggleTranslate(txtDraft)}
+          />
         </PreviewFileHeader>
-        <TextEditor
-          value={txtDraft}
-          onChange={handleChange}
-          statusMessage={statusMessage}
-          statusError={statusError}
-          className="flex-1"
-        />
+        {isTranslateMode ? (
+          <ScrollArea className="min-h-0 flex-1 p-4">
+            <MarkdownContent source={translated ?? ""} className="text-[14px]" />
+          </ScrollArea>
+        ) : (
+          <TextEditor
+            value={txtDraft}
+            onChange={handleChange}
+            statusMessage={statusMessage}
+            statusError={statusError}
+            className="flex-1"
+          />
+        )}
       </div>
     );
   }
@@ -280,7 +355,7 @@ export function FilePreviewPanel() {
   if (kind === "csv" && cached?.type === "text" && cached.text !== undefined) {
     return (
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
-        <PreviewFileHeader path={selectedPath} {...headerProps} />
+        <PreviewFileHeader path={selectedPath} {...headerProps} leftActions={fileTreeToggle} />
         <ScrollArea className="min-h-0 flex-1 p-4">
           <CsvViewer text={cached.text} />
         </ScrollArea>
@@ -291,7 +366,7 @@ export function FilePreviewPanel() {
   if (kind === "html" && cached?.type === "text" && cached.text !== undefined) {
     return (
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
-        <PreviewFileHeader path={selectedPath} {...headerProps} />
+        <PreviewFileHeader path={selectedPath} {...headerProps} leftActions={fileTreeToggle} />
         <HtmlViewer code={cached.text} path={selectedPath} />
       </div>
     );
@@ -303,14 +378,22 @@ export function FilePreviewPanel() {
     return (
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
         <div className="flex h-8 shrink-0 items-center justify-between gap-2 border-b border-border bg-background px-3">
-          <div className="min-w-0 truncate text-[12px] text-foreground-secondary" title={selectedPath}>
-            {selectedPath}
+          <div className="flex min-w-0 items-center gap-1">
+            {fileTreeToggle}
+            <div className="min-w-0 truncate text-[12px] text-foreground-secondary" title={selectedPath}>
+              {selectedPath}
+            </div>
           </div>
           <div className="flex shrink-0 items-center gap-1">
             <OpenExternallyButton workspaceRoot={workspaceRoot} path={selectedPath} />
             {absolutePath && (
               <HistoryPopover originalPath={absolutePath} onRestore={handleRestore} />
             )}
+            <TranslateButton
+              isActive={isTranslateMode}
+              loading={translating}
+              onClick={() => toggleTranslate(mdDisplayText)}
+            />
             <ViewTabBar
               viewMode={viewMode}
               onPreview={switchToPreview}
@@ -327,6 +410,10 @@ export function FilePreviewPanel() {
             statusError={statusError}
             className="flex-1"
           />
+        ) : isTranslateMode ? (
+          <ScrollArea className="min-h-0 flex-1 p-4">
+            <MarkdownContent source={translated ?? ""} className="text-[14px]" />
+          </ScrollArea>
         ) : (
           <ScrollArea className="min-h-0 flex-1 p-4">
             <MarkdownContent source={mdDisplayText} className="text-[14px]" />
@@ -341,13 +428,21 @@ export function FilePreviewPanel() {
     return (
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
         <div className="flex h-8 shrink-0 items-center justify-between gap-2 border-b border-border bg-background px-3">
-          <div className="file-preview-header-path min-w-0 text-[13px]">
-            <OpenExternallyButton workspaceRoot={workspaceRoot} path={selectedPath} />
+          <div className="flex min-w-0 items-center gap-1">
+            {fileTreeToggle}
+            <div className="file-preview-header-path min-w-0 text-[13px]">
+              <OpenExternallyButton workspaceRoot={workspaceRoot} path={selectedPath} />
+            </div>
           </div>
           <div className="flex shrink-0 items-center gap-1">
             {absolutePath && (
               <HistoryPopover originalPath={absolutePath} onRestore={handleRestore} />
             )}
+            <TranslateButton
+              isActive={isTranslateMode}
+              loading={translating}
+              onClick={() => toggleTranslate(draft ?? cached.text ?? "")}
+            />
             <ViewTabBar
               viewMode={viewMode}
               onPreview={switchToPreview}
@@ -364,6 +459,10 @@ export function FilePreviewPanel() {
             statusError={statusError}
             className="flex-1"
           />
+        ) : isTranslateMode ? (
+          <ScrollArea className="min-h-0 flex-1 p-4">
+            <MarkdownContent source={translated ?? ""} className="text-[14px]" />
+          </ScrollArea>
         ) : (
           <ScrollArea className="min-h-0 flex-1 p-4">
             <CodeViewer path={selectedPath} code={draft ?? cached.text} className="file-preview-code" />
@@ -376,7 +475,7 @@ export function FilePreviewPanel() {
   if (kind === "image" && cached?.type === "dataUrl" && cached.dataUrl) {
     return (
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
-        <PreviewFileHeader path={selectedPath} {...headerProps} />
+        <PreviewFileHeader path={selectedPath} {...headerProps} leftActions={fileTreeToggle} />
         <ImageViewer src={cached.dataUrl} alt={selectedPath} />
       </div>
     );
@@ -385,7 +484,7 @@ export function FilePreviewPanel() {
   if (kind === "pdf" && cached?.type === "dataUrl" && cached.dataUrl) {
     return (
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
-        <PreviewFileHeader path={selectedPath} {...headerProps} />
+        <PreviewFileHeader path={selectedPath} {...headerProps} leftActions={fileTreeToggle} />
         <PdfViewer dataUrl={cached.dataUrl} />
       </div>
     );
@@ -397,7 +496,7 @@ export function FilePreviewPanel() {
     if (officeExt === "docx") {
       return (
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
-          <PreviewFileHeader path={selectedPath} {...headerProps} />
+          <PreviewFileHeader path={selectedPath} {...headerProps} leftActions={fileTreeToggle} />
           {docxRenderFailed ? (
             <UnsupportedFallback
               path={selectedPath}
@@ -417,7 +516,7 @@ export function FilePreviewPanel() {
 
     return (
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
-        <PreviewFileHeader path={selectedPath} {...headerProps} />
+        <PreviewFileHeader path={selectedPath} {...headerProps} leftActions={fileTreeToggle} />
         <ScrollArea className="min-h-0 flex-1 p-4">
           {officeExt === "xlsx" && <XlsxViewer dataUrl={cached.dataUrl} />}
           {(officeExt === "pptx" || officeExt === "ppt") && <PptxViewer dataUrl={cached.dataUrl} />}

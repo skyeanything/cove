@@ -150,6 +150,25 @@ export async function verifyAndFetchModels(provider: Provider): Promise<VerifyAn
   const meta = PROVIDER_METAS[provider.type];
   const baseUrl = provider.base_url || meta.defaultBaseUrl || "";
 
+  if (provider.type === "custom") {
+    const config = parseConfig(provider);
+    const protocol = config.protocol ?? "openai";
+    if (protocol === "openai") {
+      return await fetchOpenAICompatibleModels(baseUrl, provider.api_key);
+    }
+    if (protocol === "anthropic") {
+      await verifyApiKey(provider);
+      return [];
+    }
+    // google: try fetching models, fall back to verify-only
+    try {
+      return await fetchOpenAICompatibleModels(baseUrl, provider.api_key);
+    } catch {
+      await verifyApiKey(provider);
+      return [];
+    }
+  }
+
   if (meta.supportsModelFetch) {
     if (provider.type === "ollama") return await fetchOllamaModels(baseUrl || "http://localhost:11434");
     if (provider.type === "moonshot") return await fetchMoonshotModels(baseUrl, provider.api_key);

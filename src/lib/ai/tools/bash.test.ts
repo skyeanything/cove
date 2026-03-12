@@ -10,12 +10,6 @@ vi.mock("@/stores/workspaceStore", () => ({
   },
 }));
 
-vi.mock("@/stores/dataStore", () => ({
-  useDataStore: {
-    getState: vi.fn(() => ({ activeConversationId: "conv-1" })),
-  },
-}));
-
 vi.mock("@/stores/permissionStore", () => ({
   usePermissionStore: {
     getState: vi.fn(() => ({
@@ -26,11 +20,9 @@ vi.mock("@/stores/permissionStore", () => ({
 }));
 
 import { useWorkspaceStore } from "@/stores/workspaceStore";
-import { useDataStore } from "@/stores/dataStore";
 import { usePermissionStore } from "@/stores/permissionStore";
 
 const mockWorkspace = vi.mocked(useWorkspaceStore.getState);
-const mockData = vi.mocked(useDataStore.getState);
 const mockPermission = vi.mocked(usePermissionStore.getState);
 
 // Default workspace state
@@ -53,15 +45,23 @@ function withPermission(allowed: boolean) {
 }
 
 // ── Import tool after mocks ───────────────────────────────────────────────────
-import { bashTool, cancelAllActiveCommands } from "./bash";
+import { createBashTool, cancelAllActiveCommands, cancelCommandsForConversation } from "./bash";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-type ExecInput = Parameters<NonNullable<typeof bashTool.execute>>[0];
-type ExecOptions = Parameters<NonNullable<typeof bashTool.execute>>[1];
+const CONV_ID = "conv-1";
 
-async function exec(command: string, opts: Partial<ExecInput> = {}) {
-  return bashTool.execute!({ command, ...opts } as ExecInput, {} as ExecOptions);
+function createTool(conversationId = CONV_ID) {
+  return createBashTool(conversationId);
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ExecOptions = Parameters<NonNullable<ReturnType<typeof createBashTool>["execute"]>>[1];
+
+async function exec(command: string, opts: { timeout?: number } = {}, conversationId = CONV_ID) {
+  const tool = createTool(conversationId);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return tool.execute!({ command, ...opts } as any, {} as ExecOptions);
 }
 
 function defaultRunResult(overrides = {}) {
@@ -81,11 +81,10 @@ function defaultRunResult(overrides = {}) {
 beforeEach(() => {
   vi.clearAllMocks();
   withWorkspace();
-  mockData.mockReturnValue({ activeConversationId: "conv-1" } as ReturnType<typeof mockData>);
   withPermission(true);
 });
 
-describe("bashTool – no active workspace", () => {
+describe("createBashTool – no active workspace", () => {
   it("returns Chinese prompt when workspace is null", async () => {
     withNoWorkspace();
     const result = await exec("ls");
@@ -94,7 +93,7 @@ describe("bashTool – no active workspace", () => {
   });
 });
 
-describe("bashTool – BLOCK commands", () => {
+describe("createBashTool – BLOCK commands", () => {
   beforeEach(() => {
     setupTauriMocks({});
   });
@@ -126,7 +125,7 @@ describe("bashTool – BLOCK commands", () => {
   });
 });
 
-describe("bashTool – SAFE commands (no permission prompt)", () => {
+describe("createBashTool – SAFE commands (no permission prompt)", () => {
   it("executes ls without permission ask", async () => {
     const mockAsk = vi.fn().mockResolvedValue(true);
     mockPermission.mockReturnValue({ ask: mockAsk } as unknown as ReturnType<typeof mockPermission>);
@@ -162,8 +161,8 @@ describe("bashTool – SAFE commands (no permission prompt)", () => {
   });
 });
 
-describe("bashTool – CONFIRM commands (permission prompt)", () => {
-  it("calls permission ask for curl and executes when allowed", async () => {
+describe("createBashTool – CONFIRM commands (permission prompt)", () => {
+  it("calls permission ask with bound conversationId and executes when allowed", async () => {
     const mockAsk = vi.fn().mockResolvedValue(true);
     mockPermission.mockReturnValue({ ask: mockAsk } as unknown as ReturnType<typeof mockPermission>);
 
@@ -174,6 +173,18 @@ describe("bashTool – CONFIRM commands (permission prompt)", () => {
     const result = await exec("curl https://example.com");
     expect(mockAsk).toHaveBeenCalledWith("conv-1", "bash", "curl https://example.com", expect.any(Object));
     expect(result).toContain("curl response");
+  });
+
+  it("uses the conversationId from factory, not from a global store", async () => {
+    const mockAsk = vi.fn().mockResolvedValue(true);
+    mockPermission.mockReturnValue({ ask: mockAsk } as unknown as ReturnType<typeof mockPermission>);
+
+    setupTauriMocks({
+      run_command: () => defaultRunResult({ stdout: "ok" }),
+    });
+
+    await exec("curl https://example.com", {}, "conv-other");
+    expect(mockAsk).toHaveBeenCalledWith("conv-other", "bash", "curl https://example.com", expect.any(Object));
   });
 
   it("returns cancel message when user denies", async () => {
@@ -194,7 +205,7 @@ describe("bashTool – CONFIRM commands (permission prompt)", () => {
   });
 });
 
-describe("bashTool – output formatting", () => {
+describe("createBashTool – output formatting", () => {
   it("includes stdout in result", async () => {
     setupTauriMocks({
       run_command: () => defaultRunResult({ stdout: "hello world" }),
@@ -241,13 +252,12 @@ describe("bashTool – output formatting", () => {
       run_command: () => defaultRunResult({ stdout: "clean output", exitCode: 0 }),
     });
     const result = await exec("ls");
-    // exit code is always included in the header
     expect(result).toContain("exit code: 0");
     expect(result).toContain("clean output");
   });
 });
 
-describe("bashTool – output truncation", () => {
+describe("createBashTool – output truncation", () => {
   it("truncates output exceeding 30K characters", async () => {
     const bigOutput = "A".repeat(40_000);
     setupTauriMocks({
@@ -268,7 +278,7 @@ describe("bashTool – output truncation", () => {
   });
 });
 
-describe("bashTool – timeout clamping", () => {
+describe("createBashTool – timeout clamping", () => {
   it("clamps timeout to 600s maximum", async () => {
     let capturedArgs: Record<string, unknown> | undefined;
     setupTauriMocks({
@@ -298,7 +308,7 @@ describe("bashTool – timeout clamping", () => {
   });
 });
 
-describe("bashTool – invoke error handling", () => {
+describe("createBashTool – invoke error handling", () => {
   it("catches invoke error and returns error message", async () => {
     setupTauriMocks({
       run_command: () => {
@@ -324,7 +334,7 @@ describe("bashTool – invoke error handling", () => {
   });
 });
 
-describe("bashTool – cancel support", () => {
+describe("createBashTool – cancel support", () => {
   it("passes cancelToken in invoke args", async () => {
     let capturedArgs: Record<string, unknown> | undefined;
     setupTauriMocks({
@@ -361,17 +371,46 @@ describe("bashTool – cancel support", () => {
       },
     });
 
-    // Start execution (will block on the promise)
     const execPromise = exec("ls");
-    // Wait a tick for invoke to be called
     await new Promise((r) => setTimeout(r, 0));
-    // Now cancel
     cancelAllActiveCommands();
     expect(cancelledToken).toBeDefined();
-    // Resolve the command to let exec finish
     runResolve!(defaultRunResult({ cancelled: true }));
     const result = await execPromise;
     expect(result).toBe("[命令已被取消]");
+  });
+
+  it("cancelCommandsForConversation only cancels commands for that conversation", async () => {
+    const cancelledTokens: string[] = [];
+    let runResolveA: ((v: unknown) => void) | undefined;
+    let runResolveB: ((v: unknown) => void) | undefined;
+    let callCount = 0;
+
+    setupTauriMocks({
+      run_command: () => new Promise((resolve) => {
+        callCount++;
+        if (callCount === 1) runResolveA = resolve;
+        else runResolveB = resolve;
+      }),
+      cancel_command: (payload) => {
+        cancelledTokens.push((payload as { token: string }).token);
+        return true;
+      },
+    });
+
+    const execA = exec("ls", {}, "conv-A");
+    const execB = exec("ls", {}, "conv-B");
+    await new Promise((r) => setTimeout(r, 0));
+
+    // Cancel only conv-A
+    cancelCommandsForConversation("conv-A");
+    // Only one cancel should have been issued
+    expect(cancelledTokens).toHaveLength(1);
+
+    runResolveA!(defaultRunResult({ cancelled: true }));
+    runResolveB!(defaultRunResult());
+    await execA;
+    await execB;
   });
 
   it("cleans up token from active set after execution", async () => {
@@ -381,7 +420,6 @@ describe("bashTool – cancel support", () => {
     });
 
     await exec("ls");
-    // After exec completes, cancelAllActiveCommands should have nothing to cancel
     let cancelCalled = false;
     setupTauriMocks({
       cancel_command: () => { cancelCalled = true; return true; },

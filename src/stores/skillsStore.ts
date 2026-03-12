@@ -73,6 +73,9 @@ interface SkillsState {
   deleteSkill: (folderName: string, workspacePath?: string | null, skillName?: string) => Promise<void>;
 }
 
+/** Inflight loading promise so concurrent callers can await the same work. */
+let loadingPromise: Promise<void> | null = null;
+
 export const useSkillsStore = create<SkillsState>()((set, get) => ({
   externalSkills: [],
   loaded: false,
@@ -81,41 +84,48 @@ export const useSkillsStore = create<SkillsState>()((set, get) => ({
   enabledSkillNames: [],
 
   loadExternalSkills: async (workspacePath) => {
-    if (get().loading) return;
+    if (get().loading) {
+      if (loadingPromise) await loadingPromise;
+      return;
+    }
     set({ loading: true });
-    try {
-      const customRoots = await getSkillDirPaths();
-      const entries = await invoke<ExternalSkillEntry[]>("discover_external_skills", {
-        workspacePath: workspacePath ?? null,
-        customRoots: customRoots.length > 0 ? customRoots : null,
-      });
-      const withSource: ExternalSkillWithSource[] = entries.map((e) => ({
-        skill: parseSkillFromRaw(e.content, e.name),
-        source: e.source,
-        path: e.path,
-        folderName: e.name,
-        skillDir: e.skillDir ?? "",
-        resourcePaths: e.resourcePaths ?? [],
-      }));
-      set({ externalSkills: withSource, loaded: true, scanError: null });
+    const doLoad = async () => {
+      try {
+        const customRoots = await getSkillDirPaths();
+        const entries = await invoke<ExternalSkillEntry[]>("discover_external_skills", {
+          workspacePath: workspacePath ?? null,
+          customRoots: customRoots.length > 0 ? customRoots : null,
+        });
+        const withSource: ExternalSkillWithSource[] = entries.map((e) => ({
+          skill: parseSkillFromRaw(e.content, e.name),
+          source: e.source,
+          path: e.path,
+          folderName: e.name,
+          skillDir: e.skillDir ?? "",
+          resourcePaths: e.resourcePaths ?? [],
+        }));
+        set({ externalSkills: withSource, loaded: true, scanError: null });
 
-      const bundledNames = withSource
-        .filter((e) => e.source === "office-bundled")
-        .map((e) => e.skill.meta.name);
-      if (bundledNames.length > 0) {
-        const enabled = get().enabledSkillNames;
-        const missing = bundledNames.filter((n) => !enabled.includes(n));
-        if (missing.length > 0) {
-          const next = [...enabled, ...missing];
-          await setEnabledSkillNames(next);
+        const bundledNames = withSource
+          .filter((e) => e.source === "office-bundled")
+          .map((e) => e.skill.meta.name);
+        if (bundledNames.length > 0) {
+          // Read from config, not store — store may still be at default []
+          const enabled = await getEnabledSkillNames();
+          const missing = bundledNames.filter((n) => !enabled.includes(n));
+          const next = missing.length > 0 ? [...enabled, ...missing] : enabled;
+          if (missing.length > 0) await setEnabledSkillNames(next);
           set({ enabledSkillNames: next });
         }
+      } catch (e) {
+        set({ externalSkills: [], loaded: true, scanError: String(e) });
+      } finally {
+        set({ loading: false });
+        loadingPromise = null;
       }
-    } catch (e) {
-      set({ externalSkills: [], loaded: true, scanError: String(e) });
-    } finally {
-      set({ loading: false });
-    }
+    };
+    loadingPromise = doLoad();
+    await loadingPromise;
   },
 
   loadEnabledSkillNames: async () => {

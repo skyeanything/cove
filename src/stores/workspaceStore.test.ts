@@ -20,7 +20,6 @@ vi.mock("@/db/repos/conversationRepo", () => ({
   conversationRepo: {
     getById: vi.fn(),
     update: vi.fn(),
-    delete: vi.fn(),
     getByWorkspacePath: vi.fn().mockResolvedValue([]),
   },
 }));

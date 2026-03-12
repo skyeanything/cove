@@ -25,8 +25,9 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
 // ── L1 内存缓存（按命令名隔离，session 内永久有效）──────────────────────────
 const memCache = new Map<string, string>();
 
-function cacheKey(command: string, dataUrl: string): string {
-  return `${command}:${dataUrl.length}:${dataUrl.slice(0, 64)}`;
+export function cacheKey(command: string, dataUrl: string): string {
+  const content = dataUrl.split(",")[1] ?? dataUrl;
+  return `${command}:${content.length}:${content.slice(0, 32)}:${content.slice(-32)}`;
 }
 
 // ── 主组件 ────────────────────────────────────────────────────────────────────

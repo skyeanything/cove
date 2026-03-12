@@ -1,9 +1,10 @@
 import { Button } from "@/components/ui/button";
-import { PanelLeft, SquarePen } from "lucide-react";
+import { PanelLeft, Settings, SquarePen } from "lucide-react";
 
 interface WindowControlsProps {
   onToggleSidebar: () => void;
   onNewChat?: () => void;
+  onOpenSettings?: () => void;
 }
 
 /**
@@ -11,7 +12,7 @@ interface WindowControlsProps {
  * Always pinned to the top-left of the window, right after macOS traffic lights.
  * These never move regardless of sidebar state.
  */
-export function WindowControls({ onToggleSidebar, onNewChat }: WindowControlsProps) {
+export function WindowControls({ onToggleSidebar, onNewChat, onOpenSettings }: WindowControlsProps) {
   return (
     <div
       className="no-select pointer-events-none fixed left-0 top-0 z-50 flex h-[52px] items-center"
@@ -39,6 +40,16 @@ export function WindowControls({ onToggleSidebar, onNewChat }: WindowControlsPro
           title="New chat"
         >
           <SquarePen className="size-[18px]" strokeWidth={1.5} />
+        </Button>
+
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={onOpenSettings}
+          className="text-muted-foreground hover:text-foreground"
+          title="Settings"
+        >
+          <Settings className="size-[18px]" strokeWidth={1.5} />
         </Button>
       </div>
     </div>

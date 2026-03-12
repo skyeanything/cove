@@ -1,8 +1,8 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import Prism from "prismjs";
 import { Highlight } from "prism-react-renderer";
 import { renderMermaidSVG } from "beautiful-mermaid";
-import { Copy, Check, Play } from "lucide-react";
+import { Copy, Check, Play, ChevronDown, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -14,10 +14,12 @@ import "prismjs/components/prism-jsx";
 import "prismjs/components/prism-tsx";
 import "prismjs/components/prism-css";
 import "prismjs/components/prism-python";
+import "prismjs/components/prism-lua";
 import "prismjs/components/prism-yaml";
 import "prismjs/components/prism-markdown";
 
 export const COPY_FEEDBACK_MS = 1500;
+export const COLLAPSE_THRESHOLD = 5;
 
 /** 将 React 子节点安全转为字符串，避免对象被渲染成 [object Object] */
 export function reactNodeToDisplayString(node: React.ReactNode): string {
@@ -98,9 +100,20 @@ export function CodeBlock({
   const { code, className: codeClassName } = getCodeAndLangFromPreChildren(children);
   const match = /language-(\w+)/.exec(codeClassName ?? className ?? "");
   const lang = match?.[1] ?? "text";
+  const lineCount = code.split("\n").length;
+  const collapsible = lineCount > COLLAPSE_THRESHOLD;
+  const [expanded, setExpanded] = useState(!collapsible);
+  const prevCollapsible = useRef(collapsible);
+  useEffect(() => {
+    if (prevCollapsible.current !== collapsible) {
+      prevCollapsible.current = collapsible;
+      setExpanded(!collapsible);
+    }
+  }, [collapsible]);
   const [copied, setCopied] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
   const [mermaidError, setMermaidError] = useState<string | null>(null);
+  const firstLine = collapsible ? code.split("\n")[0]?.slice(0, 60) ?? "" : "";
 
   const handleCopy = useCallback(() => {
     navigator.clipboard.writeText(code).then(() => {
@@ -157,9 +170,31 @@ export function CodeBlock({
 
   return (
     <div className="my-3 overflow-hidden rounded-lg border border-border bg-background-secondary">
-      <div className="flex items-center justify-between gap-2 border-b border-border px-2 py-1.5 text-[12px]">
-        <span className="font-medium text-muted-foreground">{lang}</span>
-        <div className="flex items-center gap-0.5">
+      <div className={cn(
+        "flex items-center justify-between gap-2 px-2 py-1.5 text-[12px]",
+        expanded && "border-b border-border",
+      )}>
+        {collapsible ? (
+          <button
+            type="button"
+            aria-expanded={expanded}
+            className="flex items-center gap-1.5 min-w-0 cursor-pointer hover:bg-background-tertiary/50 transition-colors duration-150 rounded-md -ml-1 pl-1 pr-2 py-0.5"
+            onClick={() => setExpanded((v) => !v)}
+          >
+            {expanded
+              ? <ChevronDown className="size-3 shrink-0 text-muted-foreground" strokeWidth={1.5} />
+              : <ChevronRight className="size-3 shrink-0 text-muted-foreground" strokeWidth={1.5} />
+            }
+            <span className="font-medium text-muted-foreground">{lang}</span>
+            <span className="text-muted-foreground/60">{lineCount} lines</span>
+            {!expanded && firstLine && (
+              <span className="truncate text-muted-foreground/40 font-mono">{firstLine}</span>
+            )}
+          </button>
+        ) : (
+          <span className="font-medium text-muted-foreground">{lang}</span>
+        )}
+        <div className="flex items-center gap-0.5 shrink-0">
           {(isHtml || isMermaid) && (
             <Button
               variant="ghost"
@@ -181,11 +216,18 @@ export function CodeBlock({
           </Button>
         </div>
       </div>
-      <pre className={cn("p-3 text-[13px] leading-snug font-mono whitespace-pre-wrap break-words overflow-x-auto", className)} {...props}>
-        <code className="block">
-          <CodeHighlight lang={lang} code={code} showLineNumbers={lang !== "text" && lang !== "plaintext"} />
-        </code>
-      </pre>
+      <div
+        className="grid transition-[grid-template-rows] duration-200 ease-out"
+        style={{ gridTemplateRows: expanded ? "1fr" : "0fr" }}
+      >
+        <div className="min-h-0 overflow-hidden">
+          <pre className={cn("p-3 text-[13px] leading-snug font-mono whitespace-pre-wrap break-words overflow-x-auto", className)} {...props}>
+            <code className="block">
+              <CodeHighlight lang={lang} code={code} showLineNumbers={lang !== "text" && lang !== "plaintext"} />
+            </code>
+          </pre>
+        </div>
+      </div>
       {showPreview && (isHtml || isMermaid) && (
         <>
           {mermaidError && isMermaid && (

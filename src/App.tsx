@@ -2,10 +2,12 @@ import { useThemeStore } from "@/stores/themeStore";
 import { useDataStore } from "@/stores/dataStore";
 import { useChatStore } from "@/stores/chatStore";
 import { useLayoutStore } from "@/stores/layoutStore";
+import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { AppLayout } from "@/components/layout/AppLayout";
 import { SettingsWindow } from "@/components/settings/SettingsWindow";
+import { PreviewWindow } from "@/components/preview/PreviewWindow";
 import { useTauriDrag } from "@/hooks/useTauriDrag";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { readConfig } from "@/lib/config";
 import type { GeneralConfig } from "@/lib/config/types";
@@ -13,14 +15,16 @@ import { migrateConfigIfNeeded } from "@/lib/config/migration";
 import { i18n } from "@/i18n";
 import { useSettingsStore } from "@/stores/settingsStore";
 
-const isSettingsWindow =
-  new URLSearchParams(window.location.search).get("window") === "settings";
+const windowParam = new URLSearchParams(window.location.search).get("window");
+const isSettingsWindow = windowParam === "settings";
+const isPreviewWindow = windowParam === "preview";
 
 export function App() {
   const theme = useThemeStore((s) => s.theme);
   const init = useDataStore((s) => s.init);
   const initialized = useDataStore((s) => s.initialized);
   const initError = useDataStore((s) => s.initError);
+  const [_gitBashError, setGitBashError] = useState<string | null>(null);
   useTauriDrag();
 
   // Migrate config files + initialize stores
@@ -56,6 +60,35 @@ export function App() {
     const unlistenPromise = listen<{ locale: string }>("locale-changed", (e) => {
       const l = e.payload?.locale;
       if (l === "zh" || l === "en") i18n.changeLanguage(l);
+    });
+    return () => {
+      unlistenPromise.then((unlisten) => unlisten());
+    };
+  }, [isSettingsWindow]);
+
+  // Windows: listen for Git Bash detection/install result from startup background thread.
+  useEffect(() => {
+    if (isSettingsWindow) return;
+    const unlistenPromise = listen<{ status: string; message?: string }>(
+      "git-bash-status",
+      (e) => {
+        if (e.payload.status === "failed") {
+          setGitBashError(e.payload.message ?? "Git Bash 未找到");
+        } else if (e.payload.status === "ready") {
+          setGitBashError(null);
+        }
+      },
+    );
+    return () => {
+      unlistenPromise.then((unlisten) => unlisten());
+    };
+  }, [isSettingsWindow]);
+
+  // Sync workspace list when Settings window mutates workspaces
+  useEffect(() => {
+    if (isSettingsWindow) return;
+    const unlistenPromise = listen("workspaces-changed", () => {
+      void useWorkspaceStore.getState().reload();
     });
     return () => {
       unlistenPromise.then((unlisten) => unlisten());
@@ -124,6 +157,10 @@ export function App() {
 
   if (isSettingsWindow) {
     return <SettingsWindow />;
+  }
+
+  if (isPreviewWindow) {
+    return <PreviewWindow />;
   }
 
   return <AppLayout />;

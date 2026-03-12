@@ -2,7 +2,7 @@ import type { Provider } from "@/db/types";
 import type { ModelMessage } from "ai";
 import { getModel } from "@/lib/ai/provider-factory";
 import { getModelOption } from "@/lib/ai/model-service";
-import { runAgent } from "@/lib/ai/agent";
+import { runAgent, stripToolMessages } from "@/lib/ai/agent";
 import { reportAgentRunMetrics, trackAgentPart } from "@/lib/ai/agent-metrics";
 import type { AgentRunMetrics } from "@/lib/ai/agent-metrics";
 import { handleAgentStream, type StreamResult } from "@/lib/ai/stream-handler";
@@ -13,7 +13,7 @@ import { maybeMeditate } from "@/lib/ai/soul-meditate";
 import { generateText } from "ai";
 import { getAgentTools } from "@/lib/ai/tools";
 import type { SubAgentContext } from "@/lib/ai/sub-agent";
-import { getEnabledSkillNames } from "./skillsStore";
+import { getEnabledSkillNames, useSkillsStore } from "./skillsStore";
 import type { StreamUpdate } from "@/lib/ai/stream-types";
 import { isRateLimitErrorMessage, backoffDelayMs, sleep, RETRYABLE_ATTEMPTS } from "./chat-retry-utils";
 
@@ -25,6 +25,7 @@ export interface StreamRunOptions {
   abortSignal: AbortSignal;
   runMetrics: AgentRunMetrics;
   labelBase: string;
+  conversationId: string;
 }
 
 export interface StreamRunCallbacks {
@@ -47,41 +48,96 @@ export async function runStreamLoop(
   opts: StreamRunOptions,
   callbacks: StreamRunCallbacks,
 ): Promise<StreamRunResult> {
-  const { provider, modelId, modelMessages, workspacePath, abortSignal, runMetrics, labelBase } = opts;
+  const { provider, modelId, modelMessages, workspacePath, abortSignal, runMetrics, labelBase, conversationId } = opts;
+  const t0 = performance.now();
   const model = getModel(provider, modelId);
   const modelOption = getModelOption(provider, modelId);
   const enabledSkillNames = await getEnabledSkillNames();
+  const t1 = performance.now();
+
+  // Ensure external skills (and their resources) are loaded before building tools.
+  // Without this, collectAllResources() in skill_resource tool sees an empty store.
+  const skillsState = useSkillsStore.getState();
+  if (!skillsState.loaded) {
+    await skillsState.loadExternalSkills(workspacePath);
+  }
+  const t2 = performance.now();
+
   const officeAvailable = await isOfficeAvailable();
+  const t3 = performance.now();
   const soulPrompt = formatSoulPrompt(await readSoul());
+  const t4 = performance.now();
+
+  console.log(
+    `[perf] setup: model+skills=${(t1 - t0).toFixed(0)}ms, loadExtSkills=${(t2 - t1).toFixed(0)}ms, ` +
+    `officeDetect=${(t3 - t2).toFixed(0)}ms, soulRead=${(t4 - t3).toFixed(0)}ms, total=${(t4 - t0).toFixed(0)}ms`,
+  );
 
   // Fire-and-forget: meditation check at conversation start
-  const meditateGen = async (p: string) => (await generateText({ model, prompt: p, maxOutputTokens: 1000 })).text;
+  const meditateGen = async (p: string) => {
+    const result = await generateText({ model, prompt: p, maxOutputTokens: 8192 });
+    return { text: result.text, finishReason: result.finishReason };
+  };
   maybeMeditate(meditateGen).catch((e) => console.error("[SOUL] meditation error:", e));
 
-  // Build base tools first (without spawn_agent) to use as parentTools
-  const baseTools = getAgentTools(enabledSkillNames, {
-    runtimeAvailability: { office: officeAvailable },
-  });
-  const subAgentContext: SubAgentContext = {
-    model,
-    parentTools: baseTools,
-    enabledSkillNames,
-    abortSignal,
-    workspacePath,
-    currentDepth: 0,
-    maxDepth: 2,
-  };
-  const tools = getAgentTools(enabledSkillNames, {
-    runtimeAvailability: { office: officeAvailable },
-    subAgentContext,
-  });
+  // Determine if model supports tool calling:
+  // - Explicit true/false from model options takes precedence
+  // - Ollama defaults to false (most local models lack tool support)
+  // - All other providers default to true
+  const supportsTools = modelOption?.tool_calling === true
+    || (modelOption?.tool_calling !== false && provider.type !== "ollama");
+
+  // Build tools only if model supports tool calling
+  let tools: ReturnType<typeof getAgentTools> = {};
+  if (supportsTools) {
+    const baseTools = getAgentTools(enabledSkillNames, {
+      runtimeAvailability: { office: officeAvailable },
+      conversationId,
+    });
+    const subAgentContext: SubAgentContext = {
+      model,
+      parentTools: baseTools,
+      enabledSkillNames,
+      abortSignal,
+      workspacePath,
+      currentDepth: 0,
+      maxDepth: 2,
+    };
+    tools = getAgentTools(enabledSkillNames, {
+      runtimeAvailability: { office: officeAvailable },
+      subAgentContext,
+      conversationId,
+      generateFn: meditateGen,
+    });
+  }
+
+  // Strip tool-call/tool-result messages when model doesn't support tools,
+  // so prior tool history doesn't confuse the model or trigger API errors.
+  const messages = supportsTools ? modelMessages : stripToolMessages(modelMessages);
+
+  const systemPrompt = buildSystemPrompt({ workspacePath, officeAvailable, soulPrompt });
+
+  // --- Diagnostic: measure request payload sizes ---
+  {
+    const msgChars = JSON.stringify(messages).length;
+    const toolNames = Object.keys(tools);
+    const toolSchemaChars = JSON.stringify(tools).length;
+    const sysChars = systemPrompt.length;
+    const totalChars = sysChars + msgChars + toolSchemaChars;
+    const estTokens = Math.round(totalChars / 3.5);
+    console.log(
+      `[perf] request payload: system=${sysChars} chars, messages=${msgChars} chars (${messages.length} msgs), ` +
+      `tools=${toolSchemaChars} chars (${toolNames.length} tools: ${toolNames.join(",")}), ` +
+      `total=${totalChars} chars (~${estTokens} tokens)`,
+    );
+  }
 
   let streamResult: StreamResult | null = null;
   for (let attempt = 1; attempt <= RETRYABLE_ATTEMPTS; attempt++) {
     const attemptResult = runAgent({
       model,
-      messages: modelMessages,
-      system: buildSystemPrompt({ workspacePath, officeAvailable, soulPrompt }),
+      messages,
+      system: systemPrompt,
       tools,
       abortSignal,
       maxOutputTokens: modelOption?.max_output_tokens,

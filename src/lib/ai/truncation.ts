@@ -3,8 +3,8 @@
  * 参考 opencode packages/opencode/src/tool/truncation.ts
  */
 
-const MAX_LINES = 2000;
-const MAX_BYTES = 50 * 1024; // 50KB
+const MAX_LINES = 1000;
+const MAX_BYTES = 30 * 1024; // 30KB
 
 const TRUNCATE_MESSAGE =
   "\n\n[... 输出已截断。可用 read(offset/limit) 或 bash 命令继续查看完整内容 ...]\n\n";

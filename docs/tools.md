@@ -134,28 +134,31 @@ Cove 的 AI 工具分为 built-in（始终可用）和 skill-bundled（需 Skill
 
 ---
 
-## `cove_interpreter` — JavaScript 解释器
+## `cove_interpreter` — Lua 解释器
 
-在沙箱环境（QuickJS）中执行 JavaScript 代码，无网络访问。提供工作区文件读写 API。
+在沙箱环境（Lua 5.4 via mlua）中执行 Lua 代码，无网络访问。提供工作区文件读写 API。
 
 **参数**
 
 | 参数 | 类型 | 说明 |
 |------|------|------|
-| `code` | `string` | 要执行的 JavaScript 代码 |
+| `code` | `string?` | 要执行的 Lua 代码（与 `file` 互斥） |
+| `file` | `string?` | 工作区内 `.lua` 脚本路径（与 `code` 互斥） |
 | `description` | `string?` | 代码用途简述（可选） |
 | `timeout` | `number?` | 超时秒数（默认 30，最大 60） |
 
 **可用 API**
 
-- `console.log()`, `Math.*`, `JSON.*`
-- `workspace.readFile(path)`, `workspace.writeFile(path, content)`, `workspace.listDir(path)`
+- `print()`, `json.encode()`, `json.decode()`
+- `string.*`, `table.*`, `math.*`
+- `workspace.readFile(path)`, `workspace.writeFile(path, content)`, `workspace.listDir(path)` 等 11 个文件操作
 
 **使用场景**
 
 - 数学计算、数据变换
 - JSON 处理
 - 读写工作区文件（无需外部运行时）
+- 执行工作区内的 `.lua` 脚本
 
 ---
 

@@ -92,7 +92,18 @@
     "searchMessagesTitle": "搜索消息内容",
     "searchMessagesPlaceholder": "在消息内容中搜索…",
     "searching": "搜索中…",
-    "noSearchResults": "无匹配结果"
+    "noSearchResults": "无匹配结果",
+    "quickSettings": "快速设置",
+    "language": "语言",
+    "theme": "主题",
+    "themeLight": "亮色",
+    "themeDark": "深色",
+    "themeSystem": "跟随系统",
+    "fontSize": "字体大小",
+    "fontSizeSm": "小",
+    "fontSizeMd": "默认",
+    "fontSizeLg": "大",
+    "openSettings": "设置"
   },
   "modelSelector": {
     "noProviders": "未配置提供商。请打开设置 (⌘,) 添加。",
@@ -117,7 +128,12 @@
     "newMarkdown": "新建 Markdown",
     "setContextAnchor": "设为 AI 上下文",
     "contextAnchorActive": "AI 上下文",
-    "search": "搜索文件"
+    "search": "搜索文件",
+    "duplicate": "创建副本",
+    "openInDefaultApp": "使用默认应用打开",
+    "newFile": "新建文件",
+    "invalidFileName": "文件名无效",
+    "collapsePanel": "收起面板"
   },
   "context": {
     "label": "上下文",
@@ -149,7 +165,7 @@
     "docxLoadError": "DOCX 解析失败",
     "docxRenderError": "DOCX 渲染失败",
     "pageNumber": "第 {{current}} / {{total}} 页",
-    "searchPlaceholder": "过滤文件\u2026",
+    "searchPlaceholder": "过滤文件…",
     "searchFiles": "搜索文件",
     "csvRows": "行",
     "csvCols": "列",
@@ -161,7 +177,19 @@
     "autoSaveError": "保存失败",
     "history": "历史版本",
     "historyEmpty": "暂无历史记录",
-    "restore": "恢复"
+    "restore": "恢复",
+    "collapseAll": "全部折叠",
+    "closeWorkspace": "关闭工作目录",
+    "closeExplorer": "关闭资源管理器",
+    "closePreview": "关闭预览",
+    "openInPanel": "在面板中打开",
+    "pdfFallback": "PDF 预览可在侧面板中查看",
+    "officeFallback": "Office 文档预览可在侧面板中查看",
+    "translate": "译文",
+    "translateOn": "翻译为中文（仅预览）",
+    "translateOff": "返回原文",
+    "showOriginal": "原文",
+    "translating": "翻译中…"
   },
   "common": {
     "settings": "设置"
@@ -385,5 +413,13 @@
     "exportSuccess": "已导出 {{count}} 个文件",
     "importSuccess": "已恢复 {{count}} 个文件",
     "resetSuccess": "SOUL 已重置为默认状态"
+  },
+  "trustMode": {
+    "enableTooltip": "启用信任模式",
+    "disableTooltip": "信任模式已开启（点击关闭）",
+    "confirmTitle": "启用信任模式",
+    "confirmDescription": "需要确认的命令将自动执行。危险命令仍被拦截。切换对话或关闭应用后失效。",
+    "cancel": "取消",
+    "enable": "启用"
   }
 }

@@ -22,6 +22,7 @@ vi.mock("@/stores/layoutStore", () => ({
       setFileTreeWidth: vi.fn(),
       setFilePreviewWidth: vi.fn(),
       setFileTreeShowHidden: vi.fn(),
+      setFilePreviewOpen: vi.fn(),
     }),
   },
 }));
@@ -42,8 +43,18 @@ vi.mock("@/stores/dataStore", () => ({
     getState: vi.fn().mockReturnValue({
       providers: [],
       assistants: [],
+      activeConversationId: "conv-1",
       updateProvider: vi.fn().mockResolvedValue(undefined),
       loadAssistants: vi.fn().mockResolvedValue(undefined),
+    }),
+  },
+}));
+vi.mock("@/stores/permissionStore", () => ({
+  usePermissionStore: {
+    getState: vi.fn().mockReturnValue({
+      enableTrustMode: vi.fn(),
+      disableTrustMode: vi.fn(),
+      requestTrustMode: vi.fn().mockResolvedValue(true),
     }),
   },
 }));
@@ -64,6 +75,7 @@ import { readConfig } from "@/lib/config";
 import { useThemeStore } from "@/stores/themeStore";
 import { useLayoutStore } from "@/stores/layoutStore";
 import { useDataStore } from "@/stores/dataStore";
+import { usePermissionStore } from "@/stores/permissionStore";
 import { emit } from "@tauri-apps/api/event";
 import { handleSettings } from "./settings-handlers";
 
@@ -254,6 +266,91 @@ describe("handleSettings - skills", () => {
     vi.mocked(readConfig).mockResolvedValue({ enabled: ["a"], dirPaths: [] });
     const result = await handleSettings({ action: "list", category: "skills" });
     expect(result).toContain("skill-a");
+  });
+});
+
+describe("handleSettings - assistant trust_mode", () => {
+  const assistantFixture = {
+    id: "a1", name: "Helper", model: "gpt-4", temperature: 0.7,
+    top_p: 1, frequency_penalty: 0, presence_penalty: 0,
+    web_search_enabled: 0, artifacts_enabled: 0, tools_enabled: 1,
+    sort_order: 0, created_at: "", updated_at: "",
+  };
+
+  it("setting trust_mode true calls requestTrustMode and awaits user confirmation", async () => {
+    vi.mocked(usePermissionStore.getState).mockReturnValue({
+      ...usePermissionStore.getState(),
+      requestTrustMode: vi.fn().mockResolvedValue(true),
+    });
+    vi.mocked(useDataStore.getState).mockReturnValue({
+      ...useDataStore.getState(),
+      assistants: [assistantFixture],
+      activeConversationId: "conv-42",
+    });
+    const result = await handleSettings({
+      action: "set", category: "assistant", assistant_name: "Helper",
+      key: "trust_mode", value: "true",
+    });
+    expect(result).toContain("enabled");
+    expect(result).toContain("user confirmed");
+    expect(usePermissionStore.getState().requestTrustMode).toHaveBeenCalledWith("conv-42");
+  });
+
+  it("setting trust_mode true returns denied when user rejects", async () => {
+    vi.mocked(usePermissionStore.getState).mockReturnValue({
+      ...usePermissionStore.getState(),
+      requestTrustMode: vi.fn().mockResolvedValue(false),
+    });
+    vi.mocked(useDataStore.getState).mockReturnValue({
+      ...useDataStore.getState(),
+      assistants: [assistantFixture],
+      activeConversationId: "conv-42",
+    });
+    const result = await handleSettings({
+      action: "set", category: "assistant", assistant_name: "Helper",
+      key: "trust_mode", value: "true",
+    });
+    expect(result).toContain("denied");
+  });
+
+  it("setting trust_mode false calls disableTrustMode", async () => {
+    vi.mocked(useDataStore.getState).mockReturnValue({
+      ...useDataStore.getState(),
+      assistants: [assistantFixture],
+      activeConversationId: "conv-42",
+    });
+    const result = await handleSettings({
+      action: "set", category: "assistant", assistant_name: "Helper",
+      key: "trust_mode", value: "false",
+    });
+    expect(result).toContain("disabled");
+    expect(usePermissionStore.getState().disableTrustMode).toHaveBeenCalledWith("conv-42");
+  });
+
+  it("returns error when disabling with no active conversation", async () => {
+    vi.mocked(useDataStore.getState).mockReturnValue({
+      ...useDataStore.getState(),
+      assistants: [assistantFixture],
+      activeConversationId: null,
+    });
+    const result = await handleSettings({
+      action: "set", category: "assistant", assistant_name: "Helper",
+      key: "trust_mode", value: "false",
+    });
+    expect(result).toContain("No active conversation");
+  });
+
+  it("returns error for invalid boolean value", async () => {
+    vi.mocked(useDataStore.getState).mockReturnValue({
+      ...useDataStore.getState(),
+      assistants: [assistantFixture],
+      activeConversationId: "conv-42",
+    });
+    const result = await handleSettings({
+      action: "set", category: "assistant", assistant_name: "Helper",
+      key: "trust_mode", value: "maybe",
+    });
+    expect(result).toContain("Invalid boolean");
   });
 });
 

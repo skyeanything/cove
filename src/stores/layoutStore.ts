@@ -37,12 +37,24 @@ interface LayoutState {
   setWsFileTreeWidth: (width: number) => void;
   setWsChatWidth: (width: number) => void;
 
+  /** --- Workspace mode panel visibility --- */
+  wsFileTreeVisible: boolean;
+  wsChatVisible: boolean;
+  toggleWsFileTree: () => void;
+  toggleWsChat: () => void;
+
   /** --- File panel --- */
   filePanelOpen: boolean;
   filePanelClosing: boolean;
   filePanelOpening: boolean;
   fileTreeWidth: number;
   filePreviewWidth: number;
+  fileTreeOpen: boolean;
+  filePreviewOpen: boolean;
+  toggleFileTree: () => void;
+  setFileTreeOpen: (open: boolean) => void;
+  toggleFilePreview: () => void;
+  setFilePreviewOpen: (open: boolean) => void;
   fileTreeShowHidden: boolean;
   setFileTreeShowHidden: (show: boolean) => void;
   toggleFilePanel: () => void;
@@ -93,6 +105,8 @@ function persistLayout(state: LayoutState): void {
     leftSidebarWidth: state.leftSidebarWidth,
     chatWidth: state.chatWidth,
     filePanelOpen: state.filePanelOpen,
+    fileTreeOpen: state.fileTreeOpen,
+    filePreviewOpen: state.filePreviewOpen,
     fileTreeWidth: state.fileTreeWidth,
     filePreviewWidth: state.filePreviewWidth,
     fileTreeShowHidden: state.fileTreeShowHidden,
@@ -100,6 +114,8 @@ function persistLayout(state: LayoutState): void {
     historyCollapsed: state.historyCollapsed,
     wsFileTreeWidth: state.wsFileTreeWidth,
     wsChatWidth: state.wsChatWidth,
+    wsFileTreeVisible: state.wsFileTreeVisible,
+    wsChatVisible: state.wsChatVisible,
   };
   void writeConfig("layout", config);
 }
@@ -118,8 +134,8 @@ export const useLayoutStore = create<LayoutState>()((set, get) => ({
   leftSidebarWidth: 260,
   toggleLeftSidebar: () => {
     set((s) => {
-      const next: SidebarMode = s.leftSidebarMode === "hidden" ? "full" : "hidden";
-      return { leftSidebarMode: next, leftSidebarOpen: next !== "hidden" };
+      const next: SidebarMode = s.leftSidebarMode === "mini" ? "full" : "mini";
+      return { leftSidebarMode: next, leftSidebarOpen: true };
     });
     persistLayout(get());
   },
@@ -162,27 +178,74 @@ export const useLayoutStore = create<LayoutState>()((set, get) => ({
     persistLayout(get());
   },
 
+  /* Workspace mode panel visibility */
+  wsFileTreeVisible: true,
+  wsChatVisible: true,
+  toggleWsFileTree: () => {
+    set((s) => ({ wsFileTreeVisible: !s.wsFileTreeVisible }));
+    persistLayout(get());
+  },
+  toggleWsChat: () => {
+    set((s) => ({ wsChatVisible: !s.wsChatVisible }));
+    persistLayout(get());
+  },
+
   /* File panel */
   filePanelOpen: true,
   filePanelClosing: false,
   filePanelOpening: false,
   fileTreeWidth: 260,
   filePreviewWidth: 360,
+  fileTreeOpen: true,
+  filePreviewOpen: true,
+  toggleFileTree: () => {
+    set((s) => {
+      const next = !s.fileTreeOpen;
+      if (!next && !s.filePreviewOpen) return { fileTreeOpen: next, filePanelClosing: true };
+      return { fileTreeOpen: next };
+    });
+    persistLayout(get());
+  },
+  setFileTreeOpen: (open) => {
+    set((s) => {
+      if (!open && !s.filePreviewOpen) return { fileTreeOpen: open, filePanelClosing: true };
+      return { fileTreeOpen: open };
+    });
+    persistLayout(get());
+  },
+  toggleFilePreview: () => {
+    set((s) => {
+      const next = !s.filePreviewOpen;
+      if (!next && !s.fileTreeOpen) return { filePreviewOpen: next, filePanelClosing: true };
+      return { filePreviewOpen: next };
+    });
+    persistLayout(get());
+  },
+  setFilePreviewOpen: (open) => {
+    set((s) => {
+      if (!open && !s.fileTreeOpen) return { filePreviewOpen: open, filePanelClosing: true };
+      return { filePreviewOpen: open };
+    });
+    persistLayout(get());
+  },
   fileTreeShowHidden: true,
   setFileTreeShowHidden: (show) => {
     set({ fileTreeShowHidden: show });
     persistLayout(get());
   },
   toggleFilePanel: () => {
-    set((s) =>
-      s.filePanelOpen
-        ? { filePanelClosing: true }
-        : { filePanelOpen: true, filePanelOpening: true },
-    );
+    set((s) => {
+      if (s.filePanelOpen) return { filePanelClosing: true };
+      return { filePanelOpen: true, filePanelOpening: true, fileTreeOpen: true };
+    });
     persistLayout(get());
   },
   setFilePanelOpen: (open) => {
-    set({ filePanelOpen: open });
+    if (open) {
+      set({ filePanelOpen: true, fileTreeOpen: true });
+    } else {
+      set({ filePanelOpen: false });
+    }
     persistLayout(get());
   },
   confirmFilePanelClosed: () => {
@@ -211,6 +274,8 @@ export const useLayoutStore = create<LayoutState>()((set, get) => ({
       leftSidebarWidth: config.leftSidebarWidth,
       chatWidth: config.chatWidth,
       filePanelOpen: config.filePanelOpen,
+      fileTreeOpen: config.filePanelOpen ? true : config.fileTreeOpen,
+      filePreviewOpen: config.filePreviewOpen,
       fileTreeWidth: config.fileTreeWidth,
       filePreviewWidth: config.filePreviewWidth,
       fileTreeShowHidden: config.fileTreeShowHidden,
@@ -218,6 +283,8 @@ export const useLayoutStore = create<LayoutState>()((set, get) => ({
       historyCollapsed: config.historyCollapsed ?? false,
       wsFileTreeWidth: config.wsFileTreeWidth ?? 280,
       wsChatWidth: config.wsChatWidth ?? 360,
+      wsFileTreeVisible: config.wsFileTreeVisible ?? true,
+      wsChatVisible: config.wsChatVisible ?? true,
     });
   },
 }));

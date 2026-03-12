@@ -66,8 +66,8 @@ fn expand_path(p: &str) -> PathBuf {
     PathBuf::from(s)
 }
 
-const RESOURCE_DIRS: &[&str] = &["resources", "quickjs-examples"];
-const RESOURCE_EXTENSIONS: &[&str] = &["md", "json", "js", "txt", "yaml", "yml"];
+const RESOURCE_DIRS: &[&str] = &["resources", "lua-examples"];
+const RESOURCE_EXTENSIONS: &[&str] = &["md", "json", "lua", "js", "txt", "yaml", "yml"];
 const MAX_RESOURCE_ENTRIES: usize = 100;
 const MAX_RESOURCE_DEPTH: usize = 3;
 
@@ -183,8 +183,8 @@ fn read_skill_file(path: &Path) -> Result<String, std::io::Error> {
 /// Resolve the bundled officellm skills directory (if bundled sidecar exists).
 ///
 /// Ensures `officellm init` has been run so that `skills/SKILL.md` exists
-/// before checking for the directory.  `ensure_initialized` is idempotent
-/// (returns immediately when `config.json` already exists).
+/// before checking for the directory.  `ensure_initialized` always runs
+/// `officellm init` (the init command itself is idempotent).
 fn bundled_officellm_skills(app: &tauri::AppHandle) -> Option<PathBuf> {
     let (bin, is_bundled) = crate::officellm::resolve::resolve_bin()?;
     if !is_bundled {

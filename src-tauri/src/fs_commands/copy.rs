@@ -68,6 +68,71 @@ pub fn copy_entry(app: tauri::AppHandle, args: CopyEntryArgs) -> Result<(), FsEr
 }
 
 // ---------------------------------------------------------------------------
+// copy_external_file — copy from absolute external path into workspace
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CopyExternalFileArgs {
+    pub workspace_root: String,
+    /// Absolute path to the external file or directory.
+    pub external_path: String,
+    /// Relative path within the workspace for the destination.
+    pub dest_path: String,
+}
+
+/// Core logic, separated from Tauri event emission for testability.
+pub(super) fn copy_external_file_inner(args: &CopyExternalFileArgs) -> Result<String, FsError> {
+    let src = std::path::Path::new(&args.external_path);
+    if !src.exists() {
+        return Err(FsError::NotFound);
+    }
+
+    let dest = ensure_inside_workspace_may_not_exist(&args.workspace_root, &args.dest_path)?;
+    if fs::symlink_metadata(&dest).is_ok() {
+        return Err(FsError::NotAllowed("destination already exists".into()));
+    }
+
+    if let Some(parent) = dest.parent() {
+        if !parent.exists() {
+            fs::create_dir_all(parent).map_err(FsError::from)?;
+        }
+    }
+
+    if src.is_dir() {
+        copy_dir_recursive(src, &dest)?;
+    } else {
+        fs::copy(src, &dest).map_err(FsError::from)?;
+    }
+
+    let root = Path::new(&args.workspace_root)
+        .canonicalize()
+        .map_err(FsError::from)?;
+    let rel = dest
+        .strip_prefix(&root)
+        .map(|p| p.to_string_lossy().replace('\\', "/"))
+        .unwrap_or_else(|_| args.dest_path.clone());
+
+    Ok(rel)
+}
+
+#[tauri::command]
+pub fn copy_external_file(app: tauri::AppHandle, args: CopyExternalFileArgs) -> Result<(), FsError> {
+    let rel = copy_external_file_inner(&args)?;
+
+    use tauri::Emitter;
+    let _ = app.emit(
+        crate::workspace_watcher::EVENT_WORKSPACE_FILE_CHANGED,
+        crate::workspace_watcher::WorkspaceFileChangedPayload {
+            path: rel,
+            kind: crate::workspace_watcher::FileChangeKind::Create,
+        },
+    );
+
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
 // Recursive directory copy helper
 // ---------------------------------------------------------------------------
 

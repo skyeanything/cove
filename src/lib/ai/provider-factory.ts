@@ -74,7 +74,9 @@ export function getModel(provider: Provider, modelId: string): LanguageModel {
         apiKey: "ollama",
         baseURL: `${provider.base_url || "http://localhost:11434"}/v1`,
       });
-      return ollama(modelId);
+      // Use .chat() to force Chat Completions API (/v1/chat/completions).
+      // Default (modelId) uses Responses API (/v1/responses) which Ollama doesn't fully support.
+      return ollama.chat(modelId);
     }
 
     case "tencent-cloud": {
@@ -169,8 +171,30 @@ export function getModel(provider: Provider, modelId: string): LanguageModel {
     }
 
     case "github-copilot":
-    case "github-models":
+    case "github-models": {
+      const gh = createOpenAI({
+        apiKey: provider.api_key || "no-key",
+        baseURL: provider.base_url || undefined,
+      });
+      return gh(modelId);
+    }
+
     case "custom": {
+      const protocol = (config as { protocol?: string }).protocol;
+      if (protocol === "anthropic") {
+        const anthropic = createAnthropic({
+          apiKey: provider.api_key,
+          baseURL: provider.base_url || undefined,
+        });
+        return anthropic(modelId);
+      }
+      if (protocol === "google") {
+        const google = createGoogleGenerativeAI({
+          apiKey: provider.api_key,
+          baseURL: provider.base_url || undefined,
+        });
+        return google(modelId);
+      }
       const custom = createOpenAI({
         apiKey: provider.api_key || "no-key",
         baseURL: provider.base_url || undefined,

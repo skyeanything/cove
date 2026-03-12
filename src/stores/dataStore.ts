@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Assistant, Conversation, Message, Provider, Prompt } from "@/db/types";
+import type { Assistant, Conversation, Provider, Prompt } from "@/db/types";
 import { assistantRepo } from "@/db/repos/assistantRepo";
 import { conversationRepo } from "@/db/repos/conversationRepo";
 import { messageRepo } from "@/db/repos/messageRepo";
@@ -7,6 +7,7 @@ import { providerRepo } from "@/db/repos/providerRepo";
 import { promptRepo } from "@/db/repos/promptRepo";
 import { summaryRepo } from "@/db/repos/summaryRepo";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
+import { useStreamStore } from "@/stores/streamStore";
 
 interface DataState {
   // Data
@@ -14,13 +15,7 @@ interface DataState {
   conversations: Conversation[];
   providers: Provider[];
   prompts: Prompt[];
-  messages: Message[];
   activeConversationId: string | null;
-
-  // Unread tracking (in-memory only, clears on select)
-  unreadIds: Set<string>;
-  markUnread: (id: string) => void;
-  clearUnread: (id: string) => void;
 
   // Loading state
   initialized: boolean;
@@ -32,8 +27,12 @@ interface DataState {
   loadConversations: () => Promise<void>;
   loadProviders: () => Promise<void>;
   loadPrompts: () => Promise<void>;
-  loadMessages: (conversationId: string) => Promise<void>;
   setActiveConversation: (id: string | null) => void;
+
+  // Unread tracking (in-memory only, clears on select)
+  unreadIds: Set<string>;
+  markUnread: (id: string) => void;
+  clearUnread: (id: string) => void;
 
   // Conversation
   updateConversation: (id: string, data: Partial<Conversation>) => Promise<void>;
@@ -52,23 +51,10 @@ export const useDataStore = create<DataState>()((set, get) => ({
   conversations: [],
   providers: [],
   prompts: [],
-  messages: [],
   activeConversationId: null,
-  unreadIds: new Set<string>(),
   initialized: false,
   initError: null,
-
-  markUnread(id) {
-    set((s) => ({ unreadIds: new Set([...s.unreadIds, id]) }));
-  },
-
-  clearUnread(id) {
-    set((s) => {
-      const next = new Set(s.unreadIds);
-      next.delete(id);
-      return { unreadIds: next };
-    });
-  },
+  unreadIds: new Set<string>(),
 
   async init() {
     try {
@@ -108,9 +94,16 @@ export const useDataStore = create<DataState>()((set, get) => ({
     set({ prompts });
   },
 
-  async loadMessages(conversationId: string) {
-    const messages = await messageRepo.getByConversation(conversationId);
-    set({ messages });
+  markUnread(id) {
+    set((s) => ({ unreadIds: new Set([...s.unreadIds, id]) }));
+  },
+
+  clearUnread(id) {
+    set((s) => {
+      const next = new Set(s.unreadIds);
+      next.delete(id);
+      return { unreadIds: next };
+    });
   },
 
   setActiveConversation(id: string | null) {
@@ -118,16 +111,7 @@ export const useDataStore = create<DataState>()((set, get) => ({
       if (id) localStorage.setItem("office_chat_active_conversation_id", id);
       else localStorage.removeItem("office_chat_active_conversation_id");
     }
-    set((s) => {
-      const next = new Set(s.unreadIds);
-      if (id) next.delete(id);
-      return { activeConversationId: id, messages: [], unreadIds: next };
-    });
-    if (id) {
-      get().loadMessages(id);
-      // 切换对话时自动同步对话关联的工作区
-      useWorkspaceStore.getState().loadFromConversation(id);
-    }
+    set({ activeConversationId: id });
   },
 
   async updateConversation(id, data) {
@@ -141,12 +125,14 @@ export const useDataStore = create<DataState>()((set, get) => ({
   },
 
   async deleteConversation(id) {
+    const { abortStream, isConversationStreaming } = useStreamStore.getState();
+    if (isConversationStreaming(id)) abortStream(id);
     await summaryRepo.deleteByConversation(id);
     await messageRepo.deleteByConversation(id);
     await conversationRepo.delete(id);
     if (get().activeConversationId === id) {
       if (typeof localStorage !== "undefined") localStorage.removeItem("office_chat_active_conversation_id");
-      set({ activeConversationId: null, messages: [] });
+      set({ activeConversationId: null });
     }
     await get().loadConversations();
   },

@@ -26,11 +26,9 @@ describe("buildSystemPrompt", () => {
     expect(prompt).toMatch(/\d{4}-\d{2}-\d{2}T/);
   });
 
-  it("includes operational rules (moved from SOUL)", () => {
+  it("includes operational rules (condensed)", () => {
     const prompt = buildSystemPrompt({});
-    expect(prompt).toContain("reading them first");
-    expect(prompt).toContain("user approval");
-    expect(prompt).toContain("present options to the user");
+    expect(prompt).toContain("Use dedicated tools first");
   });
 
   it("injects workspacePath when provided", () => {
@@ -45,7 +43,7 @@ describe("buildSystemPrompt", () => {
 
   it("injects office hint when available", () => {
     const prompt = buildSystemPrompt({ officeAvailable: true });
-    expect(prompt).toContain("office tool is available");
+    expect(prompt).toContain("Office tool available");
   });
 
   it("omits office hint when not available", () => {
@@ -76,19 +74,10 @@ describe("buildSystemPrompt", () => {
     expect(prompt).toContain("SKILL_CONTENT_HERE");
   });
 
-  it("includes skill tool hint", () => {
+  it("includes skill and spawn_agent hints", () => {
     const prompt = buildSystemPrompt({});
-    expect(prompt).toContain("skill tool");
-  });
-
-  it("includes spawn_agent tool hint", () => {
-    const prompt = buildSystemPrompt({});
+    expect(prompt).toContain("skills");
     expect(prompt).toContain("spawn_agent");
-  });
-
-  it("includes tools-first principle", () => {
-    const prompt = buildSystemPrompt({});
-    expect(prompt).toContain("Use dedicated tools over writing code");
   });
 
   it("prepends soulPrompt at the very start when provided", () => {

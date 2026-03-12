@@ -1,6 +1,6 @@
 {
   "name": "office-chat",
-  "version": "1.0.4",
+  "version": "1.0.9",
   "private": true,
   "type": "module",
   "scripts": {
@@ -47,6 +47,7 @@
     "lucide-react": "^0.563.0",
     "papaparse": "^5.5.3",
     "pdfjs-dist": "^5.4.624",
+    "pinyin-match": "^1.2.10",
     "pptx-preview": "^1.0.7",
     "pptx-viewer": "^0.1.0",
     "prism-react-renderer": "^2.4.1",
