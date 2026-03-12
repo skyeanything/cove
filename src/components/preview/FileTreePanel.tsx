@@ -207,6 +207,11 @@ export function FileTreePanel() {
   const handleSelectFile = useCallback((path: string) => {
     setSelected(path);
     setFocusedPath(path);
+  }, [setSelected]);
+
+  const handleDoubleClickFile = useCallback((path: string) => {
+    setSelected(path);
+    setFocusedPath(path);
     if (!useLayoutStore.getState().filePreviewOpen) setFilePreviewOpen(true);
   }, [setSelected, setFilePreviewOpen]);
 
@@ -261,7 +266,7 @@ export function FileTreePanel() {
     focusedPath,
     setFocusedPath,
     onToggleExpand: handleToggleExpand,
-    onSelectFile: handleSelectFile,
+    onSelectFile: handleDoubleClickFile,
     onRename,
     onDelete: dialogs.onDelete,
   });
@@ -422,6 +427,7 @@ export function FileTreePanel() {
                     clipboardMode={clipboard.mode}
                     onToggleExpand={handleToggleExpand}
                     onSelectFile={handleSelectFile}
+                    onDoubleClickFile={handleDoubleClickFile}
                     onLoadChildren={onLoadChildren}
                     onNewFile={dialogs.onNewFile}
                     onNewFolder={dialogs.onNewFolder}
