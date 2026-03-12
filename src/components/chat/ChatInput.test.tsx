@@ -9,6 +9,10 @@ const mockSendMessage = vi.fn();
 const mockStopGeneration = vi.fn();
 const mockAddDraftAttachments = vi.fn();
 const mockRemoveDraftAttachment = vi.fn();
+const mockGetRecentUserHistory = vi.fn().mockResolvedValue([]);
+let mockMessages: unknown[] = [];
+let mockActiveConversationId: string | null = "conv-1";
+let mockIsStreaming = false;
 
 vi.mock("@/stores/chatStore", () => ({
   useChatStore: (sel: (s: Record<string, unknown>) => unknown) => {
@@ -18,12 +22,10 @@ vi.mock("@/stores/chatStore", () => ({
       addDraftAttachments: mockAddDraftAttachments,
       removeDraftAttachment: mockRemoveDraftAttachment,
       draftAttachments: [],
-      isStreaming: false,
       modelId: "gpt-4",
       providerId: "openai",
-      messages: [],
+      messages: mockMessages,
       error: null,
-      isCompressing: false,
     };
     return sel(state);
   },
@@ -31,7 +33,7 @@ vi.mock("@/stores/chatStore", () => ({
 
 vi.mock("@/stores/dataStore", () => ({
   useDataStore: (sel: (s: Record<string, unknown>) => unknown) =>
-    sel({ providers: [{ id: "openai", type: "openai" }] }),
+    sel({ providers: [{ id: "openai", type: "openai" }], activeConversationId: mockActiveConversationId }),
 }));
 
 vi.mock("@/stores/workspaceStore", () => ({
@@ -55,6 +57,9 @@ vi.mock("@/lib/ai/model-service", () => ({
 }));
 vi.mock("@/lib/ai/context-compression", () => ({
   estimateNextTurnTokens: () => 100,
+}));
+vi.mock("@/db/repos/messageRepo", () => ({
+  messageRepo: { getRecentUserHistory: (...args: unknown[]) => mockGetRecentUserHistory(...args) },
 }));
 vi.mock("@tauri-apps/plugin-opener", () => ({
   revealItemInDir: vi.fn(),
@@ -81,6 +86,9 @@ vi.mock("@/lib/clipboard-files", () => ({
 }));
 vi.mock("@/hooks/useAttachFiles", () => ({
   pickAndSaveAttachments: vi.fn(),
+}));
+vi.mock("@/hooks/useChatStreamState", () => ({
+  useChatStreamState: () => ({ isStreaming: mockIsStreaming, isCompressing: false }),
 }));
 vi.mock("react-i18next", () => ({
   useTranslation: () => ({ t: (k: string) => k }),
@@ -130,6 +138,10 @@ vi.mock("./ChatToolbar", () => ({
 beforeEach(() => {
   vi.clearAllMocks();
   mockMentionState = { open: false, query: "", triggerIndex: -1 };
+  mockMessages = [];
+  mockActiveConversationId = "conv-1";
+  mockIsStreaming = false;
+  mockGetRecentUserHistory.mockResolvedValue([]);
 });
 afterEach(cleanup);
 
@@ -166,6 +178,16 @@ describe("ChatInput", () => {
     const textarea = screen.getByRole("textbox");
     fireEvent.keyDown(textarea, { key: "Escape" });
     expect(mockCloseMention).toHaveBeenCalledTimes(1);
+  });
+
+  it("stops streaming on Escape before mention close", () => {
+    mockMentionState = { open: true, query: "ba", triggerIndex: 0 };
+    mockIsStreaming = true;
+    render(<ChatInput />);
+    const textarea = screen.getByRole("textbox");
+    fireEvent.keyDown(textarea, { key: "Escape" });
+    expect(mockStopGeneration).toHaveBeenCalledTimes(1);
+    expect(mockCloseMention).not.toHaveBeenCalled();
   });
 
   it("calls insertMention on Enter when mention is open", () => {
@@ -222,6 +244,42 @@ describe("ChatInput", () => {
     });
   });
 
+  it("stops streaming on global Escape outside the textarea", () => {
+    mockIsStreaming = true;
+    render(<ChatInput />);
+    const button = document.createElement("button");
+    document.body.append(button);
+    button.focus();
+    fireEvent.keyDown(button, { key: "Escape" });
+    expect(mockStopGeneration).toHaveBeenCalledTimes(1);
+    button.remove();
+  });
+
+  it("does not hijack Escape inside other input fields", () => {
+    mockIsStreaming = true;
+    render(<ChatInput />);
+    const input = document.createElement("input");
+    document.body.append(input);
+    input.focus();
+    fireEvent.keyDown(input, { key: "Escape" });
+    expect(mockStopGeneration).not.toHaveBeenCalled();
+    input.remove();
+  });
+
+  it("does not hijack Escape inside dialog content", () => {
+    mockIsStreaming = true;
+    render(<ChatInput />);
+    const dialog = document.createElement("div");
+    dialog.setAttribute("data-slot", "dialog-content");
+    const button = document.createElement("button");
+    dialog.append(button);
+    document.body.append(dialog);
+    button.focus();
+    fireEvent.keyDown(button, { key: "Escape" });
+    expect(mockStopGeneration).not.toHaveBeenCalled();
+    dialog.remove();
+  });
+
   it("does not try native clipboard when paste has normal text", () => {
     render(<ChatInput />);
     const textarea = screen.getByRole("textbox");
@@ -247,5 +305,52 @@ describe("ChatInput", () => {
     await user.type(textarea, "/");
     // Slash command dropdown should appear
     expect(screen.queryByText(/\/skill:/)).toBeTruthy();
+  });
+
+  it("recalls global history and restores the prior draft", async () => {
+    mockGetRecentUserHistory.mockResolvedValue(["latest prompt", "older prompt"]);
+    const user = userEvent.setup();
+    render(<ChatInput />);
+    const textarea = screen.getByRole("textbox") as HTMLTextAreaElement;
+    await vi.waitFor(() => expect(mockGetRecentUserHistory).toHaveBeenCalled());
+
+    await user.type(textarea, "draft text");
+    fireEvent.keyDown(textarea, { key: "ArrowUp" });
+    await vi.waitFor(() => expect(textarea.value).toBe("latest prompt"));
+
+    fireEvent.keyDown(textarea, { key: "ArrowUp" });
+    await vi.waitFor(() => expect(textarea.value).toBe("older prompt"));
+
+    fireEvent.keyDown(textarea, { key: "ArrowDown" });
+    await vi.waitFor(() => expect(textarea.value).toBe("latest prompt"));
+
+    fireEvent.keyDown(textarea, { key: "ArrowDown" });
+    await vi.waitFor(() => expect(textarea.value).toBe("draft text"));
+  });
+
+  it("does not recall history while slash commands are open", async () => {
+    mockGetRecentUserHistory.mockResolvedValue(["latest prompt"]);
+    vi.mocked(await import("@/lib/ai/skills/loader")).listSkills = vi.fn(() => [
+      { name: "officellm", description: "Office", emoji: "📦" },
+    ]) as unknown as typeof import("@/lib/ai/skills/loader").listSkills;
+    const user = userEvent.setup();
+    render(<ChatInput />);
+    const textarea = screen.getByRole("textbox") as HTMLTextAreaElement;
+    await vi.waitFor(() => expect(mockGetRecentUserHistory).toHaveBeenCalled());
+
+    await user.type(textarea, "/");
+    fireEvent.keyDown(textarea, { key: "ArrowUp" });
+    expect(textarea.value).toBe("/");
+  });
+
+  it("reloads global history when the active conversation changes", async () => {
+    mockGetRecentUserHistory.mockResolvedValue([]);
+    const { rerender } = render(<ChatInput />);
+    await vi.waitFor(() => expect(mockGetRecentUserHistory).toHaveBeenCalledTimes(1));
+
+    mockActiveConversationId = "conv-2";
+    rerender(<ChatInput />);
+
+    await vi.waitFor(() => expect(mockGetRecentUserHistory).toHaveBeenCalledTimes(2));
   });
 });

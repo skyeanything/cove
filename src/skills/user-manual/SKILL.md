@@ -15,6 +15,7 @@ Desktop AI chat client. Tauri 2 + React. Local SQLite storage. Multi-provider, m
 - Conversations persist in local SQLite
 - Each conversation tracks model, messages, and attachments
 - Sidebar context menu: rename, delete
+- While a response is streaming, `Esc` stops the current generation
 
 ## Providers
 
@@ -93,6 +94,8 @@ Open with `Cmd+,` or app menu.
 | `Cmd+,` | Open settings |
 | `Cmd+/` | Open model selector |
 | `Cmd+Shift+F` | Search messages |
+| `Esc` | Stop the active response in the main chat window |
+| `ArrowUp` / `ArrowDown` | In chat input, browse recent global user-message history when the caret is at the input boundary |
 
 ## Workspace and File Panel
 

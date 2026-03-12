@@ -11,6 +11,7 @@ import { useDataStore } from "@/stores/dataStore";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useSkillsStore } from "@/stores/skillsStore";
+import { messageRepo } from "@/db/repos/messageRepo";
 import { getModelOption } from "@/lib/ai/model-service";
 import { estimateNextTurnTokens } from "@/lib/ai/context-compression";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
@@ -30,6 +31,12 @@ import {
   nonImageFilesToDraftAttachments,
 } from "@/lib/chat-input-utils";
 import { clipboardFilesToDraftAttachments } from "@/lib/clipboard-files";
+import {
+  GLOBAL_CHAT_HISTORY_LIMIT,
+  canNavigateHistoryBoundary,
+  isEditableTarget,
+  isTargetInTransientOverlay,
+} from "@/lib/chat-input-keyboard";
 import type { SkillMeta } from "@/lib/ai/skills/types";
 
 const IME_COMMIT_GRACE_MS = 150;
@@ -46,6 +53,9 @@ export function ChatInput({
   const [attachError, setAttachError] = useState<string | null>(null);
   const [modelSelectorOpenLocal, setModelSelectorOpenLocal] = useState(false);
   const [mentionActiveIndex, setMentionActiveIndex] = useState(0);
+  const [historyEntries, setHistoryEntries] = useState<string[]>([]);
+  const [historyIndex, setHistoryIndex] = useState<number | null>(null);
+  const [draftBeforeHistory, setDraftBeforeHistory] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const lastCompositionEndRef = useRef<number>(0);
 
@@ -58,6 +68,7 @@ export function ChatInput({
   const modelId = useChatStore((s) => s.modelId);
   const providerId = useChatStore((s) => s.providerId);
   const providers = useDataStore((s) => s.providers);
+  const activeConversationId = useDataStore((s) => s.activeConversationId);
   const modelSelectorOpen = onModelSelectorOpenChange != null ? (modelSelectorOpenProp ?? false) : modelSelectorOpenLocal;
   const setModelSelectorOpen = onModelSelectorOpenChange ?? setModelSelectorOpenLocal;
   const messages = useChatStore((s) => s.messages);
@@ -96,10 +107,28 @@ export function ChatInput({
 
   // Reset active index when items change
   useEffect(() => { setMentionActiveIndex(0); }, [mentionItems.length]);
+  useEffect(() => {
+    let cancelled = false;
+    void messageRepo.getRecentUserHistory(GLOBAL_CHAT_HISTORY_LIMIT)
+      .then((entries) => {
+        if (!cancelled) setHistoryEntries(entries);
+      })
+      .catch(() => {
+        if (!cancelled) setHistoryEntries([]);
+      });
+    return () => { cancelled = true; };
+  }, [activeConversationId, messages]);
+
+  useEffect(() => {
+    setHistoryIndex(null);
+    setDraftBeforeHistory(null);
+  }, [activeConversationId]);
 
   const handleMentionSelect = useCallback((type: "tool" | "skill" | "file", id: string) => {
     const cursorPos = textareaRef.current?.selectionStart ?? message.length;
     const { newMessage, newCursorPos } = insertMention(message, cursorPos, type, id);
+    setHistoryIndex(null);
+    setDraftBeforeHistory(null);
     setMessage(newMessage);
     // Explicitly sync mention detection state after programmatic text change.
     // Without this, the next @ may not trigger the popover because onChange
@@ -148,12 +177,74 @@ export function ChatInput({
 
   useEffect(() => { const el = textareaRef.current; if (!el) return; el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 200) + "px"; }, [message]);
 
+  useEffect(() => {
+    if (!isStreaming) return;
+    const handleWindowKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented || event.isComposing) return;
+      if (isTargetInTransientOverlay(event.target) || isEditableTarget(event.target)) return;
+      event.preventDefault();
+      stopGeneration();
+    };
+    window.addEventListener("keydown", handleWindowKeyDown);
+    return () => window.removeEventListener("keydown", handleWindowKeyDown);
+  }, [isStreaming, stopGeneration]);
+
   const handleAttachFiles = async () => { await pickAndSaveAttachments(addDraftAttachments, setAttachError, activeWorkspace?.path); };
+  const focusTextareaAtEnd = useCallback((value: string) => {
+    requestAnimationFrame(() => {
+      const el = textareaRef.current;
+      if (!el) return;
+      const pos = value.length;
+      el.focus();
+      el.setSelectionRange(pos, pos);
+    });
+  }, []);
+
+  const navigateHistory = useCallback((direction: "up" | "down") => {
+    const textarea = textareaRef.current;
+    if (!textarea) return false;
+
+    const selectionStart = textarea.selectionStart ?? message.length;
+    const selectionEnd = textarea.selectionEnd ?? message.length;
+    if (!canNavigateHistoryBoundary(message, selectionStart, selectionEnd, direction)) return false;
+
+    if (direction === "up") {
+      if (historyEntries.length === 0) return false;
+      const nextIndex = historyIndex === null ? 0 : Math.min(historyIndex + 1, historyEntries.length - 1);
+      const nextEntry = historyEntries[nextIndex];
+      if (!nextEntry) return false;
+      if (historyIndex === null) setDraftBeforeHistory(message);
+      setHistoryIndex(nextIndex);
+      setMessage(nextEntry);
+      focusTextareaAtEnd(nextEntry);
+      return true;
+    }
+
+    if (historyIndex === null) return false;
+    if (historyIndex === 0) {
+      const restoredDraft = draftBeforeHistory ?? "";
+      setHistoryIndex(null);
+      setDraftBeforeHistory(null);
+      setMessage(restoredDraft);
+      focusTextareaAtEnd(restoredDraft);
+      return true;
+    }
+
+    const nextIndex = historyIndex - 1;
+    const nextEntry = historyEntries[nextIndex];
+    if (!nextEntry) return false;
+    setHistoryIndex(nextIndex);
+    setMessage(nextEntry);
+    focusTextareaAtEnd(nextEntry);
+    return true;
+  }, [draftBeforeHistory, focusTextareaAtEnd, historyEntries, historyIndex, message]);
 
   const handleSend = () => {
     if (!canSend) return;
     if (draftAttachments.some((a) => isImageAttachment(a)) && !modelSupportsVision) { setAttachError(t("chat.visionNotSupported")); return; }
     setAttachError(null);
+    setHistoryIndex(null);
+    setDraftBeforeHistory(null);
     setMessage("");
     sendMessage(message.trim());
   };
@@ -191,6 +282,10 @@ export function ChatInput({
 
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
+    if (historyIndex !== null) {
+      setHistoryIndex(null);
+      setDraftBeforeHistory(null);
+    }
     setMessage(val);
     updateMention(val, e.target.selectionStart ?? val.length);
   };
@@ -198,6 +293,11 @@ export function ChatInput({
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.nativeEvent.isComposing) return;
     if (e.key === "Enter" && Date.now() - lastCompositionEndRef.current < IME_COMMIT_GRACE_MS) return;
+    if (e.key === "Escape" && isStreaming) {
+      e.preventDefault();
+      stopGeneration();
+      return;
+    }
 
     // Mention navigation
     if (mentionState.open && mentionItems.length > 0) {
@@ -205,6 +305,11 @@ export function ChatInput({
       if (e.key === "ArrowUp") { e.preventDefault(); setMentionActiveIndex((i) => (i - 1 + mentionItems.length) % mentionItems.length); return; }
       if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); const item = mentionItems[mentionActiveIndex]; if (item) handleMentionSelect(item.type, item.id); return; }
       if (e.key === "Escape") { e.preventDefault(); closeMention(); return; }
+    }
+
+    if (!showSlashCommands && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      if (e.key === "ArrowUp" && navigateHistory("up")) { e.preventDefault(); return; }
+      if (e.key === "ArrowDown" && navigateHistory("down")) { e.preventDefault(); return; }
     }
 
     if (sendMessageShortcut === "enter") {
