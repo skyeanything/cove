@@ -205,7 +205,16 @@ function WorkspaceRootNode({
   // Only fires when selectedPath actually changes (user clicked a file).
   // Skips the initial mount so a previously-selected path doesn't re-expand
   // folders when the workspace panel is opened.
+  //
+  // The cleanup resets the flag on unmount so that React StrictMode's
+  // fake unmount → remount cycle doesn't bypass the skip:
+  //   1st mount  : mounted=false → set true, skip ✅
+  //   fake unmount: cleanup → mounted=false
+  //   real remount: mounted=false → set true, skip ✅
   const autoExpandMountedRef = useRef(false);
+  useEffect(() => {
+    return () => { autoExpandMountedRef.current = false; };
+  }, []);
   useEffect(() => {
     if (!autoExpandMountedRef.current) {
       autoExpandMountedRef.current = true;
