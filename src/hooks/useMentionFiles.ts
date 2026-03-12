@@ -18,36 +18,23 @@ interface WalkFileEntry {
 
 const MAX_RESULTS = 10;
 
-/** File extensions cove can read — used to filter @mention file results. */
-const ALLOWED_EXTS = new Set([
-  // Office documents
-  "docx", "xlsx", "pptx", "pdf", "doc", "xls", "ppt", "odt", "ods", "odp",
-  // Text / markup
-  "md", "txt", "csv", "tsv", "json", "yaml", "yml", "toml", "xml", "ini",
-  "env", "log",
-  // Web
-  "html", "htm", "css", "scss", "sass", "less", "js", "jsx", "mjs", "cjs",
-  "ts", "tsx", "vue", "svelte", "astro",
-  // Systems
-  "c", "cpp", "cc", "cxx", "h", "hpp", "hxx", "rs", "go", "zig",
-  // JVM
-  "java", "kt", "kts", "scala", "groovy", "gradle",
-  // .NET
-  "cs", "fs", "vb",
-  // Scripting
-  "py", "rb", "pl", "pm", "php", "lua", "r",
-  // Shell
-  "sh", "bash", "zsh", "fish", "ps1", "bat", "cmd",
-  // Mobile
-  "swift", "m", "mm", "dart",
-  // Functional
-  "ex", "exs", "erl", "hs", "ml", "mli", "clj", "cljs", "elm", "lisp",
-  // Data / config
-  "sql", "graphql", "proto", "tf", "hcl",
-  // Other
-  "dockerfile", "makefile", "cmake",
-  // Images
-  "png", "jpg", "jpeg", "gif", "svg", "webp", "bmp", "ico",
+/** Binary extensions to exclude from @mention — everything else is allowed. */
+const BINARY_EXTS = new Set([
+  // Compiled / object
+  "exe", "dll", "so", "dylib", "o", "obj", "a", "lib", "class", "pyc", "pyo",
+  "wasm",
+  // Archives
+  "zip", "tar", "gz", "bz2", "xz", "7z", "rar", "tgz", "zst",
+  // Media (non-image binary)
+  "mp3", "mp4", "avi", "mov", "mkv", "flac", "wav", "ogg", "m4a", "wmv",
+  // Fonts
+  "ttf", "otf", "woff", "woff2", "eot",
+  // Database / binary data
+  "db", "sqlite", "sqlite3", "mdb",
+  // Disk images / packages
+  "dmg", "iso", "pkg", "deb", "rpm", "msi", "apk", "ipa",
+  // Other binary
+  "bin", "dat", "pdb", "DS_Store",
 ]);
 
 /** Filename patterns to exclude (temp/lock files). */
@@ -60,12 +47,9 @@ function isMentionable(name: string, isDir: boolean): boolean {
   if (isDir) return true;
   if (EXCLUDED_PATTERNS.some((p) => p.test(name))) return false;
   const dot = name.lastIndexOf(".");
-  if (dot === -1) {
-    // No extension — allow common extensionless files
-    const lower = name.toLowerCase();
-    return ALLOWED_EXTS.has(lower); // dockerfile, makefile, etc.
-  }
-  return ALLOWED_EXTS.has(name.slice(dot + 1).toLowerCase());
+  if (dot === -1) return true; // Extensionless files (LICENSE, Makefile, etc.) are readable
+  const ext = name.slice(dot + 1).toLowerCase();
+  return !BINARY_EXTS.has(ext);
 }
 
 /** Extract parent directory from a relative path. */
