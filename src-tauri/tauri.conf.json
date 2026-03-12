@@ -7,7 +7,7 @@
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",
     "beforeDevCommand": "pnpm dev",
-    "beforeBuildCommand": "pnpm office-pull && pnpm poppler-pull && pnpm build"
+    "beforeBuildCommand": "pnpm lua-build && pnpm office-pull && pnpm poppler-pull && pnpm build"
   },
   "app": {
     "windows": [
@@ -53,7 +53,8 @@
     "externalBin": [
       "binaries/officellm",
       "binaries/pdftoppm",
-      "binaries/pdftotext"
+      "binaries/pdftotext",
+      "binaries/lua"
     ],
     "macOS": {
       "entitlements": "entitlements.plist"

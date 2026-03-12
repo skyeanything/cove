@@ -4,7 +4,7 @@ fn main() {
 
     let _ = std::fs::create_dir_all("binaries");
     let ext = if target.contains("windows") { ".exe" } else { "" };
-    for name in ["officellm", "pdftoppm", "pdftotext"] {
+    for name in ["officellm", "pdftoppm", "pdftotext", "lua"] {
         let path = std::path::PathBuf::from(format!("binaries/{name}-{target}{ext}"));
         if !path.exists() {
             let _ = std::fs::write(&path, []);
