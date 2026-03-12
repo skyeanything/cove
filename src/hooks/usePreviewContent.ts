@@ -15,19 +15,14 @@ function isAbsolutePath(p: string): boolean {
   return p.startsWith("/");
 }
 
-function splitAbsolutePath(path: string): { workspaceRoot: string; path: string } {
-  const idx = path.lastIndexOf("/");
-  return { workspaceRoot: path.substring(0, idx) || "/", path: path.substring(idx + 1) };
-}
-
 async function loadAbsoluteAsText(path: string): Promise<string> {
-  const args = splitAbsolutePath(path);
-  return invoke<string>("read_file_raw", { args });
+  return invoke<string>("read_absolute_file", { args: { path } });
 }
 
 async function loadAbsoluteAsDataUrl(path: string): Promise<string> {
-  const args = splitAbsolutePath(path);
-  const result = await invoke<{ dataUrl: string }>("read_file_as_data_url", { args });
+  const result = await invoke<{ dataUrl: string }>("read_absolute_file_as_data_url", {
+    args: { path },
+  });
   return result.dataUrl;
 }
 
