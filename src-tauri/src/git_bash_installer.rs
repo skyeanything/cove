@@ -1,15 +1,20 @@
 //! Windows Git Bash detection and PortableGit auto-installation.
 //!
-//! On non-Windows platforms all public functions are no-ops that return None/Err.
+//! On non-Windows platforms only the status command is exposed.
 
+#[cfg(windows)]
 use std::path::{Path, PathBuf};
 
+#[cfg(windows)]
 const MANIFEST_URL: &str =
     "https://raw.githubusercontent.com/cove-founders/cove/main/tools/git-windows-manifest.json";
+#[cfg(windows)]
 const FALLBACK_X64_URL: &str = "https://cdn.npmmirror.com/binaries/git-for-windows/v2.53.0.windows.1/PortableGit-2.53.0-64-bit.7z.exe";
+#[cfg(windows)]
 const FALLBACK_ARM64_URL: &str = "https://cdn.npmmirror.com/binaries/git-for-windows/v2.53.0.windows.1/PortableGit-2.53.0-arm64.7z.exe";
 
 /// Path to the app-managed Git installation root.
+#[cfg(windows)]
 pub fn managed_git_root() -> PathBuf {
     dirs::home_dir()
         .unwrap_or_else(|| PathBuf::from("."))
@@ -20,6 +25,7 @@ pub fn managed_git_root() -> PathBuf {
 
 /// Return paths to inject into PATH for a given bash.exe.
 /// Derives git root from bash.exe location (`bash.exe` → `bin/` → `git_root/`).
+#[cfg(windows)]
 pub fn git_bash_extra_paths(bash_exe: &Path) -> Vec<PathBuf> {
     let git_root = bash_exe
         .parent()           // bin/
@@ -40,47 +46,35 @@ use std::sync::Mutex;
 static INSTALL_MUTEX: Mutex<()> = Mutex::new(());
 
 /// Locate an existing bash.exe by probing multiple sources.
+#[cfg(windows)]
 pub fn find_git_bash() -> Option<PathBuf> {
-    #[cfg(windows)]
-    {
-        try_registry()
-            .or_else(try_common_paths)
-            .or_else(try_from_git_location)
-            .or_else(|| {
-                let p = managed_git_root().join("bin").join("bash.exe");
-                p.exists().then_some(p)
-            })
-    }
-    #[cfg(not(windows))]
-    {
-        None
-    }
+    try_registry()
+        .or_else(try_common_paths)
+        .or_else(try_from_git_location)
+        .or_else(|| {
+            let p = managed_git_root().join("bin").join("bash.exe");
+            p.exists().then_some(p)
+        })
 }
 
 /// Find Git Bash; if missing, attempt PortableGit auto-install first.
+#[cfg(windows)]
 pub fn ensure_git_bash() -> Result<PathBuf, String> {
-    #[cfg(windows)]
-    {
-        if let Some(p) = find_git_bash() {
-            return Ok(p);
-        }
-        // Serialise concurrent callers (startup thread + bash tool race).
-        let _guard = INSTALL_MUTEX.lock().map_err(|e| e.to_string())?;
-        // Double-check after acquiring the lock.
-        if let Some(p) = find_git_bash() {
-            return Ok(p);
-        }
-        install_git_bash()?;
-        find_git_bash().ok_or_else(|| {
-            "Git Bash 安装后仍无法找到 bash.exe。\
-             请手动安装 Git for Windows：https://git-scm.com/download/win"
-                .to_string()
-        })
+    if let Some(p) = find_git_bash() {
+        return Ok(p);
     }
-    #[cfg(not(windows))]
-    {
-        Err("Git Bash 仅适用于 Windows 平台。".to_string())
+    // Serialise concurrent callers (startup thread + bash tool race).
+    let _guard = INSTALL_MUTEX.lock().map_err(|e| e.to_string())?;
+    // Double-check after acquiring the lock.
+    if let Some(p) = find_git_bash() {
+        return Ok(p);
     }
+    install_git_bash()?;
+    find_git_bash().ok_or_else(|| {
+        "Git Bash 安装后仍无法找到 bash.exe。\
+         请手动安装 Git for Windows：https://git-scm.com/download/win"
+            .to_string()
+    })
 }
 
 // ── Registry probe ────────────────────────────────────────────────────────────
