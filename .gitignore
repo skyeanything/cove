@@ -2,6 +2,7 @@ node_modules/
 .pnpm-store/
 dist/
 src-tauri/target/
+src-tauri/crates/*/target/
 src-tauri/gen/
 *.log
 *.tsbuildinfo
@@ -12,5 +13,6 @@ src-tauri/binaries/.officellm-version
 src-tauri/binaries/pdftoppm-*
 src-tauri/binaries/pdftotext-*
 src-tauri/binaries/.poppler-version
+src-tauri/binaries/lua-*
 coverage/
 .claude/

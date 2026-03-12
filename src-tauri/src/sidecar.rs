@@ -1,6 +1,6 @@
 //! Generic sidecar binary resolution.
 //!
-//! All bundled CLI tools (officellm, pdftoppm, pdftotext, quarto) live next
+//! All bundled CLI tools (officellm, pdftoppm, pdftotext, quarto, lua) live next
 //! to the main executable. This module provides helpers to locate them and to
 //! build a PATH that includes the sidecar directory.
 

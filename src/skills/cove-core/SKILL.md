@@ -8,39 +8,21 @@ always: true
 ## Tool priority
 
 1. Dedicated tool first (read, write, edit, fetch_url, office, etc.)
-2. `cove_interpreter` for computation, data processing, multi-step logic
-3. `bash` for system interaction (git, npm, shell, network)
+2. `bash` for anything a single shell command handles well — file listing, searching, counting, git, npm, system interaction
+3. `cove_interpreter` for multi-step computation, data transformation, JSON manipulation, or logic that would need multiple piped commands in bash
 
-Do NOT wrap a single operation in cove_interpreter when a dedicated tool can do it.
+Prefer the shorter tool call. If bash one-liner does the job, use bash — do NOT rewrite it as Lua.
 Do NOT use bash for JSON parsing or math — use cove_interpreter.
 
-## cove_interpreter (Lua 5.4)
+### cove_interpreter quick ref
 
-### Output
-Use `print()` for output (not console.log). Multiple args are tab-separated.
+Lua 5.4, sandboxed, workspace-scoped. Use `print()` for output. `json.encode/decode` built-in.
+Workspace APIs: `workspace.readFile/writeFile/listDir/exists/stat/glob/...` (full list in resource).
+No `require`, no `os.execute`, no network. Memory 64MB, timeout 30s.
 
-### JSON
-`json.encode(table)` and `json.decode(string)` are available (Rust-backed, not a Lua library).
+For full API reference, load resource: `cove-core: resources/lua-reference.md`
 
-### Workspace APIs
-`workspace.readFile(path)`, `writeFile(path, content)`, `appendFile(path, content)`, `listDir(path)`, `exists(path)`, `stat(path)`, `copyFile(src, dst)`, `moveFile(src, dst)`, `remove(path)`, `createDir(path)`, `glob(pattern)`, `officellm(cmd, args)`.
+### cove_interpreter vs bash lua
 
-### File execution
-Pass `file: "path/to/script.lua"` instead of `code` to execute a .lua file from the workspace.
-
-### Sandboxed
-Safe subsets of `io` and `os` are available (workspace-scoped).
-`io.open`, `io.lines`, `io.read`, `io.write` operate within workspace only.
-`os.time()`, `os.clock()`, `os.date()`, `os.tmpname()`, `os.remove()`, `os.rename()` available.
-`os.execute`, `io.popen`, `require`, `debug`, `dofile`, `loadfile` are blocked.
-No network access. Memory 64MB, timeout 30s (max 60s). Workspace scope only.
-
-### Available globals
-`print`, `json`, `workspace`, `io`, `os`, `string`, `table`, `math`, `tonumber`, `tostring`, `type`, `pairs`, `ipairs`, `select`, `pcall`, `xpcall`, `error`, `assert`.
-
-## Before acting
-
-- Read files before editing/overwriting
-- Verify workspace is set before file operations
-- Destructive operations require user confirmation
-- Ambiguous intent: present options, don't guess
+- **cove_interpreter** — sandboxed, workspace-scoped. Default choice for computation and data processing.
+- **bash `lua`** — unsandboxed, bundled sidecar binary (Lua 5.4). Available as `lua` in bash (on PATH). Use `lua -e "..."` for one-liners or `lua script.lua` for files. Only when script needs `require`, `os.execute`, or runs outside workspace.

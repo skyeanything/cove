@@ -12,6 +12,7 @@ vi.mock("prismjs/components/prism-jsx", () => ({}));
 vi.mock("prismjs/components/prism-tsx", () => ({}));
 vi.mock("prismjs/components/prism-css", () => ({}));
 vi.mock("prismjs/components/prism-python", () => ({}));
+vi.mock("prismjs/components/prism-lua", () => ({}));
 vi.mock("prismjs/components/prism-yaml", () => ({}));
 vi.mock("prismjs/components/prism-markdown", () => ({}));
 vi.mock("beautiful-mermaid", () => ({

@@ -18,6 +18,40 @@ interface WalkFileEntry {
 
 const MAX_RESULTS = 10;
 
+/** Binary extensions to exclude from @mention — everything else is allowed. */
+const BINARY_EXTS = new Set([
+  // Compiled / object
+  "exe", "dll", "so", "dylib", "o", "obj", "a", "lib", "class", "pyc", "pyo",
+  "wasm",
+  // Archives
+  "zip", "tar", "gz", "bz2", "xz", "7z", "rar", "tgz", "zst",
+  // Media (non-image binary)
+  "mp3", "mp4", "avi", "mov", "mkv", "flac", "wav", "ogg", "m4a", "wmv",
+  // Fonts
+  "ttf", "otf", "woff", "woff2", "eot",
+  // Database / binary data
+  "db", "sqlite", "sqlite3", "mdb",
+  // Disk images / packages
+  "dmg", "iso", "pkg", "deb", "rpm", "msi", "apk", "ipa",
+  // Other binary
+  "bin", "dat", "pdb", "DS_Store",
+]);
+
+/** Filename patterns to exclude (temp/lock files). */
+const EXCLUDED_PATTERNS = [
+  /^~\$/, // Word/Excel lock files
+  /\.tmp$/i,
+];
+
+function isMentionable(name: string, isDir: boolean): boolean {
+  if (isDir) return true;
+  if (EXCLUDED_PATTERNS.some((p) => p.test(name))) return false;
+  const dot = name.lastIndexOf(".");
+  if (dot === -1) return true; // Extensionless files (LICENSE, Makefile, etc.) are readable
+  const ext = name.slice(dot + 1).toLowerCase();
+  return !BINARY_EXTS.has(ext);
+}
+
 /** Extract parent directory from a relative path. */
 function extractParentDir(path: string): string {
   const lastSlash = path.lastIndexOf("/");
@@ -27,8 +61,7 @@ function extractParentDir(path: string): string {
 
 /**
  * Lists workspace files (recursively) for @mention autocomplete.
- * Uses walk_files for subdirectory traversal and pinyin matching
- * for Chinese filename search.
+ * Filters to cove-readable file types and excludes temp/lock files.
  */
 export function useMentionFiles(
   workspacePath: string | null,
@@ -67,12 +100,14 @@ export function useMentionFiles(
         });
         if (cancelled) return;
 
-        const items: MentionFileEntry[] = raw.map((e) => ({
-          name: e.name,
-          path: e.path,
-          isDir: e.isDir,
-          parentDir: extractParentDir(e.path),
-        }));
+        const items: MentionFileEntry[] = raw
+          .filter((e) => isMentionable(e.name, e.isDir))
+          .map((e) => ({
+            name: e.name,
+            path: e.path,
+            isDir: e.isDir,
+            parentDir: extractParentDir(e.path),
+          }));
         cacheRef.current = { path: workspacePath, items };
         applyFilter(items);
       } catch {

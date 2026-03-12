@@ -17,6 +17,16 @@ description: Git Worktree 并行开发流程 - 同时进行多个 Issue 开发
     └── fix-63-attachment-bug/           # 修复 #63 的 worktree
 ```
 
+## 前置检查（Hard Constraint）
+
+创建 Issue 前 MUST 先搜索是否已有相同或相似的 Issue，避免重复创建：
+
+```bash
+gh issue list -S "<关键词>" --state all
+```
+
+确认无重复后再创建新 Issue。
+
 ## 🚀 开始新 Issue 开发 (推荐)
 
 使用 `scripts/start-worktree.sh` 脚本可以自动完成分支规范化、目录创建和 worktree 初始化。

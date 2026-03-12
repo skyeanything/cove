@@ -1,0 +1,12 @@
+[package]
+name = "cove-lua"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.77.2"
+
+[[bin]]
+name = "lua"
+path = "src/main.rs"
+
+[dependencies]
+mlua = { version = "0.10", features = ["lua54", "vendored"] }
