@@ -17,6 +17,7 @@
     "sql:default",
     "sql:allow-execute",
     "dialog:default",
-    "opener:default"
+    "opener:default",
+    "opener:allow-open-path"
   ]
 }
