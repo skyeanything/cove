@@ -18,6 +18,23 @@ interface WalkFileEntry {
 
 const MAX_RESULTS = 10;
 
+/** Extensions commonly gitignored but cove can read (no leading dot, lowercase). */
+const FORCE_INCLUDE_EXTS = [
+  "docx", "xlsx", "pptx", "pdf",
+  "doc", "xls", "ppt",
+  "odt", "ods", "odp",
+];
+
+/** Filename patterns to exclude from @mention results (temp/lock files). */
+const EXCLUDED_PATTERNS = [
+  /^~\$/, // Word/Excel lock files
+  /\.tmp$/i,
+];
+
+function isExcluded(name: string): boolean {
+  return EXCLUDED_PATTERNS.some((p) => p.test(name));
+}
+
 /** Extract parent directory from a relative path. */
 function extractParentDir(path: string): string {
   const lastSlash = path.lastIndexOf("/");
@@ -63,16 +80,22 @@ export function useMentionFiles(
 
       try {
         const raw = await invoke<WalkFileEntry[]>("walk_files", {
-          args: { workspaceRoot: workspacePath, includeDirs: true },
+          args: {
+            workspaceRoot: workspacePath,
+            includeDirs: true,
+            forceIncludeExts: FORCE_INCLUDE_EXTS,
+          },
         });
         if (cancelled) return;
 
-        const items: MentionFileEntry[] = raw.map((e) => ({
-          name: e.name,
-          path: e.path,
-          isDir: e.isDir,
-          parentDir: extractParentDir(e.path),
-        }));
+        const items: MentionFileEntry[] = raw
+          .filter((e) => e.isDir || !isExcluded(e.name))
+          .map((e) => ({
+            name: e.name,
+            path: e.path,
+            isDir: e.isDir,
+            parentDir: extractParentDir(e.path),
+          }));
         cacheRef.current = { path: workspacePath, items };
         applyFilter(items);
       } catch {
