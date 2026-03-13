@@ -26,6 +26,10 @@ vi.mock("dompurify", () => ({
   },
 }));
 
+vi.mock("@tauri-apps/api/core", () => ({
+  invoke: vi.fn(),
+}));
+
 afterEach(cleanup);
 
 const SAMPLE_HTML = "<h1>Hello</h1><p>World</p>";

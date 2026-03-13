@@ -1,12 +1,12 @@
 import "katex/dist/katex.min.css";
-import React, { useEffect, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
 import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import type { Components } from "react-markdown";
-import { convertFileSrc } from "@tauri-apps/api/core";
+import { invoke } from "@tauri-apps/api/core";
 import { CodeBlock, reactNodeToDisplayString } from "./CodeBlock";
 import { detectPreviewableFilePath } from "@/lib/detect-file-path";
 import { resolveFilePathsFromContext } from "@/lib/resolve-file-paths";
@@ -28,12 +28,29 @@ function normalizePath(path: string): string {
   return (path.startsWith("/") ? "/" : "") + normalized.join("/");
 }
 
-function resolveImageSrc(src: string, basePath?: string): string {
-  if (/^(https?:\/\/|data:|#)/.test(src)) return src;
-  if (basePath === undefined) return src;
-  if (src.startsWith("/")) return convertFileSrc(src);
+function resolveAbsolutePath(src: string, basePath: string): string {
+  if (src.startsWith("/")) return src;
   const joined = basePath === "" ? src : basePath + "/" + src;
-  return convertFileSrc(normalizePath(joined));
+  return normalizePath(joined);
+}
+
+function LocalImage({ src, alt, basePath }: { src: string; alt: string; basePath?: string }) {
+  const [dataUrl, setDataUrl] = useState<string | null>(null);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    if (!src || basePath === undefined) return;
+    const absPath = resolveAbsolutePath(src, basePath);
+    invoke<{ dataUrl: string }>("read_absolute_file_as_data_url", {
+      args: { path: absPath },
+    })
+      .then((r) => setDataUrl(r.dataUrl))
+      .catch(() => setError(true));
+  }, [src, basePath]);
+
+  if (error) return <span title={src}>[image: {src}]</span>;
+  if (!dataUrl) return null;
+  return <img src={dataUrl} alt={alt} className="max-w-full rounded" loading="lazy" />;
 }
 
 /**
@@ -106,7 +123,13 @@ function createMarkdownComponents(basePath?: string): Components {
     },
     img: ({ src, alt }) => {
       if (!src) return null;
-      return <img src={resolveImageSrc(src, basePath)} alt={alt ?? ""} className="max-w-full rounded" loading="lazy" />;
+      if (/^(https?:\/\/|data:|#)/.test(src)) {
+        return <img src={src} alt={alt ?? ""} className="max-w-full rounded" loading="lazy" />;
+      }
+      if (basePath === undefined) {
+        return <img src={src} alt={alt ?? ""} className="max-w-full rounded" loading="lazy" />;
+      }
+      return <LocalImage src={src} alt={alt ?? ""} basePath={basePath} />;
     },
     a: ({ href, children }) => (
       <a

@@ -25,7 +25,6 @@ vi.mock("@/components/common/FilePathChip", () => ({
 }));
 
 vi.mock("@tauri-apps/api/core", () => ({
-  convertFileSrc: (path: string) => `asset://localhost/${path.replace(/^\//, "")}`,
   invoke: vi.fn(),
 }));
 

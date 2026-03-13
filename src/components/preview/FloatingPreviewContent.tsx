@@ -79,7 +79,7 @@ export function FloatingPreviewContent({
   }
 
   if (kind === "html" && cached?.type === "text" && cached.text !== undefined) {
-    return <HtmlViewer code={cached.text} path={path} />;
+    return <HtmlViewer code={cached.text} path={path} basePath={computeMarkdownBasePath(path, workspaceRoot)} />;
   }
 
   if (kind === "md" && cached?.type === "text" && cached.text !== undefined) {

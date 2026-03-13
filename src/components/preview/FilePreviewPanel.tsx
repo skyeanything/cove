@@ -124,7 +124,7 @@ export function FilePreviewPanel() {
     return (
       <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-background">
         <PreviewFileHeader path={selectedPath} {...headerProps} />
-        <HtmlViewer code={cached.text} path={selectedPath} />
+        <HtmlViewer code={cached.text} path={selectedPath} basePath={computeMarkdownBasePath(selectedPath, workspaceRoot)} />
       </div>
     );
   }
