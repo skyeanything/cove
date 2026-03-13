@@ -20,7 +20,7 @@ pub struct CommandErrorDetail {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CommandResult {
-    /// "success" | "error"
+    /// "success" | "error" | "failure" | "partial"
     pub status: String,
     /// 结构化状态码（例如 NO_MATCH、COMMAND_NOT_FOUND）
     #[serde(default)]
@@ -51,7 +51,8 @@ impl CommandResult {
         if self.error.is_none() {
             self.error = self
                 .message
-                .clone()
+                .as_ref()
+                .cloned()
                 .or_else(|| self.errors.iter().find_map(|e| e.message.clone()));
         }
         self

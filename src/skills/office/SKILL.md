@@ -60,7 +60,7 @@ office(command: "close")
 
 ## Multi-step workflows
 
-Use the `cove_interpreter` bridge when you need multiple operations on the same active document:
+Use the built-in `cove_interpreter` officellm bridge when you need multiple operations on the same active document:
 
 ```lua
 local doc = officellm.open("report.docx")

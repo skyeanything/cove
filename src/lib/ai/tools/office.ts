@@ -108,6 +108,7 @@ const WRAPPER_COMMANDS: Record<string, WrapperCommandSpec> = {
   },
 };
 
+// These wrapper/discovery commands bypass Lua so they can work without an active workspace.
 const NO_WORKSPACE_COMMANDS = new Set(["help", "detect", "doctor", "list-commands", "get-command-schema"]);
 
 const COMMAND_NAME_MAPPINGS = [
