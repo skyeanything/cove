@@ -90,7 +90,7 @@ function buildPayload(
 
 export const parseDocumentTool = tool({
   description:
-    "Parse document text content. Accepts attachmentId (for chat attachments) or filePath (workspace-relative path for DOCX/XLSX/PPTX/PDF files). Provide exactly one.",
+    "Parse document text content. Primary use: parse chat attachments via attachmentId. For workspace files (DOCX/XLSX/PPTX/PDF), prefer the read tool -- it extracts the same text directly. Only use filePath here when you need chunked/summary mode or PDF pageRange.",
   inputSchema: z.object({
     attachmentId: z.string().optional().describe("Attachment ID from user message"),
     filePath: z.string().optional().describe("Workspace-relative path to an office file"),

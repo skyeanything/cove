@@ -56,7 +56,7 @@ function handleFsError(err: unknown, filePath: string): string {
 
 export const readTool = tool({
   description:
-    "Read the contents of a file in the current workspace. Supports text files and Office documents (DOCX/XLSX/PPTX/PDF). Path is relative to workspace root. Returns line-numbered text. Use offset/limit for large text files.",
+    "Read the contents of a file in the current workspace. Natively extracts text from Office documents (DOCX/XLSX/PPTX/PDF) -- no need for parse_document or office tool. Path is relative to workspace root. Returns line-numbered text. Use offset/limit for large text files.",
   inputSchema: z.object({
     filePath: z.string().describe("Relative path to the file from workspace root"),
     offset: z.number().optional().describe("Skip this many lines (0-based, text files only)"),

@@ -77,6 +77,10 @@ doc.close()
 - Always `close` when the workflow is done
 - Do not use `bash` to run `officellm`; bundled office must go through the `office` tool
 
+## Simple tasks: skip this skill
+
+For simple read/write/merge tasks, the `read` and `write` tools handle DOCX directly without loading this skill. Only load this skill when you need advanced operations (formatting, find-replace, slide manipulation, spreadsheet formulas).
+
 ## Resources
 
 - `resources/command-discovery.md` — exact discovery workflow for bundled office
