@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Code, Eye, X } from "lucide-react";
-import { MarkdownContent } from "@/components/chat/MarkdownContent";
+import { MarkdownContent, computeMarkdownBasePath } from "@/components/chat/MarkdownContent";
 import { CodeViewer } from "@/components/preview/CodeViewer";
 import { CsvViewer } from "@/components/preview/CsvViewer";
 import { HtmlViewer } from "@/components/preview/HtmlViewer";
@@ -179,7 +179,7 @@ export function FilePreviewPanel() {
         </div>
         <ScrollArea className="min-h-0 flex-1 p-1.5">
           {mdViewMode === "preview" ? (
-            <MarkdownContent source={cached.text} className="text-[14px]" basePath={selectedPath.substring(0, selectedPath.lastIndexOf("/"))} />
+            <MarkdownContent source={cached.text} className="text-[14px]" basePath={computeMarkdownBasePath(selectedPath, workspaceRoot)} />
           ) : (
             <CodeViewer path={selectedPath} code={cached.text} className="file-preview-code" />
           )}

@@ -30,9 +30,25 @@ function normalizePath(path: string): string {
 
 function resolveImageSrc(src: string, basePath?: string): string {
   if (/^(https?:\/\/|data:|#)/.test(src)) return src;
-  if (!basePath) return src;
+  if (basePath === undefined) return src;
   if (src.startsWith("/")) return convertFileSrc(src);
-  return convertFileSrc(normalizePath(basePath + "/" + src));
+  const joined = basePath === "" ? src : basePath + "/" + src;
+  return convertFileSrc(normalizePath(joined));
+}
+
+/**
+ * Compute the absolute base directory for resolving relative image paths in a
+ * markdown file. Returns `undefined` when resolution is not possible (no
+ * workspace root for a relative path).
+ */
+export function computeMarkdownBasePath(
+  filePath: string,
+  workspaceRoot: string | null,
+): string | undefined {
+  const dir = filePath.substring(0, filePath.lastIndexOf("/"));
+  if (filePath.startsWith("/")) return dir;
+  if (!workspaceRoot) return undefined;
+  return dir ? workspaceRoot + "/" + dir : workspaceRoot;
 }
 
 function createMarkdownComponents(basePath?: string): Components {

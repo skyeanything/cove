@@ -48,6 +48,12 @@ vi.mock("@/components/chat/MarkdownContent", () => ({
   MarkdownContent: ({ source }: { source: string }) => (
     <div data-testid="markdown-content">{source}</div>
   ),
+  computeMarkdownBasePath: (filePath: string, workspaceRoot: string | null) => {
+    const dir = filePath.substring(0, filePath.lastIndexOf("/"));
+    if (filePath.startsWith("/")) return dir;
+    if (!workspaceRoot) return undefined;
+    return dir ? workspaceRoot + "/" + dir : workspaceRoot;
+  },
 }));
 
 vi.mock("@/components/preview/PdfViewer", () => ({

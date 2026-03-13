@@ -24,7 +24,12 @@ vi.mock("@/components/common/FilePathChip", () => ({
   FilePathChip: ({ path }: { path: string }) => <span>{path}</span>,
 }));
 
-import { MarkdownContent } from "./MarkdownContent";
+vi.mock("@tauri-apps/api/core", () => ({
+  convertFileSrc: (path: string) => `asset://localhost/${path.replace(/^\//, "")}`,
+  invoke: vi.fn(),
+}));
+
+import { MarkdownContent, computeMarkdownBasePath } from "./MarkdownContent";
 
 const LONG_URL = "https://example.com/" + "a".repeat(400);
 
@@ -67,5 +72,31 @@ describe("MarkdownContent overflow prevention", () => {
   it("returns null for empty/whitespace source", () => {
     const { container } = render(<MarkdownContent source="   " />);
     expect(container.querySelector("[data-md]")).toBeNull();
+  });
+});
+
+describe("computeMarkdownBasePath", () => {
+  it("returns directory for absolute path", () => {
+    expect(computeMarkdownBasePath("/Users/me/docs/README.md", null)).toBe("/Users/me/docs");
+  });
+
+  it("returns directory for absolute path ignoring workspaceRoot", () => {
+    expect(computeMarkdownBasePath("/Users/me/docs/guide.md", "/workspace")).toBe("/Users/me/docs");
+  });
+
+  it("returns workspaceRoot for root-level relative path (README.md)", () => {
+    expect(computeMarkdownBasePath("README.md", "/workspace")).toBe("/workspace");
+  });
+
+  it("returns workspaceRoot + dir for nested relative path", () => {
+    expect(computeMarkdownBasePath("docs/guide.md", "/workspace")).toBe("/workspace/docs");
+  });
+
+  it("returns undefined when relative path and no workspaceRoot", () => {
+    expect(computeMarkdownBasePath("docs/guide.md", null)).toBeUndefined();
+  });
+
+  it("handles deeply nested relative path", () => {
+    expect(computeMarkdownBasePath("a/b/c/file.md", "/ws")).toBe("/ws/a/b/c");
   });
 });
