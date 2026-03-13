@@ -33,8 +33,8 @@ All tools are available by default. Category determines gating.
 
 | Tool | Description |
 |------|-------------|
-| Read File | Read file contents from the workspace |
-| Write File | Create or overwrite a file |
+| Read File | Read file contents from the workspace. Natively extracts text from Office documents (DOCX/XLSX/PPTX/PDF) |
+| Write File | Create or overwrite a file. For .docx paths, automatically creates DOCX from markdown |
 | Edit File | Apply targeted edits to an existing file |
 | Shell Command | Execute a shell command |
 | Fetch URL | Fetch content from a URL as text |
@@ -112,4 +112,4 @@ Three methods to attach files:
 2. Drag and drop from Finder
 3. Toolbar attachment button
 
-Supported: images (PNG, JPG, GIF, WebP), PDF, text files, office documents (via Office tool).
+Supported: images (PNG, JPG, GIF, WebP), PDF, text files, office documents (read/write handle DOCX directly; Office tool for advanced operations).

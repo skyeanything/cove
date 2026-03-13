@@ -26,6 +26,8 @@ Common shortcuts:
 - Convert markdown to DOCX: `write` with .docx path (1 call)
 - Extract text from DOCX: `read` the file (1 call)
 
+For PDF page-range reads (e.g. "pages 5-10"), use `parse_document` with `filePath` + `pageRange` -- `read` does not support page ranges.
+
 Only load OfficeLLM skill for advanced operations: formatting, find-replace, slide manipulation, spreadsheet formulas.
 
 ### cove_interpreter quick ref
