@@ -14,7 +14,12 @@ import {
 import { ShieldCheck } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { useDataStore } from "@/stores/dataStore";
+import { useLayoutStore } from "@/stores/layoutStore";
 import { usePermissionStore } from "@/stores/permissionStore";
+
+// The header already has 24px of left offset (px-3 + ml-3). Add 184px more
+// when the sidebar is hidden so the title starts to the right of WindowControls.
+const HIDDEN_SIDEBAR_TITLE_PADDING_LEFT = 184;
 
 function TrustModeToggle({ conversationId }: { conversationId: string }) {
   const { t } = useTranslation();
@@ -87,6 +92,7 @@ function TrustModeToggle({ conversationId }: { conversationId: string }) {
 
 export function ChatHeader() {
   const { t } = useTranslation();
+  const leftSidebarOpen = useLayoutStore((s) => s.leftSidebarOpen);
   const activeConversationId = useDataStore((s) => s.activeConversationId);
   const conversations = useDataStore((s) => s.conversations);
   const activeConversation = activeConversationId
@@ -100,7 +106,8 @@ export function ChatHeader() {
         className="no-select flex h-8 items-center px-3"
       >
         <div
-          className="ml-3 flex min-w-0 max-w-[50%] items-center"
+          className="ml-3 flex min-w-0 max-w-[50%] items-center transition-[padding] duration-300 ease-out"
+          style={{ paddingLeft: leftSidebarOpen ? 0 : HIDDEN_SIDEBAR_TITLE_PADDING_LEFT }}
         >
           <span className="truncate text-[13px] font-semibold text-foreground">
             {title}

@@ -235,6 +235,31 @@ describe("messageRepo", () => {
     });
   });
 
+  describe("getRecentUserHistory", () => {
+    it("returns trimmed global user history with custom limit", async () => {
+      db.select.mockResolvedValueOnce([
+        { content: " latest " },
+        { content: "older" },
+      ]);
+
+      const result = await messageRepo.getRecentUserHistory(15);
+
+      expect(db.select).toHaveBeenCalledWith(
+        expect.stringContaining("WHERE role = $1"),
+        ["user", 15],
+      );
+      expect(result).toEqual(["latest", "older"]);
+    });
+
+    it("returns empty array when no rows are found", async () => {
+      db.select.mockResolvedValueOnce([]);
+
+      const result = await messageRepo.getRecentUserHistory();
+
+      expect(result).toEqual([]);
+    });
+  });
+
   describe("searchContent", () => {
     it("returns empty array for empty query without db call", async () => {
       const result = await messageRepo.searchContent("");

@@ -80,6 +80,21 @@ export const messageRepo = {
     return rows[0]?.count ?? 0;
   },
 
+  async getRecentUserHistory(limit = 30): Promise<string[]> {
+    const db = await getDb();
+    const rows = (await db.select(
+      `SELECT content
+       FROM messages
+       WHERE role = $1 AND TRIM(COALESCE(content, '')) <> ''
+       ORDER BY created_at DESC
+       LIMIT $2`,
+      ["user", limit],
+    )) as { content: string }[];
+    return rows
+      .map((row) => row.content.trim())
+      .filter(Boolean);
+  },
+
   /** 全文搜索：使用 FTS5 索引，返回会话 id 及片段（用于 ⌘⇧F） */
   async searchContent(query: string): Promise<{ conversationId: string; snippet: string }[]> {
     const q = query.trim();

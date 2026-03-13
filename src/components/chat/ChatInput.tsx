@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useChatStore } from "@/stores/chatStore";
+import { useChatStreamState } from "@/hooks/useChatStreamState";
 import { useDataStore } from "@/stores/dataStore";
-import { useStreamStore } from "@/stores/streamStore";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 import { useSettingsStore } from "@/stores/settingsStore";
 import { useSkillsStore } from "@/stores/skillsStore";
+import { messageRepo } from "@/db/repos/messageRepo";
 import { getModelOption } from "@/lib/ai/model-service";
 import { listSkills } from "@/lib/ai/skills/loader";
 import { USER_VISIBLE_TOOLS } from "@/lib/ai/tools/tool-meta";
@@ -21,6 +22,13 @@ import {
   imageFilesToDraftAttachments,
   nonImageFilesToDraftAttachments,
 } from "@/lib/chat-input-utils";
+import { clipboardFilesToDraftAttachments } from "@/lib/clipboard-files";
+import {
+  GLOBAL_CHAT_HISTORY_LIMIT,
+  canNavigateHistoryBoundary,
+  isEditableTarget,
+  isTargetInTransientOverlay,
+} from "@/lib/chat-input-keyboard";
 import type { SkillMeta } from "@/lib/ai/skills/types";
 
 const IME_COMMIT_GRACE_MS = 150;
@@ -37,6 +45,9 @@ export function ChatInput({
   const [attachError, setAttachError] = useState<string | null>(null);
   const [modelSelectorOpenLocal, setModelSelectorOpenLocal] = useState(false);
   const [mentionActiveIndex, setMentionActiveIndex] = useState(0);
+  const [historyEntries, setHistoryEntries] = useState<string[]>([]);
+  const [historyIndex, setHistoryIndex] = useState<number | null>(null);
+  const [draftBeforeHistory, setDraftBeforeHistory] = useState<string | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const lastCompositionEndRef = useRef<number>(0);
 
@@ -49,12 +60,11 @@ export function ChatInput({
   const providerId = useChatStore((s) => s.providerId);
   const providers = useDataStore((s) => s.providers);
   const activeConversationId = useDataStore((s) => s.activeConversationId);
-  const streams = useStreamStore((s) => s.streams);
-  const isStreaming = activeConversationId ? (streams[activeConversationId]?.isStreaming ?? false) : false;
-  const isCompressing = activeConversationId ? (streams[activeConversationId]?.isCompressing ?? false) : false;
+  const { isStreaming, isCompressing } = useChatStreamState();
   const modelSelectorOpen = onModelSelectorOpenChange != null ? (modelSelectorOpenProp ?? false) : modelSelectorOpenLocal;
   const setModelSelectorOpen = onModelSelectorOpenChange ?? setModelSelectorOpenLocal;
   const error = useChatStore((s) => s.error);
+  const messages = useChatStore((s) => s.messages);
   const sendMessageShortcut = useSettingsStore((s) => s.sendMessageShortcut);
   const activeWorkspace = useWorkspaceStore((s) => s.activeWorkspace);
   const externalSkills = useSkillsStore((s) => s.externalSkills);
@@ -89,10 +99,28 @@ export function ChatInput({
 
   // Reset active index when items change
   useEffect(() => { setMentionActiveIndex(0); }, [mentionItems.length]);
+  useEffect(() => {
+    let cancelled = false;
+    void messageRepo.getRecentUserHistory(GLOBAL_CHAT_HISTORY_LIMIT)
+      .then((entries) => {
+        if (!cancelled) setHistoryEntries(entries);
+      })
+      .catch(() => {
+        if (!cancelled) setHistoryEntries([]);
+      });
+    return () => { cancelled = true; };
+  }, [activeConversationId, messages]);
+
+  useEffect(() => {
+    setHistoryIndex(null);
+    setDraftBeforeHistory(null);
+  }, [activeConversationId]);
 
   const handleMentionSelect = useCallback((type: "tool" | "skill" | "file", id: string) => {
     const cursorPos = textareaRef.current?.selectionStart ?? message.length;
     const { newMessage, newCursorPos } = insertMention(message, cursorPos, type, id);
+    setHistoryIndex(null);
+    setDraftBeforeHistory(null);
     setMessage(newMessage);
     // Explicitly sync mention detection state after programmatic text change.
     // Without this, the next @ may not trigger the popover because onChange
@@ -133,16 +161,78 @@ export function ChatInput({
 
   useEffect(() => { const el = textareaRef.current; if (!el) return; el.style.height = "auto"; el.style.height = Math.min(el.scrollHeight, 200) + "px"; }, [message]);
 
+  useEffect(() => {
+    if (!isStreaming) return;
+    const handleWindowKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== "Escape" || event.defaultPrevented || event.isComposing) return;
+      if (isTargetInTransientOverlay(event.target) || isEditableTarget(event.target)) return;
+      event.preventDefault();
+      stopGeneration();
+    };
+    window.addEventListener("keydown", handleWindowKeyDown);
+    return () => window.removeEventListener("keydown", handleWindowKeyDown);
+  }, [isStreaming, stopGeneration]);
+
   const handleAttachFiles = async () => {
     const wsPath = activeWorkspace && !activeWorkspace.is_default ? activeWorkspace.path : undefined;
     await pickAndSaveAttachments(addDraftAttachments, setAttachError, wsPath, activeConversationId);
   };
+  const focusTextareaAtEnd = useCallback((value: string) => {
+    requestAnimationFrame(() => {
+      const el = textareaRef.current;
+      if (!el) return;
+      const pos = value.length;
+      el.focus();
+      el.setSelectionRange(pos, pos);
+    });
+  }, []);
+
+  const navigateHistory = useCallback((direction: "up" | "down") => {
+    const textarea = textareaRef.current;
+    if (!textarea) return false;
+
+    const selectionStart = textarea.selectionStart ?? message.length;
+    const selectionEnd = textarea.selectionEnd ?? message.length;
+    if (!canNavigateHistoryBoundary(message, selectionStart, selectionEnd, direction)) return false;
+
+    if (direction === "up") {
+      if (historyEntries.length === 0) return false;
+      const nextIndex = historyIndex === null ? 0 : Math.min(historyIndex + 1, historyEntries.length - 1);
+      const nextEntry = historyEntries[nextIndex];
+      if (!nextEntry) return false;
+      if (historyIndex === null) setDraftBeforeHistory(message);
+      setHistoryIndex(nextIndex);
+      setMessage(nextEntry);
+      focusTextareaAtEnd(nextEntry);
+      return true;
+    }
+
+    if (historyIndex === null) return false;
+    if (historyIndex === 0) {
+      const restoredDraft = draftBeforeHistory ?? "";
+      setHistoryIndex(null);
+      setDraftBeforeHistory(null);
+      setMessage(restoredDraft);
+      focusTextareaAtEnd(restoredDraft);
+      return true;
+    }
+
+    const nextIndex = historyIndex - 1;
+    const nextEntry = historyEntries[nextIndex];
+    if (!nextEntry) return false;
+    setHistoryIndex(nextIndex);
+    setMessage(nextEntry);
+    focusTextareaAtEnd(nextEntry);
+    return true;
+  }, [draftBeforeHistory, focusTextareaAtEnd, historyEntries, historyIndex, message]);
 
   const handleSend = () => {
     if (!canSend) return;
     if (draftAttachments.some((a) => isImageAttachment(a)) && !modelSupportsVision) { setAttachError(t("chat.visionNotSupported")); return; }
     setAttachError(null);
     const content = message.trim();
+    setHistoryIndex(null);
+    setDraftBeforeHistory(null);
     setMessage("");
     const withHint = webSearchEnabled
       ? `${content}\n\n[Web search enabled: use fetch_url to retrieve current information when needed, e.g. https://html.duckduckgo.com/html/?q=YOUR_QUERY]`
@@ -154,11 +244,18 @@ export function ChatInput({
     const items = e.clipboardData?.items; if (!items?.length) return;
     const files: File[] = [];
     for (let i = 0; i < items.length; i++) { const item = items[i]; if (item?.kind === "file") { const f = item.getAsFile(); if (f && isImageFile(f)) files.push(f); } }
-    if (files.length === 0) return;
-    e.preventDefault();
     const wsPath = activeWorkspace && !activeWorkspace.is_default ? activeWorkspace.path : undefined;
-    const attachments = await imageFilesToDraftAttachments(files, wsPath);
-    if (attachments.length > 0) { addDraftAttachments(attachments); setAttachError(null); }
+    if (files.length > 0) {
+      e.preventDefault();
+      const attachments = await imageFilesToDraftAttachments(files, wsPath);
+      if (attachments.length > 0) { addDraftAttachments(attachments); setAttachError(null); }
+      return;
+    }
+    // No image files — try native clipboard (macOS Finder copy, etc.) only when no text
+    const textContent = e.clipboardData?.getData("text/plain") ?? "";
+    if (textContent) return;
+    const nativeAttachments = await clipboardFilesToDraftAttachments(wsPath);
+    if (nativeAttachments.length > 0) { e.preventDefault(); addDraftAttachments(nativeAttachments); setAttachError(null); }
   };
 
   const handleDrop = async (e: React.DragEvent) => {
@@ -173,6 +270,10 @@ export function ChatInput({
 
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
+    if (historyIndex !== null) {
+      setHistoryIndex(null);
+      setDraftBeforeHistory(null);
+    }
     setMessage(val);
     updateMention(val, e.target.selectionStart ?? val.length);
   };
@@ -180,6 +281,11 @@ export function ChatInput({
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.nativeEvent.isComposing) return;
     if (e.key === "Enter" && Date.now() - lastCompositionEndRef.current < IME_COMMIT_GRACE_MS) return;
+    if (e.key === "Escape" && isStreaming) {
+      e.preventDefault();
+      stopGeneration();
+      return;
+    }
 
     // Mention navigation
     if (mentionState.open && mentionItems.length > 0) {
@@ -187,6 +293,11 @@ export function ChatInput({
       if (e.key === "ArrowUp") { e.preventDefault(); setMentionActiveIndex((i) => (i - 1 + mentionItems.length) % mentionItems.length); return; }
       if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); const item = mentionItems[mentionActiveIndex]; if (item) handleMentionSelect(item.type, item.id); return; }
       if (e.key === "Escape") { e.preventDefault(); closeMention(); return; }
+    }
+
+    if (!showSlashCommands && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      if (e.key === "ArrowUp" && navigateHistory("up")) { e.preventDefault(); return; }
+      if (e.key === "ArrowDown" && navigateHistory("down")) { e.preventDefault(); return; }
     }
 
     if (sendMessageShortcut === "enter") {

@@ -59,6 +59,20 @@ afterEach(() => {
   resetPermission();
 });
 
+describe("ChatHeader title spacing", () => {
+  it("keeps title flush when sidebar is open", () => {
+    render(<ChatHeader leftSidebarOpen={true} />);
+    const title = screen.getByText("Test Chat");
+    expect(title.parentElement?.style.paddingLeft).toBe("0px");
+  });
+
+  it("adds enough left padding when sidebar is hidden", () => {
+    render(<ChatHeader leftSidebarOpen={false} />);
+    const title = screen.getByText("Test Chat");
+    expect(title.parentElement?.style.paddingLeft).toBe("184px");
+  });
+});
+
 describe("ChatHeader — TrustModeToggle", () => {
   it("renders toggle when activeConversationId exists", () => {
     render(<ChatHeader leftSidebarOpen={true} />);

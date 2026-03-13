@@ -13,6 +13,7 @@ always: true
 
 Prefer the shorter tool call. If bash one-liner does the job, use bash — do NOT rewrite it as Lua.
 Do NOT use bash for JSON parsing or math — use cove_interpreter.
+Do not claim success, concrete IDs/URLs, or completed side effects until a tool result explicitly confirms them. Before the tool result arrives, describe the action as pending or in progress.
 
 ### cove_interpreter quick ref
 
