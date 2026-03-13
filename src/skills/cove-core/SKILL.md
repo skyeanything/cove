@@ -15,6 +15,19 @@ Prefer the shorter tool call. If bash one-liner does the job, use bash — do NO
 Do NOT use bash for JSON parsing or math — use cove_interpreter.
 Do not claim success, concrete IDs/URLs, or completed side effects until a tool result explicitly confirms them. Before the tool result arrives, describe the action as pending or in progress.
 
+### Document shortcuts (DOCX/XLSX/PPTX/PDF)
+
+`read` extracts text from Office documents natively. Do NOT use `parse_document` or `office` to read workspace files when `read` suffices.
+
+`write` creates DOCX automatically when the path ends in `.docx` -- pass markdown content. No need to load OfficeLLM skill or call the `office` tool.
+
+Common shortcuts:
+- Merge documents: `read` each file, combine content, `write` to new .docx (3 calls)
+- Convert markdown to DOCX: `write` with .docx path (1 call)
+- Extract text from DOCX: `read` the file (1 call)
+
+Only load OfficeLLM skill for advanced operations: formatting, find-replace, slide manipulation, spreadsheet formulas.
+
 ### cove_interpreter quick ref
 
 Lua 5.4, sandboxed, workspace-scoped. Use `print()` for output. `json.encode/decode` built-in.
