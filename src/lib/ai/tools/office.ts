@@ -3,6 +3,11 @@ import { z } from "zod/v4";
 import { invoke } from "@tauri-apps/api/core";
 import { useWorkspaceStore } from "@/stores/workspaceStore";
 
+/** Encode an absolute filesystem path for use inside a file:// URL. */
+function encodeFilePath(absPath: string): string {
+  return absPath.split("/").map((seg) => encodeURIComponent(seg)).join("/");
+}
+
 interface DetectResult {
   available: boolean;
   version: string | null;
@@ -122,7 +127,7 @@ export const officeTool = tool({
           ? p.replace(/\/+/g, "/")
           : `${activeWorkspace.path}/${p}`.replace(/\/+/g, "/");
         const fileName = absPath.split("/").pop() ?? p;
-        return `已保存文档：[${fileName}](file://${absPath})\n完整路径：${absPath}`;
+        return `已保存文档：[${fileName}](file://${encodeFilePath(absPath)})\n完整路径：${absPath}`;
       }
       return formatOfficellmOutput(command, result.output.trim());
     } catch (err) {
