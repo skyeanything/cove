@@ -1,12 +1,11 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { listen } from "@tauri-apps/api/event";
-import { invoke } from "@tauri-apps/api/core";
-import { openPath } from "@tauri-apps/plugin-opener";
 import { ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FloatingPreviewContent } from "./FloatingPreviewContent";
 import { getFileIcon } from "@/lib/file-tree-icons";
+import { useOpenExternally } from "./PreviewFileHeader";
 
 function basename(p: string): string {
   const segments = p.replace(/\/+$/, "").split("/");
@@ -42,17 +41,7 @@ export function PreviewWindow() {
     };
   }, []);
 
-  // Use the window's own workspace state, not the store-based hook
-  const handleOpenExternal = useCallback(() => {
-    if (!path) return;
-    if (path.startsWith("/")) {
-      openPath(path).catch((e) => console.error("openPath failed:", e));
-    } else if (workspace) {
-      invoke("open_with_app", {
-        args: { workspaceRoot: workspace, path, openWith: null },
-      }).catch((e) => console.error("open_with_app failed:", e));
-    }
-  }, [path, workspace]);
+  const openExternally = useOpenExternally(workspace, path);
 
   if (!path) {
     return (
@@ -64,14 +53,15 @@ export function PreviewWindow() {
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background">
-      {/* Draggable title bar area */}
-      <div
-        data-tauri-drag-region
-        className="flex h-10 shrink-0 items-center gap-2 border-b border-border px-3"
-      >
-        {/* macOS traffic light spacing */}
-        <div className="w-16 shrink-0" />
-        <div className="flex min-w-0 flex-1 items-center gap-1.5">
+      {/* macOS overlay zone (~28px) intercepts all mouse events, so only a
+          drag spacer lives here — no interactive elements */}
+      <div data-tauri-drag-region className="h-7 shrink-0" />
+      {/* Toolbar below the overlay: filename area is draggable, button is not */}
+      <div className="flex h-8 shrink-0 items-center gap-2 border-b border-border px-3">
+        <div
+          data-tauri-drag-region
+          className="flex min-w-0 flex-1 items-center gap-1.5 self-stretch"
+        >
           {getFileIcon(path, "size-4 shrink-0 text-foreground-secondary", 1.5)}
           <span
             className="min-w-0 truncate text-sm font-medium text-foreground"
@@ -83,8 +73,8 @@ export function PreviewWindow() {
         <Button
           variant="ghost"
           size="sm"
-          className="h-7 px-2 text-xs text-foreground-secondary"
-          onClick={handleOpenExternal}
+          className="h-6 px-2 text-xs text-foreground-secondary"
+          onClick={() => openExternally()}
         >
           <ExternalLink className="mr-1 size-3.5" strokeWidth={1.5} />
           {t("preview.openDefault")}
