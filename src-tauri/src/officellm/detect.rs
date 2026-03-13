@@ -31,7 +31,11 @@ pub fn detect() -> DetectResult {
         .and_then(|o| {
             if o.status.success() {
                 let out = String::from_utf8_lossy(&o.stdout).trim().to_string();
-                if out.is_empty() { None } else { Some(out) }
+                if out.is_empty() {
+                    None
+                } else {
+                    Some(out)
+                }
             } else {
                 None
             }
@@ -48,11 +52,16 @@ pub fn detect() -> DetectResult {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_util::with_home;
+    use crate::test_util::{with_home, with_home_and_path_cleared};
+
+    #[cfg(unix)]
+    fn fake_binary_contents(body: &str) -> String {
+        format!("#!/bin/sh\n{body}\n#{}\n", "x".repeat(2048))
+    }
 
     #[test]
     fn bin_path_returns_error_when_missing() {
-        with_home(|_home| {
+        with_home_and_path_cleared(|_home| {
             let err = bin_path().unwrap_err();
             assert!(err.contains("未找到 officellm"));
         });
@@ -60,7 +69,7 @@ mod tests {
 
     #[test]
     fn detect_unavailable_when_binary_missing() {
-        with_home(|_home| {
+        with_home_and_path_cleared(|_home| {
             let r = detect();
             assert!(!r.available);
             assert!(!r.bundled);
@@ -77,9 +86,8 @@ mod tests {
         with_home(|home| {
             let bin = home.join(".officellm/bin/officellm");
             std::fs::create_dir_all(bin.parent().unwrap()).unwrap();
-            std::fs::write(&bin, "#!/bin/sh\necho '1.2.3'\n").unwrap();
-            std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o755))
-                .unwrap();
+            std::fs::write(&bin, fake_binary_contents("echo '1.2.3'")).unwrap();
+            std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o755)).unwrap();
 
             let r = detect();
             assert!(r.available);
@@ -97,9 +105,8 @@ mod tests {
         with_home(|home| {
             let bin = home.join(".officellm/bin/officellm");
             std::fs::create_dir_all(bin.parent().unwrap()).unwrap();
-            std::fs::write(&bin, "#!/bin/sh\n").unwrap();
-            std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o755))
-                .unwrap();
+            std::fs::write(&bin, fake_binary_contents("")).unwrap();
+            std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o755)).unwrap();
 
             let r = detect();
             assert!(r.available);
@@ -116,9 +123,8 @@ mod tests {
         with_home(|home| {
             let bin = home.join(".officellm/bin/officellm");
             std::fs::create_dir_all(bin.parent().unwrap()).unwrap();
-            std::fs::write(&bin, "#!/bin/sh\n").unwrap();
-            std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o755))
-                .unwrap();
+            std::fs::write(&bin, fake_binary_contents("")).unwrap();
+            std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o755)).unwrap();
 
             let result = bin_path();
             assert!(result.is_ok());

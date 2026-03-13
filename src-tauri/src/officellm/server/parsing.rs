@@ -21,28 +21,33 @@ pub(super) fn format_exit_status(status: &ExitStatus) -> String {
 
 /// 解析 JSON-RPC 响应为 CommandResult
 pub(super) fn parse_response(line: &str) -> Result<CommandResult, String> {
-    let resp: JsonRpcResponse = serde_json::from_str(line)
-        .map_err(|e| format!("解析 JSON-RPC 响应失败: {e}"))?;
+    let resp: JsonRpcResponse =
+        serde_json::from_str(line).map_err(|e| format!("解析 JSON-RPC 响应失败: {e}"))?;
     if let Some(err) = resp.error {
         return Ok(CommandResult {
             status: "error".to_string(),
+            code: Some(err.code.to_string()),
+            message: Some(err.message.clone()),
             data: serde_json::Value::Null,
             error: Some(err.message),
+            errors: Vec::new(),
+            meta: None,
             metrics: None,
         });
     }
     let result = resp.result.unwrap_or(serde_json::Value::Null);
     let payload = result.get("output").cloned().unwrap_or(result);
-    if let Ok(mut r) = serde_json::from_value::<CommandResult>(payload.clone()) {
-        if r.status == "failure" {
-            r.status = "error".to_string();
-        }
-        return Ok(r);
+    if let Ok(r) = serde_json::from_value::<CommandResult>(payload.clone()) {
+        return Ok(r.with_error_fallback());
     }
     Ok(CommandResult {
         status: "success".to_string(),
+        code: None,
+        message: None,
         data: payload,
         error: None,
+        errors: Vec::new(),
+        meta: None,
         metrics: None,
     })
 }

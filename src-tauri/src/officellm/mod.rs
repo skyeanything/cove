@@ -17,6 +17,18 @@ fn compute_home(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
     resolve::resolve_home(is_bundled, app)
 }
 
+async fn call_cli_in_home(
+    app: tauri::AppHandle,
+    cmd: &str,
+    args: Vec<String>,
+) -> Result<CommandResult, String> {
+    let home = compute_home(&app)?;
+    let cmd = cmd.to_string();
+    tauri::async_runtime::spawn_blocking(move || cli::call(&cmd, &args, &home, &home))
+        .await
+        .map_err(|e| format!("后台线程错误: {e}"))?
+}
+
 // ── Tauri 命令 ──────────────────────────────────────────────────────────────
 
 /// 检测 officellm 是否已安装
@@ -94,19 +106,42 @@ pub fn officellm_status() -> Result<Option<SessionInfo>, String> {
 /// 诊断外部依赖状态（强制 CLI 模式），并在 data 中注入 home 路径
 #[tauri::command]
 pub async fn officellm_doctor(app: tauri::AppHandle) -> Result<CommandResult, String> {
-    let home = compute_home(&app)?;
-    let home_str = home.to_string_lossy().to_string();
-    let mut result = tauri::async_runtime::spawn_blocking(move || {
-        cli::call("doctor", &[], &home, &home)
-    })
-    .await
-    .map_err(|e| format!("后台线程错误: {e}"))??;
+    let home_str = compute_home(&app)?.to_string_lossy().to_string();
+    let mut result = call_cli_in_home(app, "doctor", Vec::new()).await?;
 
     // 注入 home 路径到 data 对象
     if let serde_json::Value::Object(ref mut map) = result.data {
         map.insert("home".into(), serde_json::Value::String(home_str));
     }
     Ok(result)
+}
+
+/// 列出所有可用 officellm CLI 命令（强制 CLI 模式，不依赖 workspace）
+#[tauri::command]
+pub async fn officellm_list_commands(
+    app: tauri::AppHandle,
+    category: Option<String>,
+) -> Result<CommandResult, String> {
+    let mut args = Vec::new();
+    if let Some(category) = category {
+        args.push("--category".to_string());
+        args.push(category);
+    }
+    call_cli_in_home(app, "list-commands", args).await
+}
+
+/// 获取单个 officellm CLI 命令 schema（强制 CLI 模式，不依赖 workspace）
+#[tauri::command]
+pub async fn officellm_get_command_schema(
+    app: tauri::AppHandle,
+    command: String,
+) -> Result<CommandResult, String> {
+    call_cli_in_home(
+        app,
+        "get-command-schema",
+        vec!["--command".to_string(), command],
+    )
+    .await
 }
 
 /// 首次使用时初始化 officellm home 目录。
@@ -120,15 +155,13 @@ pub async fn officellm_init(app: tauri::AppHandle) -> Result<(), String> {
         return init::init_result();
     }
     let result = async {
-        let (bin, _) = resolve::resolve_bin()
-            .ok_or("officellm binary not found")?;
+        let (bin, _) = resolve::resolve_bin().ok_or("officellm binary not found")?;
         let home = resolve::officellm_home(&app)?;
-        tauri::async_runtime::spawn_blocking(move || {
-            init::ensure_initialized(&bin, &home)
-        })
-        .await
-        .map_err(|e| format!("后台线程错误: {e}"))?
-    }.await;
+        tauri::async_runtime::spawn_blocking(move || init::ensure_initialized(&bin, &home))
+            .await
+            .map_err(|e| format!("后台线程错误: {e}"))?
+    }
+    .await;
     init::mark_init_done(&result);
     result
 }

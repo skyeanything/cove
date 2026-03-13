@@ -23,7 +23,9 @@ export function buildSystemPrompt(options: {
   }
 
   if (options.officeAvailable) {
-    parts.push("Office tool available for DOCX/PPTX/XLSX. Load 'OfficeLLM' skill for commands.");
+    parts.push(
+      "Office tool available for DOCX/PPTX/XLSX. Use office(command: \"help\") to discover commands before execution, then load 'OfficeLLM' skill for workflow guidance.",
+    );
   }
 
   if (options.assistant?.system_instruction) {

@@ -44,6 +44,7 @@ describe("buildSystemPrompt", () => {
   it("injects office hint when available", () => {
     const prompt = buildSystemPrompt({ officeAvailable: true });
     expect(prompt).toContain("Office tool available");
+    expect(prompt).toContain('office(command: "help")');
   });
 
   it("omits office hint when not available", () => {

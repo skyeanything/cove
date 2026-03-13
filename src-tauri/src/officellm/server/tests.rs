@@ -24,6 +24,8 @@ fn parse_response_error_response() {
     let json = r#"{"id":1,"error":{"code":-1,"message":"fail"}}"#;
     let r = parse_response(json).unwrap();
     assert_eq!(r.status, "error");
+    assert_eq!(r.code.as_deref(), Some("-1"));
+    assert_eq!(r.message.as_deref(), Some("fail"));
     assert_eq!(r.error.as_deref(), Some("fail"));
     assert_eq!(r.data, serde_json::Value::Null);
 }
@@ -35,11 +37,13 @@ fn parse_response_invalid_json() {
 }
 
 #[test]
-fn parse_response_failure_normalized() {
-    let json =
-        r#"{"id":1,"result":{"output":{"status":"failure","data":null}}}"#;
+fn parse_response_failure_is_preserved() {
+    let json = r#"{"id":1,"result":{"output":{"status":"failure","code":"NO_MATCH","message":"not found","data":null}}}"#;
     let r = parse_response(json).unwrap();
-    assert_eq!(r.status, "error");
+    assert_eq!(r.status, "failure");
+    assert_eq!(r.code.as_deref(), Some("NO_MATCH"));
+    assert_eq!(r.message.as_deref(), Some("not found"));
+    assert_eq!(r.error.as_deref(), Some("not found"));
 }
 
 #[test]

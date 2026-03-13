@@ -82,7 +82,11 @@ fn sidecar_path() -> Option<PathBuf> {
 
 /// Return the external install binary path (`~/.officellm/bin/officellm` or `...\officellm.exe` on Windows).
 fn external_bin_path() -> Option<PathBuf> {
-    dirs::home_dir().map(|h| h.join(".officellm").join("bin").join(format!("officellm{BIN_EXT}")))
+    dirs::home_dir().map(|h| {
+        h.join(".officellm")
+            .join("bin")
+            .join(format!("officellm{BIN_EXT}"))
+    })
 }
 
 /// Search PATH for officellm (e.g. npm -g, scoop, chocolatey). Returns first existing path.
@@ -125,8 +129,7 @@ pub fn officellm_home(app: &tauri::AppHandle) -> Result<PathBuf, String> {
         .app_data_dir()
         .map_err(|e| format!("failed to resolve app data dir: {e}"))?;
     let home = base.join("officellm");
-    std::fs::create_dir_all(&home)
-        .map_err(|e| format!("failed to create officellm home: {e}"))?;
+    std::fs::create_dir_all(&home).map_err(|e| format!("failed to create officellm home: {e}"))?;
     Ok(home)
 }
 
@@ -154,13 +157,13 @@ mod tests {
     #[cfg(unix)]
     #[test]
     fn resolve_bin_finds_external() {
-        use crate::test_util::with_home;
+        use crate::test_util::with_home_and_path_cleared;
         use std::os::unix::fs::PermissionsExt;
 
-        with_home(|home| {
+        with_home_and_path_cleared(|home| {
             let bin = home.join(".officellm/bin/officellm");
             std::fs::create_dir_all(bin.parent().unwrap()).unwrap();
-            std::fs::write(&bin, "#!/bin/sh\n").unwrap();
+            std::fs::write(&bin, format!("#!/bin/sh\n#{}\n", "x".repeat(2048))).unwrap();
             std::fs::set_permissions(&bin, std::fs::Permissions::from_mode(0o755)).unwrap();
 
             let result = resolve_bin();

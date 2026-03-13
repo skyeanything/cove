@@ -120,19 +120,26 @@ describe("officeTool – doctor", () => {
       }),
     });
     const result = await exec({ command: "doctor" });
-    expect(result).toContain("Error");
+    expect(result).toContain('"status":"error"');
     expect(result).toContain("binary not found");
   });
 
-  it("returns 'unknown' when error field is null", async () => {
+  it("preserves structured failure details", async () => {
     setupTauriMocks({
       officellm_doctor: () => ({
-        status: "error", data: null, error: null, metrics: null,
+        status: "failure",
+        code: "DEPENDENCY_MISSING",
+        message: "Install LibreOffice",
+        error: null,
+        data: null,
+        errors: [{ message: "Install LibreOffice", suggestions: ["brew install libreoffice"] }],
+        metrics: null,
       }),
     });
     const result = await exec({ command: "doctor" });
-    expect(result).toContain("Error");
-    expect(result).toContain("unknown");
+    expect(result).toContain('"status":"failure"');
+    expect(result).toContain('"code":"DEPENDENCY_MISSING"');
+    expect(result).toContain("brew install libreoffice");
   });
 
   it("handles doctor invoke error", async () => {
@@ -145,10 +152,81 @@ describe("officeTool – doctor", () => {
   });
 });
 
+// ── discovery commands ──────────────────────────────────────────────────────
+
+describe("officeTool – discovery commands", () => {
+  it("returns help summary without workspace", async () => {
+    withNoWorkspace();
+    const result = await exec({ command: "help" });
+    expect(result).toContain("Bundled office command discovery");
+    expect(result).toContain("list-commands");
+    expect(result).toContain("get-command-schema");
+  });
+
+  it("returns wrapper command schema for help(name)", async () => {
+    withNoWorkspace();
+    const result = await exec({ command: "help", args: { name: "save" } });
+    expect(result).toContain('"source":"cove-office-wrapper"');
+    expect(result).toContain('"name":"save"');
+    expect(result).toContain("save-as path");
+  });
+
+  it("loads document command schema for help(name)", async () => {
+    withNoWorkspace();
+    setupTauriMocks({
+      officellm_get_command_schema: () => ({
+        status: "success",
+        data: { command: "replace-text", usage: "replace-text -i <input.docx> --find <text>" },
+      }),
+    });
+    const result = await exec({ command: "help", args: { name: "replace-text" } });
+    expect(result).toContain("replace-text");
+    expect(result).toContain("--find");
+  });
+
+  it("lists commands without workspace", async () => {
+    withNoWorkspace();
+    setupTauriMocks({
+      officellm_list_commands: (payload) => {
+        expect(payload).toEqual({ category: "Editing" });
+        return {
+          status: "success",
+          data: { commands: [{ name: "replace-text", category: "Editing" }] },
+        };
+      },
+    });
+    const result = await exec({ command: "list-commands", args: { category: "Editing" } });
+    expect(result).toContain("replace-text");
+    expect(result).toContain("Editing");
+  });
+
+  it("gets command schema without workspace", async () => {
+    withNoWorkspace();
+    setupTauriMocks({
+      officellm_get_command_schema: (payload) => {
+        expect(payload).toEqual({ command: "replace-text" });
+        return {
+          status: "success",
+          data: { command: "replace-text", parameters: [{ name: "--find", required: false }] },
+        };
+      },
+    });
+    const result = await exec({ command: "get-command-schema", args: { name: "replace-text" } });
+    expect(result).toContain("replace-text");
+    expect(result).toContain("--find");
+  });
+
+  it("returns an input error when schema name is missing", async () => {
+    withNoWorkspace();
+    const result = await exec({ command: "get-command-schema" });
+    expect(result).toContain("requires args.name");
+  });
+});
+
 // ── Lua-routed commands ──────────────────────────────────────────────────────
 
 describe("officeTool – Lua commands", () => {
-  it("requires workspace for non-detect/doctor commands", async () => {
+  it("requires workspace for document execution commands", async () => {
     withNoWorkspace();
     const result = await exec({ command: "open", args: { path: "doc.docx" } });
     expect(result).toContain("Error");
@@ -235,8 +313,18 @@ describe("officeTool – Lua commands", () => {
       run_lua: () => jsResult('{"status":"error","error":"no active session"}'),
     });
     const result = await exec({ command: "save" });
-    expect(result).toContain("Error");
+    expect(result).toContain('"status":"error"');
     expect(result).toContain("no active session");
+  });
+
+  it("preserves partial results from officellm", async () => {
+    setupTauriMocks({
+      run_lua: () => jsResult('{"status":"partial","code":"NO_MATCH","message":"target not found","errors":[{"suggestions":["search first"]}],"data":{"matched_count":0}}'),
+    });
+    const result = await exec({ command: "replace-text", args: { find: "old", replace: "new" } });
+    expect(result).toContain('"status":"partial"');
+    expect(result).toContain('"code":"NO_MATCH"');
+    expect(result).toContain("search first");
   });
 
   it("returns JS execution error", async () => {
