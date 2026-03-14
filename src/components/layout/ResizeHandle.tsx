@@ -22,6 +22,7 @@ export function ResizeHandle({
 
   const handleMouseDown = useCallback(
     (e: React.MouseEvent) => {
+      e.preventDefault();
       isDragging.current = true;
       startX.current = e.clientX;
       startWidth.current = currentWidth;
@@ -60,7 +61,7 @@ export function ResizeHandle({
     <div
       onMouseDown={handleMouseDown}
       className={cn(
-        "absolute top-0 bottom-0 z-10 w-1 cursor-col-resize transition-colors hover:bg-ring/30",
+        "absolute top-0 bottom-0 z-10 w-2 cursor-col-resize transition-colors hover:bg-ring/30",
         side === "left" ? "right-0" : "left-0",
       )}
     />

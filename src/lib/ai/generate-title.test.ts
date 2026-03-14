@@ -86,15 +86,15 @@ describe("generateConversationTitleFromUserQuestion", () => {
     expect(systemArg).toContain("x".repeat(500));
   });
 
-  it("truncates generated title to 100 characters", async () => {
-    mockGenerateText.mockResolvedValue({ text: "T".repeat(200) } as Awaited<
+  it("truncates generated title to 400 characters", async () => {
+    mockGenerateText.mockResolvedValue({ text: "T".repeat(500) } as Awaited<
       ReturnType<typeof generateText>
     >);
 
     await generateConversationTitleFromUserQuestion("conv-1", "Hello", opts);
 
     const titleArg = mockUpdate.mock.calls[0]?.[1]?.title as string;
-    expect(titleArg).toHaveLength(100);
+    expect(titleArg).toHaveLength(400);
   });
 
   it("does not update if generated title is empty after trim", async () => {

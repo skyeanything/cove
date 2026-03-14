@@ -28,6 +28,6 @@ export async function generateConversationTitleFromUserQuestion(
     maxOutputTokens: 50,
   });
 
-  const trimmed = title.trim().slice(0, 100);
+  const trimmed = title.trim().slice(0, 400);
   if (trimmed) await conversationRepo.update(conversationId, { title: trimmed });
 }

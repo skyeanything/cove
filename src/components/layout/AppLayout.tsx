@@ -18,14 +18,10 @@ import { GitBashBanner } from "@/components/common/GitBashBanner";
 import { FloatingPreviewProvider } from "@/components/preview/FloatingPreviewPopup";
 import { openSettingsWindow } from "@/lib/settings-window";
 import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
-
-const SIDEBAR_MIN = 200;
-const SIDEBAR_MAX = 400;
-const CHAT_MIN = 480;
-const CHAT_MAX = 1200;
-const FILE_TREE_MIN = 200;
-const FILE_TREE_MAX = 480;
-const FILE_PREVIEW_MIN = 200;
+import {
+  SIDEBAR_MIN, CHAT_MIN, FILE_TREE_MIN, FILE_TREE_MAX, FILE_PREVIEW_MIN,
+  computeSidebarMax, computeChatMax,
+} from "./layout-utils";
 
 interface AppLayoutProps {
   gitBashError?: string | null;
@@ -53,6 +49,8 @@ export function AppLayout({ gitBashError }: AppLayoutProps) {
 
   const [modelSelectorOpen, setModelSelectorOpen] = useState(false);
   const [searchMessagesOpen, setSearchMessagesOpen] = useState(false);
+  const sidebarMax = computeSidebarMax(window.innerWidth);
+  const chatMax = computeChatMax(window.innerWidth, leftOpen, leftSidebarWidth);
   const middleSectionRef = useRef<HTMLDivElement>(null);
   const [chatColumnCloseTarget, setChatColumnCloseTarget] = useState<number | null>(null);
   const [chatColumnOpenTarget, setChatColumnOpenTarget] = useState<number | null>(null);
@@ -240,7 +238,7 @@ export function AppLayout({ gitBashError }: AppLayoutProps) {
             currentWidth={leftSidebarWidth}
             onResize={setLeftSidebarWidth}
             minWidth={SIDEBAR_MIN}
-            maxWidth={SIDEBAR_MAX}
+            maxWidth={sidebarMax}
           />
         </div>
       ) : (
@@ -251,9 +249,9 @@ export function AppLayout({ gitBashError }: AppLayoutProps) {
         {filePanelOpen || filePanelClosing ? (
           <>
             <div
-              className={`relative flex min-w-0 flex-col overflow-hidden border-r border-border transition-[width] duration-300 ease-out${isAnimating || previewVisible ? " shrink-0" : " flex-1"}`}
+              className={`relative flex min-w-0 shrink-0 flex-col overflow-hidden border-r border-border transition-[width] duration-300 ease-out`}
               style={{
-                width: isAnimating ? chatColumnTargetWidth : previewVisible ? chatWidth : undefined,
+                width: isAnimating ? chatColumnTargetWidth : chatWidth,
                 minWidth: CHAT_MIN,
                 willChange: isAnimating ? "width" : undefined,
               }}
@@ -269,10 +267,10 @@ export function AppLayout({ gitBashError }: AppLayoutProps) {
                 currentWidth={chatWidth}
                 onResize={setChatWidth}
                 minWidth={CHAT_MIN}
-                maxWidth={CHAT_MAX}
+                maxWidth={chatMax}
               />
             </div>
-            <div className={`flex flex-col overflow-hidden bg-background${previewVisible ? " min-w-0 flex-1" : " shrink-0"}`}>
+            <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-background">
               <div
                 className="flex min-h-0 min-w-0 flex-1 flex-col"
                 style={{
@@ -284,7 +282,7 @@ export function AppLayout({ gitBashError }: AppLayoutProps) {
                 <div className="flex min-h-0 flex-1">
                   {fileTreeOpen && (
                     <div
-                      className="relative flex shrink-0 flex-col overflow-hidden"
+                      className={`relative flex flex-col overflow-hidden${previewVisible ? " shrink-0" : " flex-1"}`}
                       style={{ width: fileTreeWidth, minWidth: FILE_TREE_MIN }}
                     >
                       <FileTreePanel />
