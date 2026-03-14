@@ -117,7 +117,7 @@ function WorkspaceRootNode({
   const setPendingExpandPath = useFilePreviewStore((s) => s.setPendingExpandPath);
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspace?.id);
 
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
   const [rootEntries, setRootEntries] = useState<ListDirEntry[] | null>(null);
   const [rootLoaded, setRootLoaded] = useState(false);
   const [expandedDirs, setExpandedDirs] = useState<Set<string>>(new Set());
@@ -184,8 +184,8 @@ function WorkspaceRootNode({
   }, [workspaceRoot, fileTreeShowHidden, loadOrder]);
 
   useEffect(() => {
-    if (workspaceRoot && !rootLoaded) loadRoot();
-  }, [workspaceRoot, rootLoaded, loadRoot]);
+    if (workspaceRoot && !rootLoaded && expanded) loadRoot();
+  }, [workspaceRoot, rootLoaded, loadRoot, expanded]);
 
   useEffect(() => {
     const toLoad = [...expandedDirs].filter((p) => loadedChildren[p] === undefined);
