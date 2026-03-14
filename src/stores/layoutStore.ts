@@ -47,9 +47,10 @@ function getSidebarMax(): number {
   return Math.max(SIDEBAR_MIN_W, Math.floor(getViewportWidth() * 0.5));
 }
 
-/** Chat max: viewport minus sidebar and a 100px buffer for file panel */
-function getChatMax(): number {
-  return Math.max(CHAT_MIN, getViewportWidth() - SIDEBAR_MIN_W - 100);
+/** Chat max: viewport minus actual sidebar width and a 100px buffer for file panel */
+function getChatMax(sidebarWidth: number, sidebarOpen: boolean): number {
+  const sidebar = sidebarOpen ? sidebarWidth : 0;
+  return Math.max(CHAT_MIN, getViewportWidth() - sidebar - 100);
 }
 
 const FILE_TREE_MIN = 200;
@@ -86,7 +87,9 @@ export const useLayoutStore = create<LayoutState>()((set, get) => ({
 
   chatWidth: 640,
   setChatWidth: (width) => {
-    set({ chatWidth: Math.min(getChatMax(), Math.max(CHAT_MIN, width)) });
+    const s = get();
+    const max = getChatMax(s.leftSidebarWidth, s.leftSidebarOpen);
+    set({ chatWidth: Math.min(max, Math.max(CHAT_MIN, width)) });
     persistLayout(get());
   },
 
@@ -169,10 +172,12 @@ export const useLayoutStore = create<LayoutState>()((set, get) => ({
   },
   init: async () => {
     const config = await readConfig<LayoutConfig>("layout");
+    const clampedSidebar = Math.min(getSidebarMax(), Math.max(SIDEBAR_MIN_W, config.leftSidebarWidth));
+    const chatMax = getChatMax(clampedSidebar, config.leftSidebarOpen);
     set({
       leftSidebarOpen: config.leftSidebarOpen,
-      leftSidebarWidth: Math.min(getSidebarMax(), Math.max(SIDEBAR_MIN_W, config.leftSidebarWidth)),
-      chatWidth: Math.min(getChatMax(), Math.max(CHAT_MIN, config.chatWidth)),
+      leftSidebarWidth: clampedSidebar,
+      chatWidth: Math.min(chatMax, Math.max(CHAT_MIN, config.chatWidth)),
       filePanelOpen: config.filePanelOpen,
       fileTreeOpen: config.filePanelOpen ? true : config.fileTreeOpen,
       filePreviewOpen: config.filePreviewOpen,

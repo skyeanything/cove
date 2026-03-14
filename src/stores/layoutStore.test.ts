@@ -58,11 +58,11 @@ describe("layoutStore", () => {
       expect(useLayoutStore.getState().chatWidth).toBe(360);
     });
 
-    it("clamps to viewport-based maximum", () => {
-      // In Node test env, window is undefined; fallback viewport = 1440
-      // max = 1440 - 200 (sidebar min) - 100 (buffer) = 1140
+    it("clamps to viewport-based maximum using actual sidebar width", () => {
+      // Fallback viewport = 1440, default sidebar = 260 (open)
+      // max = 1440 - 260 - 100 = 1080
       useLayoutStore.getState().setChatWidth(20000);
-      expect(useLayoutStore.getState().chatWidth).toBe(1140);
+      expect(useLayoutStore.getState().chatWidth).toBe(1080);
     });
   });
 
@@ -337,8 +337,8 @@ describe("layoutStore", () => {
       const s = useLayoutStore.getState();
       // sidebar max = floor(1440 * 0.5) = 720
       expect(s.leftSidebarWidth).toBe(720);
-      // chat max = 1440 - 200 - 100 = 1140
-      expect(s.chatWidth).toBe(1140);
+      // chat max = 1440 - 720 (clamped sidebar) - 100 = 620
+      expect(s.chatWidth).toBe(620);
     });
 
     it("ensures file tree open when panel is open, preserves preview state", async () => {

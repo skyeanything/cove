@@ -18,12 +18,10 @@ import { GitBashBanner } from "@/components/common/GitBashBanner";
 import { FloatingPreviewProvider } from "@/components/preview/FloatingPreviewPopup";
 import { openSettingsWindow } from "@/lib/settings-window";
 import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
-
-const SIDEBAR_MIN = 200;
-const CHAT_MIN = 480;
-const FILE_TREE_MIN = 200;
-const FILE_TREE_MAX = 480;
-const FILE_PREVIEW_MIN = 200;
+import {
+  SIDEBAR_MIN, CHAT_MIN, FILE_TREE_MIN, FILE_TREE_MAX, FILE_PREVIEW_MIN,
+  computeSidebarMax, computeChatMax,
+} from "./layout-utils";
 
 interface AppLayoutProps {
   gitBashError?: string | null;
@@ -51,8 +49,8 @@ export function AppLayout({ gitBashError }: AppLayoutProps) {
 
   const [modelSelectorOpen, setModelSelectorOpen] = useState(false);
   const [searchMessagesOpen, setSearchMessagesOpen] = useState(false);
-  const sidebarMax = Math.max(SIDEBAR_MIN, Math.floor(window.innerWidth * 0.5));
-  const chatMax = Math.max(CHAT_MIN, window.innerWidth - (leftOpen ? leftSidebarWidth : SIDEBAR_MIN) - 100);
+  const sidebarMax = computeSidebarMax(window.innerWidth);
+  const chatMax = computeChatMax(window.innerWidth, leftOpen, leftSidebarWidth);
   const middleSectionRef = useRef<HTMLDivElement>(null);
   const [chatColumnCloseTarget, setChatColumnCloseTarget] = useState<number | null>(null);
   const [chatColumnOpenTarget, setChatColumnOpenTarget] = useState<number | null>(null);
