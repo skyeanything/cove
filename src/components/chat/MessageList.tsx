@@ -4,6 +4,7 @@ import {
   Check,
   X,
   ChevronRight,
+  Info,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEffect, useRef, useState, useCallback, memo } from "react";
@@ -27,6 +28,7 @@ const EMPTY_ATTACHMENTS: Attachment[] = [];
 
 export function MessageList() {
   const messages = useChatStore((s) => s.messages);
+  const modelChangeLog = useChatStore((s) => s.modelChangeLog);
   const { isStreaming, streamingContent, streamingReasoning, streamingToolCalls, streamingParts } = useChatStreamState();
 
   const hasOrderedStreamingParts = streamingParts.length > 0;
@@ -48,7 +50,14 @@ export function MessageList() {
       <div ref={scrollRef} className="absolute inset-0 overflow-y-auto overflow-x-hidden">
         <div className="mx-auto w-full max-w-[896px] px-4 py-6">
           {messages.map((msg) => (
-            <MessageBubble key={msg.id} message={msg} />
+            <div key={msg.id}>
+              <MessageBubble message={msg} />
+              {modelChangeLog
+                .filter((e) => e.afterMessageId === msg.id)
+                .map((e) => (
+                  <ModelChangeDivider key={e.id} fromModel={e.fromModel} toModel={e.toModel} />
+                ))}
+            </div>
           ))}
           {isStreaming && (
             <AssistantMessage
@@ -241,6 +250,19 @@ function SummaryCard({ content }: { content: string }) {
           {content}
         </div>
       )}
+    </div>
+  );
+}
+
+function ModelChangeDivider({ fromModel, toModel }: { fromModel: string; toModel: string }) {
+  return (
+    <div className="my-4 flex items-center gap-3 text-[12px] text-foreground-tertiary">
+      <div className="h-px flex-1 bg-border" />
+      <div className="flex items-center gap-1.5 shrink-0">
+        <Info className="size-3.5" strokeWidth={1.5} />
+        <span>模型已从 <span className="font-medium text-foreground-secondary">{fromModel}</span> 更改为 <span className="font-medium text-foreground-secondary">{toModel}</span>。</span>
+      </div>
+      <div className="h-px flex-1 bg-border" />
     </div>
   );
 }

@@ -1,3 +1,4 @@
+// FILE_SIZE_EXCEPTION: ChatInput consolidates input, toolbar, mention detection, attach, history navigation, and web search toggle
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { useChatStore } from "@/stores/chatStore";
@@ -32,6 +33,47 @@ import {
 import type { SkillMeta } from "@/lib/ai/skills/types";
 
 const IME_COMMIT_GRACE_MS = 150;
+
+/** Cycles through short hint texts inside the empty-state placeholder. */
+function RotatingPlaceholder() {
+  const { i18n } = useTranslation();
+  const isZh = i18n.language === "zh";
+  const hints = isZh
+    ? ["输入 @ 调用技能或工具", "输入 / 执行命令或关联工作区"]
+    : ["type @ for skills & tools", "type / for commands or workspace"];
+  const [idx, setIdx] = useState(0);
+  const [visible, setVisible] = useState(true);
+  const switchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    const cycleTimer = setInterval(() => {
+      setVisible(false);
+      switchTimerRef.current = setTimeout(() => {
+        setIdx((i) => (i + 1) % 2);
+        setVisible(true);
+      }, 220);
+    }, 3200);
+    return () => {
+      clearInterval(cycleTimer);
+      if (switchTimerRef.current) clearTimeout(switchTimerRef.current);
+    };
+  }, []);
+
+  return (
+    <span className="text-muted-foreground select-none">
+      {isZh ? "描述任务，" : "Describe a task, "}
+      <span
+        className="inline-block transition-all duration-[220ms] ease-out"
+        style={{
+          opacity: visible ? 1 : 0,
+          transform: visible ? "translateY(0)" : "translateY(-4px)",
+        }}
+      >
+        {hints[idx]}
+      </span>
+    </span>
+  );
+}
 
 export function ChatInput({
   modelSelectorOpen: modelSelectorOpenProp,
@@ -320,14 +362,21 @@ export function ChatInput({
         <div className="rounded-lg border border-border transition-colors hover:border-accent focus-within:border-accent" onDrop={handleDrop} onDragOver={handleDragOver}>
           <AttachmentBar attachments={draftAttachments} onRemove={removeDraftAttachment} />
 
-          <textarea
-            ref={textareaRef} value={message} onChange={handleChange}
-            onCompositionEnd={() => { lastCompositionEndRef.current = Date.now(); }}
-            onKeyDown={handleKeyDown} onPaste={handlePaste}
-            placeholder={modelId ? t("chat.placeholder") : t("chat.placeholderNoModel")}
-            rows={1} disabled={!modelId}
-            className="block min-h-[44px] max-h-[200px] w-full resize-none bg-transparent px-4 pt-3 pb-1 text-[14px] leading-[1.5] placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-          />
+          <div className="relative">
+            <textarea
+              ref={textareaRef} value={message} onChange={handleChange}
+              onCompositionEnd={() => { lastCompositionEndRef.current = Date.now(); }}
+              onKeyDown={handleKeyDown} onPaste={handlePaste}
+              placeholder={!modelId ? t("chat.placeholderNoModel") : ""}
+              rows={1} disabled={!modelId}
+              className="block min-h-[44px] max-h-[200px] w-full resize-none bg-transparent px-4 pt-3 pb-1 text-[14px] leading-[1.5] placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+            />
+            {modelId && !message && (
+              <div className="pointer-events-none absolute left-0 top-0 w-full overflow-hidden px-4 pt-3 pb-1 text-[14px] leading-[1.5]">
+                <RotatingPlaceholder />
+              </div>
+            )}
+          </div>
 
           {showSlashCommands && slashFilteredSkills.length > 0 && (
             <div className="max-h-48 overflow-auto border-t border-border bg-background-secondary/80">

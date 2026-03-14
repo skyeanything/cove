@@ -75,6 +75,8 @@ interface ChatState {
   modelId: string | null;
   providerId: string | null;
   providerType: string | null;
+  /** In-memory model change notices — not persisted, cleared on conversation load */
+  modelChangeLog: Array<{ id: string; fromModel: string; toModel: string; afterMessageId: string | null }>;
 
   loadMessages: (conversationId: string) => Promise<void>;
   selectModel: (providerId: string, modelId: string, providerType: string) => void;
@@ -99,6 +101,7 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   modelId: null,
   providerId: null,
   providerType: null,
+  modelChangeLog: [],
 
   async loadMessages(conversationId: string) {
     const [messages, conversation] = await Promise.all([
@@ -112,12 +115,24 @@ export const useChatStore = create<ChatState>()((set, get) => ({
         if (attachments.length > 0) attachmentsByMessage[message.id] = attachments;
       }),
     );
-    set({ messages, attachmentsByMessage, draftAttachments: [], error: null, summaryUpTo: conversation?.summary_up_to ?? null });
+    set({ messages, attachmentsByMessage, draftAttachments: [], error: null, summaryUpTo: conversation?.summary_up_to ?? null, modelChangeLog: [] });
     await useWorkspaceStore.getState().loadFromConversation(conversationId);
   },
 
   selectModel(providerId: string, modelId: string, providerType: string) {
-    set({ providerId, modelId, providerType });
+    const { modelId: prevModelId, messages, modelChangeLog } = get();
+    if (prevModelId && prevModelId !== modelId && messages.length > 0) {
+      const lastMsg = messages[messages.length - 1];
+      const entry = {
+        id: `model-change-${Date.now()}`,
+        fromModel: prevModelId,
+        toModel: modelId,
+        afterMessageId: lastMsg?.id ?? null,
+      };
+      set({ providerId, modelId, providerType, modelChangeLog: [...modelChangeLog, entry] });
+    } else {
+      set({ providerId, modelId, providerType });
+    }
     settingsRepo.set(LAST_MODEL_KEY, JSON.stringify({ providerId, modelId, providerType }));
   },
 
@@ -467,6 +482,6 @@ export const useChatStore = create<ChatState>()((set, get) => ({
   },
 
   reset() {
-    set({ messages: [], attachmentsByMessage: {}, draftAttachments: [], error: null, summaryUpTo: null });
+    set({ messages: [], attachmentsByMessage: {}, draftAttachments: [], error: null, summaryUpTo: null, modelChangeLog: [] });
   },
 }));
